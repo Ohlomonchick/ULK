@@ -55,8 +55,11 @@ class User(AbstractUser):
     platoon = models.ForeignKey(Platoon,
                                 related_name="students",
                                 on_delete=models.CASCADE,
-                                default=Platoon.get_default_platoon,
-                                verbose_name="взвод")
+                                verbose_name="взвод",
+                                null = True)
+    
+    def save(self, *args, **kwargs):
+        super(User, self).save(args, kwargs)
 
     class Meta:
         verbose_name = 'Пользователь'

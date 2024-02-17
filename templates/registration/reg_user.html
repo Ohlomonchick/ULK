@@ -1,0 +1,23 @@
+{% extends 'interface/base.html' %}
+
+{% block content %}
+    <div class="columns is-centered">
+        <div class="column is-narrow">
+            <div class="box">
+                <h2 class="title is-2">Вход в аккаунт</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="field">
+                            <label class="label" for="{{ field.auto_id }}">{{ field.label }}</label>
+                            <div class="control">
+                                {{ field }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                     <button class="button is-black" type="submit">Войти</button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

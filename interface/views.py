@@ -1,8 +1,12 @@
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
-
-from interface.models import Lab, Answers
+import logging
+from interface.models import Lab, Answers, User, Platoon
 from interface.forms import LabAnswerForm
+
+from django.contrib.auth import login, authenticate
+from interface.forms import SignUpForm
+from django.shortcuts import render, redirect
 
 
 class LabDetailView(DetailView):
@@ -34,3 +38,25 @@ class LabListView(ListView):
 
 
 
+def registration(request):
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        platoon = int(request.POST.get('platoon'))
+        if not Platoon.objects.filter(id = platoon).exists():
+            Platoon.objects.create(id = platoon)
+        platoon = Platoon.objects.get(id = platoon)
+        form.platoon = platoon
+        if form.is_valid():
+            usname = request.POST.get('name') + " " + request.POST.get('second_name')
+            if User.objects.filter(username = usname).exists():
+                user = User.objects.get(username = usname)
+            else:
+                user = form.save(commit = False)
+                user.username = usname
+                user = form.save()
+            authenticate(user)
+            login(request, user)
+            return redirect('/cyberpolygon/')
+    else:
+        form = SignUpForm()
+    return render(request, 'registration/reg_user.html', {'form': form})
