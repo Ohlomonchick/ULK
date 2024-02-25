@@ -37,6 +37,33 @@ class LabListView(ListView):
     model = Lab
 
 
+class PlatoonDetailView(DetailView):
+    model = Platoon
+    pk_url_kwarg = 'id'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_list = User.objects.filter(platoon = context["platoon"]).exclude(username = "admin")
+        context["user_list"] = user_list
+        logging.debug(context)
+        return context
+
+
+class PlatoonListView(ListView):
+    model = Platoon
+
+
+class UserDetailView(DetailView):
+    model = User
+    pk_url_kwarg = 'id'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["user"] = User.objects.filter(username = "admin").first()
+        logging.debug(context)
+        logging.debug(context["object"].username)
+        return context
+
 
 def registration(request):
     if request.method == 'POST':

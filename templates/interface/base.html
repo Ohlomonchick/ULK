@@ -29,6 +29,12 @@
         Документация
       </a>
 
+      {% if user.is_superuser %}
+        <a class="navbar-item" href = "{% url 'interface:platoon-list' %}">
+          Список взводов
+        </a>
+      {% endif %}
+
       <div class="navbar-item has-dropdown is-hoverable">
         <a class="navbar-link">
           Другое

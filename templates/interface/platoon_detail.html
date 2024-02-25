@@ -1,0 +1,29 @@
+
+{% extends 'interface/base.html' %}
+
+{% block content %}
+{% if user.is_superuser %}
+    <div class="columns is-centered">
+        <div class="column is-two-thirds">
+            <h1 class="title is-2">{{ object.number }}</h1>
+            <p class = "content is-medium">Список студентов данного взвода или группы.</p>
+                {% for student in user_list %}
+                <label class="checkbox">
+                    <input type="checkbox">
+                    <b>Выбрать всех студентов данного взвода.</b>
+                    <div class="field">
+                        <div class="box">
+                            <label class="is-checkradio">
+                                <input type="checkbox">
+                                <a href = " {% url 'interface:user-detail' student.id %}">{{student.username}}</a>
+                            </label>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <h2 class="title is-3">Студентов нет</h2>
+                </label>
+                {% endfor %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

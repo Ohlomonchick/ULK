@@ -56,7 +56,7 @@ class User(AbstractUser):
                                 related_name="students",
                                 on_delete=models.CASCADE,
                                 verbose_name="взвод",
-                                null = True)
+                                null=True)
     
     def save(self, *args, **kwargs):
         super(User, self).save(args, kwargs)

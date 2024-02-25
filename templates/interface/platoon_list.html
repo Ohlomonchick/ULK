@@ -1,0 +1,21 @@
+{% extends 'interface/base.html' %}
+
+{% block content %}
+{% if user.is_superuser %}
+<div class="block">
+
+<h1 class="title is-1">Взвода</h1>
+<ul>
+{% for plat in object_list %}
+    <div class="box">
+        <h2 class="title is-3 is-link"><a href=" {% url 'interface:platoon-detail' plat.id %}">{{ plat.number }}</a></h2>
+    </div>
+{% empty %}
+    <li>Взводов нет.</li>
+{% endfor %}
+</ul>
+
+
+</div>
+{% endif %}
+{% endblock %}
