@@ -8,6 +8,16 @@ from .models import *
 class SomeModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     summernote_fields = '__all__'
 
+class PlatoonModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
+    summernote_fields = '__all__'
+    change_form_template = "../templates/admin/set_lab_to_platoon.html"
+
+class IssuedLabsModel(admin.ModelAdmin):
+    list_display = ("lab", "user", "end_date", "done")
+    list_filter = ("user", "lab")
+    # search_fields = ("user",)
+
+    fieldsets = admin.ModelAdmin.fieldsets
 
 class MyUserAdmin(UserAdmin):
     list_display = ("username", "is_staff", "platoon")
@@ -19,5 +29,6 @@ class MyUserAdmin(UserAdmin):
 
 
 admin.site.register(Lab, SomeModelAdmin)
-admin.site.register(Platoon, admin.ModelAdmin)
+admin.site.register(Platoon, PlatoonModelAdmin)
 admin.site.register(User, MyUserAdmin)
+admin.site.register(IssuedLabs, IssuedLabsModel)

@@ -1,7 +1,7 @@
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 import logging
-from interface.models import Lab, Answers, User, Platoon
+from interface.models import Lab, Answers, User, Platoon, IssuedLabs
 from interface.forms import LabAnswerForm
 
 from django.contrib.auth import login, authenticate
@@ -18,12 +18,15 @@ class LabDetailView(DetailView):
         context["submitted"] = False
         if self.request.user.is_authenticated:
             answered = Answers.objects.filter(lab=context["object"], user=self.request.user).first()
+            issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=self.request.user).first()
             if answered is None:
                 answer = self.request.GET.get("answer_flag")
                 if answer:
                     if answer == context["object"].answer_flag:
                         context["submitted"] = True
                         answer_object = Answers(lab=context["object"], user=self.request.user)
+                        issuedLab.done = True
+                        issuedLab.save()
                         answer_object.save()
                     else:
                         context["form"].fields["answer_flag"].label = "Неверный флаг!"
@@ -35,6 +38,19 @@ class LabDetailView(DetailView):
 
 class LabListView(ListView):
     model = Lab
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if not self.request.user.is_superuser:
+            labs = []
+            issues = IssuedLabs.objects.filter(user = self.request.user).exclude(done = True)
+            for issue in issues:
+                labs.append(issue.lab)
+            labs_set = set(labs)
+            object_list = labs_set
+            context["object_list"] = object_list
+        logging.debug(context)
+        return context
 
 
 class PlatoonDetailView(DetailView):
@@ -52,6 +68,20 @@ class PlatoonDetailView(DetailView):
 class PlatoonListView(ListView):
     model = Platoon
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        platoons_progress = {}
+        for platoon in context["object_list"]:
+            platoons_progress[platoon] = {"total":0, "submitted":0, "progress":0}
+            user_list = User.objects.filter(platoon = platoon).exclude(username = "admin")
+            for user in user_list:
+                platoons_progress[platoon]["total"] += len(IssuedLabs.objects.filter(user = user))
+                platoons_progress[platoon]["submitted"] += len(IssuedLabs.objects.filter(user = user).exclude(done = False))
+                platoons_progress[platoon]["progress"] += int(platoons_progress[platoon]["submitted"] / platoons_progress[platoon]["total"]) * 100
+        context["object_list"] = platoons_progress
+        logging.debug(context)
+        return context
+
 
 class UserDetailView(DetailView):
     model = User
@@ -60,8 +90,17 @@ class UserDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["user"] = User.objects.filter(username = "admin").first()
+        labs = []
+        issues = IssuedLabs.objects.filter(user = context["object"])
+        object_list = issues
+        context["object_list"] = object_list
+        total = len(issues)
+        context["total"] = total
+        submitted = len(IssuedLabs.objects.filter(user = context["object"]).exclude(done = False))
+        context["submitted"] = submitted
+        progress = int((submitted / total) * 100)
+        context["progress"] = progress
         logging.debug(context)
-        logging.debug(context["object"].username)
         return context
 
 

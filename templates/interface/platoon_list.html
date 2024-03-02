@@ -6,9 +6,17 @@
 
 <h1 class="title is-1">Взвода</h1>
 <ul>
-{% for plat in object_list %}
+{% for plat, info in object_list.items %}
     <div class="box">
         <h2 class="title is-3 is-link"><a href=" {% url 'interface:platoon-detail' plat.id %}">{{ plat.number }}</a></h2>
+        <h1 class = "title is-4"> Назначено: {{ info.total }} / Выполнено: {{ info.submitted}}</h1>
+        {% if info.progress >= 80%}
+        <h1 class = "title is-4 has-text-success"> Процент выполнения: {{info.progress}}%</h1>
+        {%elif info.progress >= 60%}
+        <h1 class = "title is-4 has-text-warning"> Процент выполнения: {{info.progress}}%</h1>
+        {%else%}
+        <h1 class = "title is-4 has-text-danger"> Процент выполнения: {{info.progress}}%</h1>
+        {%endif%}
     </div>
 {% empty %}
     <li>Взводов нет.</li>

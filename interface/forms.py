@@ -11,3 +11,6 @@ class SignUpForm(forms.ModelForm):
     class Meta:
         fields = ["name", "second_name", "platoon"]
         model = User
+
+# class LabAssignForm(forms.Form):
+#     lab = forms.

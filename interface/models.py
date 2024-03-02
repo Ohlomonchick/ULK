@@ -65,3 +65,18 @@ class User(AbstractUser):
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
 
+
+class IssuedLabs(models.Model):
+    lab = models.ForeignKey(Lab, related_name="lab_for_issue", on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    date_of_appointment = models.DateField('Дата назначения')
+    end_date = models.DateField('Дата окончания')
+    done = models.BooleanField('Завершено')
+
+    # def __str__(self):
+    #     return str(self.lab.name) + " " + str(self.user.username)
+
+    class Meta:
+        verbose_name = 'Назначенная работа'
+        verbose_name_plural = 'Назначенные работы'
+
