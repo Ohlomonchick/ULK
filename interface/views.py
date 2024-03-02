@@ -9,6 +9,9 @@ from interface.forms import SignUpForm
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
+from interface.serializers import *
+from rest_framework import viewsets
+
 
 class LabDetailView(DetailView):
     model = Lab
@@ -199,3 +202,8 @@ def registration(request):
     else:
         form = SignUpForm()
     return render(request, 'registration/reg_user.html', {'form': form})
+
+
+class AnswerAPIView(viewsets.ModelViewSet):
+    queryset = Answers.objects.all()
+    serializer_class = AnswerSerializer
