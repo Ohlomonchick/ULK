@@ -1,0 +1,80 @@
+
+{% extends 'interface/base.html' %}
+
+{% block content %}
+    <div class="columns is-centered">
+        <div class="column is-two-thirds">
+        {% if available  %}
+            <h1 class="title is-2">{{ object.lab.name }}</h1>
+            <div class="column is-one-quarter p-0 mb-4">
+                <div id="timer" class="message is-dark">
+                    <div class="message-body">
+                    <h2 class="has-text-weight-bold">Оставшееся время:</h2>
+                    <div id="countdown" class="has-text-weight-bold has-text-danger">{{ delta.hours }} <span>:</span>
+                         {{ delta.minutes }} <span>:</span>
+                         {{ delta.seconds }}
+                    </div>
+
+                    </div>
+                </div>
+            </div>
+            <p><div class="content">{{ object.lab.description | safe  }}</div></p>
+            {% if submitted %}
+                <div class="notification is-success">Вы выполнили работу!</div>
+            {% else %}
+                <form action="" method="get">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="field">
+                            <label class="label" for="{{ field.auto_id }}">{{ field.label }}</label>
+                            <div class="control">
+                                {{ field }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                    <input class="button is-danger" type="submit" value="Проверить">
+                </form>
+            {% endif %}
+        {% else  %}
+            <div class="notification is-warning is-light">
+                <h1 class="subtitle is-4">Соревнование станет доступно: {{ object.start }}</h1>
+            </div>
+        {% endif %}
+        </div>
+    </div>
+
+     <script>
+        // Function to update the countdown timer
+        function updateTimer() {
+            var hours = parseInt(document.getElementById('countdown').textContent.split(':')[0]);
+            var minutes = parseInt(document.getElementById('countdown').textContent.split(':')[1]);
+            var seconds = parseInt(document.getElementById('countdown').textContent.split(':')[2]);
+
+            if (seconds > 0) {
+                seconds--;
+            } else {
+                if (minutes > 0) {
+                    minutes--;
+                    seconds = 59;
+                } else {
+                    if (hours > 0) {
+                        hours--;
+                        minutes = 59;
+                        seconds = 59;
+                    } else {
+                        // Timer has reached zero, you can handle this case as needed
+                    }
+                }
+            }
+
+            // Update the timer display
+            document.getElementById('countdown').textContent =
+                (hours < 10 ? '0' : '') + hours + ' : ' +
+                (minutes < 10 ? '0' : '') + minutes + ' : ' +
+                (seconds < 10 ? '0' : '') + seconds;
+        }
+
+        // Update the timer every second
+        setInterval(updateTimer, 1000);
+    </script>
+{% endblock %}

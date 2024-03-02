@@ -7,6 +7,7 @@ from .models import *
 
 class SomeModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     summernote_fields = '__all__'
+    exclude = ('slug',)
 
 
 class MyUserAdmin(UserAdmin):
@@ -18,6 +19,12 @@ class MyUserAdmin(UserAdmin):
     search_fields = ("platoon",)
 
 
+class CompetitionAdmin(admin.ModelAdmin):
+    exclude = ('slug', )
+    list_display = ("start", "lab")
+
+
 admin.site.register(Lab, SomeModelAdmin)
 admin.site.register(Platoon, admin.ModelAdmin)
+admin.site.register(Competition, CompetitionAdmin)
 admin.site.register(User, MyUserAdmin)

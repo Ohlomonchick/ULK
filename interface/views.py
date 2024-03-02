@@ -1,12 +1,13 @@
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 import logging
-from interface.models import Lab, Answers, User, Platoon
+from interface.models import *
 from interface.forms import LabAnswerForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm
 from django.shortcuts import render, redirect
+from django.utils import timezone
 
 
 class LabDetailView(DetailView):
@@ -14,27 +15,76 @@ class LabDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context = LabDetailView.set_submitted(context, self.request)
+        return context
+
+    @staticmethod
+    def set_submitted(context, request):
         context["form"] = LabAnswerForm()
         context["submitted"] = False
-        if self.request.user.is_authenticated:
-            answered = Answers.objects.filter(lab=context["object"], user=self.request.user).first()
+        lab = context["object"]
+        if request.user.is_authenticated:
+            answered = Answers.objects.filter(lab=lab, user=request.user).first()
             if answered is None:
-                answer = self.request.GET.get("answer_flag")
+                answer = request.GET.get("answer_flag")
                 if answer:
-                    if answer == context["object"].answer_flag:
+                    if answer == lab.answer_flag:
                         context["submitted"] = True
-                        answer_object = Answers(lab=context["object"], user=self.request.user)
+                        answer_object = Answers(lab=lab, user=request.user, datetime=timezone.now())
                         answer_object.save()
                     else:
                         context["form"].fields["answer_flag"].label = "Неверный флаг!"
             else:
                 context["submitted"] = True
-
         return context
 
 
 class LabListView(ListView):
     model = Lab
+
+
+class CompetitionListView(ListView):
+    model = Competition
+
+    def get_queryset(self):
+        queryset = []
+        if self.request.user.is_authenticated:
+            queryset = Competition.objects.all().filter(platoons__in=[self.request.user.platoon])
+        return queryset
+
+
+class CompetitionDetailView(DetailView):
+    model = Competition
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context["available"] = True
+
+        if timezone.now() < context["object"].start or timezone.now() > context["object"].finish:
+            context["available"] = False
+            return context
+
+        competition = context["object"]
+        context["object"] = competition.lab
+        context = LabDetailView.set_submitted(context, self.request)
+
+        context["object"] = competition
+
+        context["delta"] = CompetitionDetailView.get_timer(context["object"])
+
+        return context
+
+    @staticmethod
+    def get_timer(competition):
+        delta = (competition.finish - timezone.now()).seconds
+        seconds = delta % 60
+        delta //= 60
+        minutes = delta % 60
+        hours = delta // 60
+
+        return {"hours": hours, "minutes": minutes, "seconds": seconds}
+
 
 
 class PlatoonDetailView(DetailView):

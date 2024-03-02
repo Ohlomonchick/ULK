@@ -25,8 +25,8 @@
         Главная
       </a>
 
-      <a class="navbar-item">
-        Документация
+      <a class="navbar-item" href="{% url 'interface:competition-list' %}">
+        Соревнования
       </a>
 
       {% if user.is_superuser %}

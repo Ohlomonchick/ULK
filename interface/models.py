@@ -3,6 +3,7 @@ from django.utils.text import slugify
 from django_summernote.models import AbstractAttachment
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.template.defaultfilters import slugify
 
 
 class Lab(models.Model):
@@ -26,6 +27,7 @@ class Lab(models.Model):
 class Answers(models.Model):
     lab = models.ForeignKey(Lab, related_name="lab", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    datetime = models.DateTimeField(null=True)
 
 
 class Platoon(models.Model):
@@ -64,4 +66,26 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+
+
+class Competition(models.Model):
+    slug = models.SlugField('Название в адресной строке', unique=True)
+    start = models.DateTimeField("Начало")
+    finish = models.DateTimeField("Конец")
+    lab = models.ForeignKey(Lab,
+                                related_name="competitions",
+                                on_delete=models.CASCADE,
+                                verbose_name="Лабораторная работа",
+                                null=True)
+
+    platoons = models.ManyToManyField(Platoon)
+
+    class Meta:
+        verbose_name = 'Соревнование'
+        verbose_name_plural = 'Соревнования'
+
+    def save(self, *args, **kwargs):
+        self.slug = slugify(self.lab.name + str(self.start))
+        super(Competition, self).save(*args, **kwargs)
+
 
