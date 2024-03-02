@@ -6,6 +6,30 @@
     <div class="columns is-centered">
         <div class="column is-two-thirds">
             <h1 class="title is-2">{{ object.username }}</h1>
+            <h1 class = "title is-4"> Назначено: {{ total }} / Выполнено: {{ submitted}}</h1>
+            {% if progress >= 80%}
+            <h1 class = "title is-4 has-text-success"> Процент выполнения: {{progress}}%</h1>
+            {%elif progress >= 60%}
+            <h1 class = "title is-4 has-text-warning"> Процент выполнения: {{progress}}%</h1>
+            {%else%}
+            <h1 class = "title is-4 has-text-danger"> Процент выполнения: {{progress}}%</h1>
+            {%endif%}
+            <h1 class="title is-3">Назначенные лабораторные работы</h1>
+                <ul>
+                {% for issue in object_list %}
+                    <div class="box">
+                        <h2 class="title is-3">{{ issue.lab.name }}</h2>
+                        <h2> Срок выполнения работы {{issue.end_date}}</h2>
+                        {% if issue.done %}
+                            <h2 class="tag is-success"> Выполнено </h2>
+                        {% else %}
+                            <h2 class="tag is-danger"> Выполнено </h2>
+                        {% endif %}
+                    </div>
+                {% empty %}
+                    <li>Лабораторных работ нет.</li>
+                {% endfor %}
+                </ul>
         </div>
     </div>
 {% endif %}

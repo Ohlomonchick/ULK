@@ -18,6 +18,30 @@
                     </div>
                 </div>
             </div>
+            {% if solutions %}
+                {% for solution in solutions %}
+                <table class="table">
+                  <thead>
+                    <tr>
+                        <th><abbr title="Позиция">Поз.</abbr></th>
+                        <th>Фамилия</th>
+                        <th>Имя</th>
+                        <th>Взвод</th>
+                        <th>Время</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th>{{ solution.pos }}</th>
+                      <td>{{ solution.user.name }}</td>
+                      <td>{{ solution.user.second_name }}</td>
+                      <td>{{ solution.user.platoon }}</td>
+                      <td>{{ solution.datetime }}</td>
+                     </tr>
+                  </tbody>
+                </table>
+                {% endfor  %}
+            {% endif %}
             <p><div class="content">{{ object.lab.description | safe  }}</div></p>
             {% if submitted %}
                 <div class="notification is-success">Вы выполнили работу!</div>
