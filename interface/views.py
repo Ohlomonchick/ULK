@@ -61,7 +61,16 @@ class PlatoonDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         user_list = User.objects.filter(platoon = context["platoon"]).exclude(username = "admin")
         context["user_list"] = user_list
+        competitions ={}
+        comps = Competition.objects.filter(platoons = context["platoon"])
+        for comp in comps:
+            if (comp.finish - timezone.now()).seconds < 0:
+                competitions[comp] = False
+            else: 
+                competitions[comp] = True
+        context["competitions"] = competitions
         logging.debug(context)
+        logging.debug(competitions)
         return context
 
 

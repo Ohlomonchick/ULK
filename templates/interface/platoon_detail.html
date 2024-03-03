@@ -8,20 +8,24 @@
             <h1 class="title is-2">{{ object.number }}</h1>
             <p class = "content is-medium">Список студентов данного взвода или группы.</p>
                 {% for student in user_list %}
-                <label class="checkbox">
-                    <input type="checkbox">
-                    <b>Выбрать всех студентов данного взвода.</b>
-                    <div class="field">
                         <div class="box">
-                            <label class="is-checkradio">
-                                <input type="checkbox">
                                 <a href = " {% url 'interface:user-detail' student.id %}">{{student.username}}</a>
-                            </label>
                         </div>
-                    </div>
-                    {% empty %}
-                    <h2 class="title is-3">Студентов нет</h2>
-                </label>
+                {% empty %}
+                <h2 class="title is-3">Студентов нет</h2>
+                {% endfor %}
+            <p class = "content is-medium">Список соревнований данного взвода или группы.</p>
+                {% for comp, info in competitions.items %}
+                        <div class="box">
+                            <h2 class="title is-3 is-link"><a href="{% url 'interface:competition-list' %}{{ comp.slug }}">{{ comp.lab.name }}</a></h2>
+                            {% if info %}
+                                <h2 class="tag is-success"> Идет </h2>
+                            {% else %}
+                                <h2 class="tag is-danger"> Окончено </h2>
+                            {% endif %}
+                        </div>
+                {% empty %}
+                <h2 class="title is-3">Соревнований нет</h2>
                 {% endfor %}
         </div>
     </div>
