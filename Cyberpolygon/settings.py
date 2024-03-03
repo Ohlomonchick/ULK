@@ -153,7 +153,7 @@ SUMMERNOTE_CONFIG = {
     'attachment_model': 'interface.MyAttachment',
 }
 
-LOGIN_REDIRECT_URL = "/cyberpolygon/"
+LOGIN_REDIRECT_URL = "/cyberpolygon/labs"
 LOGOUT_REDIRECT_URL = "/cyberpolygon/user/registration/"
 AUTH_USER_MODEL = 'interface.User'
 
