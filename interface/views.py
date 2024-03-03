@@ -35,8 +35,9 @@ class LabDetailView(DetailView):
                     if answer == lab.answer_flag:
                         context["submitted"] = True
                         answer_object = Answers(lab=lab, user=request.user, datetime=timezone.now())
-                        issuedLab.done = True
-                        issuedLab.save()
+                        if issuedLab:
+                            issuedLab.done = True
+                            issuedLab.save()
                         answer_object.save()
                     else:
                         context["form"].fields["answer_flag"].label = "Неверный флаг!"
@@ -105,7 +106,7 @@ class CompetitionDetailView(DetailView):
 
             context["solutions"] = solutions
 
-        print(context["solutions"])
+        # print(context["solutions"])
 
         context["object"] = competition
         context["delta"] = CompetitionDetailView.get_timer(context["object"])
@@ -198,7 +199,7 @@ def registration(request):
                 user = form.save()
             authenticate(user)
             login(request, user)
-            return redirect('/cyberpolygon/')
+            return redirect('/cyberpolygon/labs')
     else:
         form = SignUpForm()
     return render(request, 'registration/reg_user.html', {'form': form})

@@ -19,7 +19,6 @@
                 </div>
             </div>
             {% if solutions %}
-                {% for solution in solutions %}
                 <table class="table">
                   <thead>
                     <tr>
@@ -31,6 +30,7 @@
                     </tr>
                   </thead>
                   <tbody>
+                  {% for solution in solutions %}
                     <tr>
                       <th>{{ solution.pos }}</th>
                       <td>{{ solution.user.name }}</td>
@@ -38,9 +38,9 @@
                       <td>{{ solution.user.platoon }}</td>
                       <td>{{ solution.datetime }}</td>
                      </tr>
+                  {% endfor  %}
                   </tbody>
                 </table>
-                {% endfor  %}
             {% endif %}
             <p><div class="content">{{ object.lab.description | safe  }}</div></p>
             {% if submitted %}
