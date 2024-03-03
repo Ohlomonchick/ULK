@@ -20,7 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from interface.views import registration
 
-admin.site.site_url = '/cyberpolygon/'
+admin.site.site_url = '/cyberpolygon/labs'
 
 urlpatterns = [
     path('', registration),

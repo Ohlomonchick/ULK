@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-pox3rzla+uyevpp=4_zxq86riks*4)gg2ztv&h2i2xdqan9wik
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 
@@ -113,7 +113,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'ru-RU'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Moscow'
 
 USE_I18N = True
 
@@ -153,6 +153,10 @@ SUMMERNOTE_CONFIG = {
     'attachment_model': 'interface.MyAttachment',
 }
 
-LOGIN_REDIRECT_URL = "/cyberpolygon/"
+LOGIN_REDIRECT_URL = "/cyberpolygon/labs"
 LOGOUT_REDIRECT_URL = "/cyberpolygon/user/registration/"
 AUTH_USER_MODEL = 'interface.User'
+
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+XS_SHARING_ALLOWED_METHODS = ['POST','GET','OPTIONS', 'PUT', 'DELETE']

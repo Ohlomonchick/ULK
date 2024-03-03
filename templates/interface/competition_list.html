@@ -1,0 +1,20 @@
+{% extends 'interface/base.html' %}
+
+{% block content %}
+<div class="block">
+
+<h1 class="title is-1">Доступные соревнования</h1>
+<ul>
+{% for comp in object_list %}
+    <div class="box">
+        <h2 class="title is-3 is-link"><a href="{% url 'interface:competition-list' %}{{ comp.slug }}">{{ comp.lab.name }}</a></h2>
+        <h4 class="subtitle is-5">Начало: {{ comp.start }}</h4>
+    </div>
+{% empty %}
+    <li>Доступных соревнований нет.</li>
+{% endfor %}
+</ul>
+
+
+</div>
+{% endblock %}
