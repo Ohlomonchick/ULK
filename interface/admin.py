@@ -9,10 +9,6 @@ class SomeModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     summernote_fields = '__all__'
     exclude = ('slug',)
 
-class PlatoonModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
-    summernote_fields = '__all__'
-    change_form_template = "../templates/admin/set_lab_to_platoon.html"
-
 class IssuedLabsModel(admin.ModelAdmin):
     list_display = ("lab", "user", "end_date", "done")
     list_filter = ("user", "lab")
@@ -27,15 +23,6 @@ class MyUserAdmin(UserAdmin):
     list_filter = ("is_staff", "platoon")
 
     search_fields = ("platoon",)
-
-
-class IssuedLabsModel(admin.ModelAdmin):
-    list_display = ("lab", "user", "end_date", "done")
-    list_filter = ("user", "lab")
-    # search_fields = ("user",)
-
-    fieldsets = admin.ModelAdmin.fieldsets
-
 
 class CompetitionAdmin(admin.ModelAdmin):
     exclude = ('slug', )
