@@ -9,6 +9,9 @@ from interface.forms import SignUpForm
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
+from interface.serializers import *
+from rest_framework import viewsets
+
 
 class LabDetailView(DetailView):
     model = Lab
@@ -32,8 +35,9 @@ class LabDetailView(DetailView):
                     if answer == lab.answer_flag:
                         context["submitted"] = True
                         answer_object = Answers(lab=lab, user=request.user, datetime=timezone.now())
-                        issuedLab.done = True
-                        issuedLab.save()
+                        if issuedLab:
+                            issuedLab.done = True
+                            issuedLab.save()
                         answer_object.save()
                     else:
                         context["form"].fields["answer_flag"].label = "Неверный флаг!"
@@ -202,3 +206,8 @@ def registration(request):
     else:
         form = SignUpForm()
     return render(request, 'registration/reg_user.html', {'form': form})
+
+
+class AnswerAPIView(viewsets.ModelViewSet):
+    queryset = Answers.objects.all()
+    serializer_class = AnswerSerializer
