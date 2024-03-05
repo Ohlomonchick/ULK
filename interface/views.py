@@ -148,7 +148,7 @@ class PlatoonListView(ListView):
         context = super().get_context_data(**kwargs)
         platoons_progress = {}
         for platoon in context["object_list"]:
-            platoons_progress[platoon] = {"total":0, "submitted":0, "progress":100}
+            platoons_progress[platoon] = {"total":0, "submitted":0, "progress":0}
             user_list = User.objects.filter(platoon = platoon).exclude(username = "admin")
             for user in user_list:
                 platoons_progress[platoon]["total"] += len(IssuedLabs.objects.filter(user = user))

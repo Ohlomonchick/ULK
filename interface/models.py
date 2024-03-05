@@ -102,8 +102,3 @@ class IssuedLabs(models.Model):
     class Meta:
         verbose_name = 'Назначенная работа'
         verbose_name_plural = 'Назначенные работы'
-
-<<<<<<< HEAD
-=======
-
->>>>>>> master
