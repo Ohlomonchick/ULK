@@ -29,11 +29,6 @@ class MyUserAdmin(UserAdmin):
     search_fields = ("platoon",)
 
 
-class PlatoonModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
-    summernote_fields = '__all__'
-    change_form_template = "../templates/admin/set_lab_to_platoon.html"
-
-
 class IssuedLabsModel(admin.ModelAdmin):
     list_display = ("lab", "user", "end_date", "done")
     list_filter = ("user", "lab")
