@@ -154,7 +154,7 @@ SUMMERNOTE_CONFIG = {
 }
 
 LOGIN_REDIRECT_URL = "/cyberpolygon/labs"
-LOGOUT_REDIRECT_URL = "/cyberpolygon/user/registration/"
+LOGOUT_REDIRECT_URL = "/"
 AUTH_USER_MODEL = 'interface.User'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'

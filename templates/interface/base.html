@@ -25,10 +25,12 @@
         Главная
       </a>
 
-      <a class="navbar-item" href="{% url 'interface:competition-list' %}">
-        Соревнования
-      </a>
-
+      {% if user.is_authenticated %}
+        <a class="navbar-item" href="{% url 'interface:competition-list' %}">
+          Соревнования
+        </a>
+      {% endif %}
+      
       {% if user.is_superuser %}
         <a class="navbar-item" href = "{% url 'interface:platoon-list' %}">
           Список взводов
@@ -72,7 +74,7 @@
                     <button class="button is-light" type="submit"><strong>Выйти</strong></button>
                 </form>
             {% else %}
-              <a class="button is-primary" href="{% url 'interface:register_user' %}">
+              <a class="button is-primary" href="{% url 'reg' %}">
                 <strong>Войти как участник</strong>
               </a>
               <a class="button is-light" href="{% url 'login' %}">

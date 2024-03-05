@@ -102,8 +102,6 @@ class CompetitionDetailView(DetailView):
 
             context["solutions"] = solutions
 
-        print(context["solutions"])
-
         context["object"] = competition
         context["delta"] = CompetitionDetailView.get_timer(context["object"])
 
@@ -153,10 +151,10 @@ class PlatoonListView(ListView):
             for user in user_list:
                 platoons_progress[platoon]["total"] += len(IssuedLabs.objects.filter(user = user))
                 platoons_progress[platoon]["submitted"] += len(IssuedLabs.objects.filter(user = user).exclude(done = False))
-                if platoons_progress[platoon]["total"] == 0:
-                    platoons_progress[platoon]["progress"] = 100
-                else:
-                    platoons_progress[platoon]["progress"] += int(platoons_progress[platoon]["submitted"] / platoons_progress[platoon]["total"]) * 100
+            if platoons_progress[platoon]["total"] == 0:
+                platoons_progress[platoon]["progress"] = 100
+            else:
+                platoons_progress[platoon]["progress"] += int(platoons_progress[platoon]["submitted"] / platoons_progress[platoon]["total"]) * 100
         context["object_list"] = platoons_progress
         logging.debug(context)
         return context
@@ -190,21 +188,17 @@ def registration(request):
     if request.method == 'POST':
         form = SignUpForm(request.POST)
         platoon = int(request.POST.get('platoon'))
-        if not Platoon.objects.filter(id = platoon).exists():
-            Platoon.objects.create(id = platoon)
         platoon = Platoon.objects.get(id = platoon)
         form.platoon = platoon
         if form.is_valid():
             usname = request.POST.get('name') + " " + request.POST.get('second_name')
-            if User.objects.filter(username = usname).exists():
-                user = User.objects.get(username = usname)
+            if User.objects.filter(username = usname, platoon = platoon.id).exists():
+                user = User.objects.get(username = usname, platoon = platoon.id)
+                authenticate(user)
+                login(request, user)
+                return redirect('/cyberpolygon/labs')
             else:
-                user = form.save(commit = False)
-                user.username = usname
-                user = form.save()
-            authenticate(user)
-            login(request, user)
-            return redirect('/cyberpolygon/')
+                form = SignUpForm()
     else:
         form = SignUpForm()
     return render(request, 'registration/reg_user.html', {'form': form})

@@ -6,11 +6,8 @@ class LabAnswerForm(forms.Form):
 
 
 class SignUpForm(forms.ModelForm):
-    # platoon = forms.IntegerField(required=True, label='Взвод')
 
     class Meta:
         fields = ["name", "second_name", "platoon"]
         model = User
 
-# class LabAssignForm(forms.Form):
-#     lab = forms.

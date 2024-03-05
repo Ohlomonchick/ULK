@@ -23,7 +23,7 @@ from interface.views import registration
 admin.site.site_url = '/cyberpolygon/labs'
 
 urlpatterns = [
-    path('', registration),
+    path('', registration, name="reg"),
     path('jet/', include('jet.urls', 'jet')),
     path('cyberpolygon/', include(('interface.urls', 'interface'), namespace='interface')),
     path('admin/', admin.site.urls),
