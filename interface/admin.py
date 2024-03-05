@@ -12,6 +12,7 @@ class SomeModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
 class IssuedLabsModel(admin.ModelAdmin):
     list_display = ("lab", "user", "end_date", "done")
     list_filter = ("user", "lab")
+    exclude = ('done', )
     # search_fields = ("user",)
 
     fieldsets = admin.ModelAdmin.fieldsets

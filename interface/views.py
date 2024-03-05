@@ -10,8 +10,11 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 
 from interface.serializers import *
-from rest_framework import viewsets
-
+from rest_framework import viewsets, status
+from rest_framework.decorators import api_view
+from django.http.response import JsonResponse
+from urllib.parse import unquote
+import json
 
 class LabDetailView(DetailView):
     model = Lab
@@ -211,3 +214,65 @@ def registration(request):
 class AnswerAPIView(viewsets.ModelViewSet):
     queryset = Answers.objects.all()
     serializer_class = AnswerSerializer
+
+
+
+
+# Хардкодный ответ (генерация потом)
+hardcode = r"""/testdir/ 1 1 1 1 1 1 1 1 1 1
+./ d1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
+d1/ d2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
+d1/ f1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
+d1/ f3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
+# 
+
+@api_view(['GET'])
+def start_lab(request):
+    if request.method == 'GET':
+        logging.debug(request.body)
+        data = json.loads(request.body.decode('utf-8'))
+        username = data.get("username")
+        lab_name = data.get("lab")
+        if username and lab_name:
+            user = User.objects.filter(username = username).first()
+            lab = Lab.objects.filter(name = lab_name).first()
+            if user and lab:
+                issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user)
+                if issue:
+                    data = {
+                        "variant":1,
+                        "task": hardcode
+                    }
+                    return JsonResponse(data)
+                else:
+                    return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND) 
+            else:
+                return JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND) 
+        else:
+                return JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST) 
+
+
+@api_view(['POST'])
+def end_lab(request):
+    if request.method == 'POST':
+        logging.debug(request.body)
+        data = json.loads(request.body.decode('utf-8'))
+        username = data.get("username")
+        lab_name = data.get("lab")
+        if username and lab_name:
+            user = User.objects.filter(username = username).first()
+            lab = Lab.objects.filter(name = lab_name).first()
+            if user and lab:
+                issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user).first()
+                if issue and not lab.answer_flag and not issue.done:
+                    ans = Answers(lab=lab, user=user, datetime=timezone.now())
+                    ans.save()
+                    issue.done = True
+                    issue.save()
+                    return JsonResponse({'message': 'Task finished'})
+                else:
+                    return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND) 
+            else:
+                return JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND) 
+        else:
+                return JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)

@@ -43,7 +43,7 @@
                 </table>
             {% endif %}
             <p><div class="content">{{ object.lab.description | safe  }}</div></p>
-            {% if not user.is_superuser %}
+            {% if not user.is_superuser and object.lab.answer_flag %}
                 {% if submitted %}
                     <div class="notification is-success">Вы выполнили работу!</div>
                 {% else %}

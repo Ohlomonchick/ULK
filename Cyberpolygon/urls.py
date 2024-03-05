@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from interface.views import registration, AnswerAPIView
+from interface.views import registration, AnswerAPIView, start_lab, end_lab
 
 admin.site.site_url = '/cyberpolygon/labs'
 
@@ -26,6 +26,8 @@ urlpatterns = [
     path('', registration, name="reg"),
     path('api/', include('rest_framework.urls')),
     path("api/answers", AnswerAPIView.as_view({'get': 'list', 'post': 'create'})),
+    path("api/start", start_lab),
+    path("api/end", end_lab),
     path('jet/', include('jet.urls', 'jet')),
     path('cyberpolygon/', include(('interface.urls', 'interface'), namespace='interface')),
     path('admin/', admin.site.urls),

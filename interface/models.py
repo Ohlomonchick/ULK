@@ -9,7 +9,7 @@ from django.template.defaultfilters import slugify
 class Lab(models.Model):
     name = models.CharField('Имя', max_length=255, primary_key=True)
     description = models.TextField('Описание')
-    answer_flag = models.CharField('Ответный флаг', max_length=1024, null=True)
+    answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True,null=True)
     slug = models.SlugField('Название в адресной строке', unique=True)
 
     def __str__(self):
@@ -94,7 +94,7 @@ class IssuedLabs(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     date_of_appointment = models.DateField('Дата назначения')
     end_date = models.DateField('Дата окончания')
-    done = models.BooleanField('Завершено')
+    done = models.BooleanField('Завершено',default = False)
 
     # def __str__(self):
     #     return str(self.lab.name) + " " + str(self.user.username)

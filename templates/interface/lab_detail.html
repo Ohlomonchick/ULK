@@ -6,7 +6,7 @@
         <div class="column is-two-thirds">
             <h1 class="title is-2">{{ object.name }}</h1>
             <p><div class="content">{{ object.description | safe  }}</div></p>
-            {% if not user.is_superuser %}
+            {% if not user.is_superuser and object.answer_flag %}
                 {% if submitted %}
                     <div class="notification is-success">Вы выполнили работу!</div>
                 {% else %}
