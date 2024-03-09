@@ -6,3 +6,4 @@ class AnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Answers
         fields = ("user", "lab", "datetime")
+

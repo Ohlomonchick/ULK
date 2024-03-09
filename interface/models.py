@@ -4,6 +4,9 @@ from django_summernote.models import AbstractAttachment
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.template.defaultfilters import slugify
+from rest_framework import serializers
+import requests
+import os
 
 
 class Lab(models.Model):
@@ -21,7 +24,18 @@ class Lab(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)
+        serializer = LabSerializer(self)
+
+        address = os.environ.get('CREATE_ADDRESS', "192.0.0.1")
+        port = os.environ.get('CREATE_PORT', "5555")
+        requests.post(f"http://{address}:{port}", data=serializer.data)
         super(Lab, self).save(*args, **kwargs)
+
+
+class LabSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lab
+        fields = ("name", "description")
 
 
 class Answers(models.Model):

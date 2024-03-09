@@ -86,10 +86,10 @@ class CompetitionDetailView(DetailView):
         context = super().get_context_data(**kwargs)
 
         context["available"] = True
-
-        if timezone.now() < context["object"].start or timezone.now() > context["object"].finish:
-            context["available"] = False
-            return context
+        if not self.request.user.is_staff:
+            if timezone.now() < context["object"].start or timezone.now() > context["object"].finish:
+                context["available"] = False
+                return context
 
         competition = context["object"]
         context["object"] = competition.lab
@@ -122,7 +122,12 @@ class CompetitionDetailView(DetailView):
         minutes = delta % 60
         hours = delta // 60
 
-        return {"hours": hours, "minutes": minutes, "seconds": seconds}
+        out = {"hours": hours, "minutes": minutes, "seconds": seconds}
+        for key, value in out.items():
+            n_value = str(value)
+            n_value = (2 - len(n_value)) * "0" + n_value
+            out[key] = n_value
+        return out
 
 
 class PlatoonDetailView(DetailView):
@@ -174,7 +179,6 @@ class UserDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["user"] = User.objects.filter(username = "admin").first()
-        labs = []
         issues = IssuedLabs.objects.filter(user = context["object"])
         object_list = issues
         context["object_list"] = object_list

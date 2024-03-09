@@ -71,6 +71,12 @@
 
      <script>
         // Function to update the countdown timer
+        {% if solutions %}
+            setTimeout('location.reload()', 30000);
+        {% else %}
+            setTimeout('location.reload()', 2 * 60000 + Math.floor(Math.random() * 5000));
+        {% endif %}
+
         function updateTimer() {
             var hours = parseInt(document.getElementById('countdown').textContent.split(':')[0]);
             var minutes = parseInt(document.getElementById('countdown').textContent.split(':')[1]);
@@ -88,7 +94,7 @@
                         minutes = 59;
                         seconds = 59;
                     } else {
-                        // Timer has reached zero, you can handle this case as needed
+                        location.reload();
                     }
                 }
             }
