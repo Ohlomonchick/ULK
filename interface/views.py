@@ -30,9 +30,12 @@ class LabDetailView(DetailView):
         context["submitted"] = False
         lab = context["object"]
         if request.user.is_authenticated:
-            answered = Answers.objects.filter(lab=lab, user=request.user).first()
-            issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=request.user).first()
-            if answered is None:
+            now = timezone.now()
+            issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=request.user, end_date__gte = now, date_of_appointment__lte = now ).exclude(done = True).first()
+            comps = Competition.objects.filter(lab=context["object"], start__lte=now, finish__gte = now).first()
+            if comps:
+                answers = Answers.objects.filter(lab=context["object"],user=request.user, datetime__lte = comps.finish, datetime__gte = comps.start).first()
+            if issuedLab or comps and (answers is None):
                 answer = request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
@@ -87,9 +90,10 @@ class CompetitionDetailView(DetailView):
 
         context["available"] = True
 
-        if timezone.now() < context["object"].start or timezone.now() > context["object"].finish:
-            context["available"] = False
-            return context
+        if not self.request.user.is_superuser:
+            if timezone.now() < context["object"].start or timezone.now() > context["object"].finish:
+                context["available"] = False
+                return context
 
         competition = context["object"]
         context["object"] = competition.lab
@@ -98,7 +102,9 @@ class CompetitionDetailView(DetailView):
         if self.request.user.is_staff:
             solutions = Answers.objects.filter(
                 lab=competition.lab,
-                user__platoon__in=competition.platoons.all()
+                user__platoon__in=competition.platoons.all(), 
+                datetime__lte = competition.finish, 
+                datetime__gte = competition.start
             ).order_by('datetime').values()
             pos = 1
             for solution in solutions:
@@ -263,7 +269,7 @@ def end_lab(request):
             user = User.objects.filter(username = username).first()
             lab = Lab.objects.filter(name = lab_name).first()
             if user and lab:
-                issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user).first()
+                issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user).exclude(done = True).first()
                 if issue and not lab.answer_flag and not issue.done:
                     ans = Answers(lab=lab, user=user, datetime=timezone.now())
                     ans.save()
