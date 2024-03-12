@@ -244,7 +244,7 @@ def start_lab(request):
             lab = Lab.objects.filter(name = lab_name).first()
             if user and lab:
                 issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user)
-                if issue:
+                if issue and not lab.answer_flag:
                     data = {
                         "variant":1,
                         "task": hardcode
