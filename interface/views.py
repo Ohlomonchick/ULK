@@ -171,7 +171,7 @@ class PlatoonListView(ListView):
             if platoons_progress[platoon]["total"] == 0:
                 platoons_progress[platoon]["progress"] = 100
             else:
-                platoons_progress[platoon]["progress"] += int(platoons_progress[platoon]["submitted"] / platoons_progress[platoon]["total"]) * 100
+                platoons_progress[platoon]["progress"] += int((platoons_progress[platoon]["submitted"] / platoons_progress[platoon]["total"]) * 100)
         context["object_list"] = platoons_progress
         logging.debug(context)
         return context
