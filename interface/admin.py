@@ -30,8 +30,10 @@ class CompetitionAdmin(admin.ModelAdmin):
     list_display = ("start", "lab")
 
 
+
 admin.site.register(IssuedLabs, IssuedLabsModel)
 admin.site.register(Lab, SomeModelAdmin)
 admin.site.register(Platoon, admin.ModelAdmin)
 admin.site.register(Competition, CompetitionAdmin)
 admin.site.register(User, MyUserAdmin)
+admin.site.register(Answers, admin.ModelAdmin)

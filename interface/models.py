@@ -43,6 +43,13 @@ class Answers(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     datetime = models.DateTimeField(null=True)
 
+    def __str__(self):
+        return str(self.lab.name + " " +self.user.username)
+
+    class Meta:
+        verbose_name = 'Ответ'
+        verbose_name_plural = 'Ответы'
+
 
 class Platoon(models.Model):
     number = models.fields.IntegerField('Номер взвода')
