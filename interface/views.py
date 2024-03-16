@@ -30,9 +30,12 @@ class LabDetailView(DetailView):
         context["submitted"] = False
         lab = context["object"]
         if request.user.is_authenticated:
-            answered = Answers.objects.filter(lab=lab, user=request.user).first()
-            issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=request.user).first()
-            if answered is None:
+            now = timezone.now()
+            issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=request.user, end_date__gte = now, date_of_appointment__lte = now ).exclude(done = True).first()
+            comps = Competition.objects.filter(lab=context["object"], start__lte=now, finish__gte = now).first()
+            if comps:
+                answers = Answers.objects.filter(lab=context["object"],user=request.user, datetime__lte = comps.finish, datetime__gte = comps.start).first()
+            if issuedLab or comps and (answers is None):
                 answer = request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
@@ -98,7 +101,9 @@ class CompetitionDetailView(DetailView):
         if self.request.user.is_staff:
             solutions = Answers.objects.filter(
                 lab=competition.lab,
-                user__platoon__in=competition.platoons.all()
+                user__platoon__in=competition.platoons.all(), 
+                datetime__lte = competition.finish, 
+                datetime__gte = competition.start
             ).order_by('datetime').values()
             pos = 1
             for solution in solutions:
@@ -166,7 +171,7 @@ class PlatoonListView(ListView):
             if platoons_progress[platoon]["total"] == 0:
                 platoons_progress[platoon]["progress"] = 100
             else:
-                platoons_progress[platoon]["progress"] += int(platoons_progress[platoon]["submitted"] / platoons_progress[platoon]["total"]) * 100
+                platoons_progress[platoon]["progress"] += int((platoons_progress[platoon]["submitted"] / platoons_progress[platoon]["total"]) * 100)
         context["object_list"] = platoons_progress
         logging.debug(context)
         return context
@@ -242,7 +247,7 @@ def start_lab(request):
             lab = Lab.objects.filter(name = lab_name).first()
             if user and lab:
                 issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user)
-                if issue:
+                if issue and not lab.answer_flag:
                     data = {
                         "variant":1,
                         "task": hardcode
@@ -267,7 +272,7 @@ def end_lab(request):
             user = User.objects.filter(username = username).first()
             lab = Lab.objects.filter(name = lab_name).first()
             if user and lab:
-                issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user).first()
+                issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user).exclude(done = True).first()
                 if issue and not lab.answer_flag and not issue.done:
                     ans = Answers(lab=lab, user=user, datetime=timezone.now())
                     ans.save()
