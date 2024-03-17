@@ -19,7 +19,7 @@
                 {% for issue in object_list %}
                     <div class="box">
                         <h2 class="title is-3">{{ issue.lab.name }}</h2>
-                        <h2> Срок выполнения работы {{issue.end_date}}</h2>
+                        <h2> Срок выполнения работы {{ issue.end_date }}</h2>
                         {% if issue.done %}
                             <h2 class="tag is-success"> Выполнено </h2>
                         {% else %}
