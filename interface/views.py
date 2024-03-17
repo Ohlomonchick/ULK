@@ -13,8 +13,8 @@ from interface.serializers import *
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
 from django.http.response import JsonResponse
-from urllib.parse import unquote
 import json
+
 
 class LabDetailView(DetailView):
     model = Lab
@@ -74,10 +74,15 @@ class CompetitionListView(ListView):
 
     def get_queryset(self):
         queryset = []
+        current_time = timezone.now()
         if self.request.user.is_authenticated:
             queryset = Competition.objects.all()
             if not self.request.user.is_staff:
-                queryset = queryset.filter(platoons__in=[self.request.user.platoon])
+                queryset = queryset.filter(
+                    platoons__in=[self.request.user.platoon],
+                    start__lte=current_time,
+                    finish__gte=current_time
+                )
             queryset.order_by("start")
         return queryset
 
@@ -102,8 +107,8 @@ class CompetitionDetailView(DetailView):
             solutions = Answers.objects.filter(
                 lab=competition.lab,
                 user__platoon__in=competition.platoons.all(), 
-                datetime__lte = competition.finish, 
-                datetime__gte = competition.start
+                datetime__lte=competition.finish,
+                datetime__gte=competition.start
             ).order_by('datetime').values()
             pos = 1
             for solution in solutions:

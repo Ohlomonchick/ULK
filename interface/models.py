@@ -7,6 +7,7 @@ from django.template.defaultfilters import slugify
 from rest_framework import serializers
 import requests
 import os
+from django.core.exceptions import ValidationError
 
 
 class Lab(models.Model):
@@ -24,11 +25,14 @@ class Lab(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)
-        serializer = LabSerializer(self)
 
-        address = os.environ.get('CREATE_ADDRESS', "192.0.0.1")
-        port = os.environ.get('CREATE_PORT', "5555")
-        requests.post(f"http://{address}:{port}", data=serializer.data)
+        address = os.environ.get('CREATE_ADDRESS', "")
+        port = os.environ.get('CREATE_PORT', "")
+
+        if port and address:
+            serializer = LabSerializer(self)
+            requests.post(f"http://{address}:{port}", data=serializer.data)
+
         super(Lab, self).save(*args, **kwargs)
 
 
@@ -101,6 +105,10 @@ class Competition(models.Model):
                                 null=True)
 
     platoons = models.ManyToManyField(Platoon)
+
+    def clean(self):
+        if self.start >= self.finish:
+            raise ValidationError("Начало должно быть позже конца!")
 
     class Meta:
         verbose_name = 'Соревнование'
