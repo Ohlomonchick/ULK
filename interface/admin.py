@@ -21,6 +21,14 @@ class MyUserAdmin(UserAdmin):
     list_display = ("username", "is_staff", "platoon")
     fieldsets = UserAdmin.fieldsets
     fieldsets = ((None, {'fields': ('username', 'password', 'platoon')}), ) + fieldsets[1:]
+    add_fieldsets = (
+        (None, {
+            "classes": ("wide",),
+            "fields": (
+                "first_name", "last_name", "password1", "password2", "platoon"
+            )}
+        ),
+    )
     list_filter = ("is_staff", "platoon")
 
     search_fields = ("platoon",)

@@ -73,8 +73,6 @@ class MyAttachment(AbstractAttachment):
 
 
 class User(AbstractUser):
-    name = models.CharField('Имя', max_length=127, null=True)
-    second_name = models.CharField('Фамилия', max_length=127, null=True)
     platoon = models.ForeignKey(Platoon,
                                 related_name="students",
                                 on_delete=models.CASCADE,
@@ -82,6 +80,9 @@ class User(AbstractUser):
                                 null=True)
     
     def save(self, *args, **kwargs):
+        if not self.pk:
+            self.username = self.last_name + "_" + self.first_name
+            self.set_password("test.test") 
         super(User, self).save(args, kwargs)
 
     class Meta:

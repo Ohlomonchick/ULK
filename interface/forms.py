@@ -6,8 +6,11 @@ class LabAnswerForm(forms.Form):
 
 
 class SignUpForm(forms.ModelForm):
-
+    password = forms.CharField(widget=forms.PasswordInput(), label = "Пароль")
     class Meta:
-        fields = ["name", "second_name", "platoon"]
+        fields = ["first_name", "last_name", "platoon"]
         model = User
 
+class ChangePasswordForm(forms.Form):
+    password1 = forms.CharField(widget=forms.PasswordInput(), label = " Новый пароль")
+    password2 = forms.CharField(widget=forms.PasswordInput(), label = "Повторите пароль")

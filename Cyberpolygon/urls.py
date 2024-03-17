@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from interface.views import registration, AnswerAPIView, start_lab, end_lab
+from interface.views import registration, AnswerAPIView, start_lab, end_lab, change_password
 
 admin.site.site_url = '/cyberpolygon/labs'
 
@@ -33,6 +33,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('summernote/', include('django_summernote.urls')),
     path("accounts/", include("django.contrib.auth.urls")),
+    path("registration/change_password", change_password, name="ch_pass")
 ]
 
 if settings.DEBUG:

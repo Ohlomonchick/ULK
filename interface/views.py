@@ -5,7 +5,7 @@ from interface.models import *
 from interface.forms import LabAnswerForm
 
 from django.contrib.auth import login, authenticate
-from interface.forms import SignUpForm
+from interface.forms import SignUpForm, ChangePasswordForm
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
@@ -207,18 +207,38 @@ def registration(request):
         platoon = Platoon.objects.get(id = platoon)
         form.platoon = platoon
         if form.is_valid():
-            usname = request.POST.get('name') + " " + request.POST.get('second_name')
-            if User.objects.filter(username = usname, platoon = platoon.id).exists():
-                user = User.objects.get(username = usname, platoon = platoon.id)
-                authenticate(user)
-                login(request, user)
-                return redirect('/cyberpolygon/labs')
+            usname = request.POST.get('last_name') + "_" + request.POST.get('first_name')
+            passwd = request.POST.get('password')
+            user = authenticate(username = usname, password = passwd)
+            if user:
+                if user.platoon == platoon:
+                    login(request, user)
+                    if passwd == "test.test":
+                        return redirect('registration/change_password')
+                    return redirect('/cyberpolygon/labs')
+                else:
+                    form = SignUpForm()    
             else:
                 form = SignUpForm()
     else:
         form = SignUpForm()
     return render(request, 'registration/reg_user.html', {'form': form})
 
+
+def change_password(request):
+    if request.method == 'POST':
+        form = ChangePasswordForm(request.POST)
+        if request.POST.get('password1') == request.POST.get('password2') and request.POST.get('password1') != "":
+            user = request.user
+            user.set_password(request.POST.get('password1'))
+            user.save()
+            login(request, user)
+            return redirect('/cyberpolygon/labs')
+        else:
+            form = ChangePasswordForm()
+    else:
+        form = ChangePasswordForm()
+    return render(request, 'registration/change_password.html', {'form': form})
 
 class AnswerAPIView(viewsets.ModelViewSet):
     queryset = Answers.objects.all()
@@ -229,11 +249,19 @@ class AnswerAPIView(viewsets.ModelViewSet):
 
 # Хардкодный ответ (генерация потом)
 hardcode = r"""/testdir/ 1 1 1 1 1 1 1 1 1 1
-./ d1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
-d1/ d2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
-d1/ f1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
-d1/ f3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
+./ Горяиновd1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
+Горяиновd1/ Горяиновd2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
+Горяиновd1/ Горяиновf1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
+Горяиновd1/ Горяиновf3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
 # 
+
+def create_var_text(text, second_name):
+    new_var = rf"""/testdir/ 1 1 1 1 1 1 1 1 1 1
+./ {second_name}d1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
+{second_name}d1/ {second_name}d2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
+{second_name}1/ {second_name}f1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
+{second_name}d1/ {second_name}f3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
+    return new_var
 
 @api_view(['GET'])
 def start_lab(request):
@@ -250,7 +278,7 @@ def start_lab(request):
                 if issue and not lab.answer_flag:
                     data = {
                         "variant":1,
-                        "task": hardcode
+                        "task": create_var_text(hardcode, user.second_name)
                     }
                     return JsonResponse(data)
                 else:

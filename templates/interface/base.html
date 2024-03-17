@@ -72,6 +72,10 @@
                     <a class="button is-light" href="{% url 'admin:index' %}">
                         <strong>Админ-панель</strong>
                     </a>
+                {% else %}
+                  <a class="button is-light" href="{% url 'ch_pass' %}">
+                    <strong>Сменить пароль</strong>
+                  </a>
                 {% endif %}
                 <form class="m-0" method="post" action="{% url 'logout' %}">
                     {% csrf_token %}
