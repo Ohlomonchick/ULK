@@ -7,6 +7,7 @@ from django.template.defaultfilters import slugify
 from rest_framework import serializers
 import requests
 import os
+from django.core.exceptions import ValidationError
 
 
 class Lab(models.Model):
@@ -103,6 +104,10 @@ class Competition(models.Model):
                                 null=True)
 
     platoons = models.ManyToManyField(Platoon)
+
+    def clean(self):
+        if self.start >= self.finish:
+            raise ValidationError("Начало должно быть позже конца!")
 
     class Meta:
         verbose_name = 'Соревнование'
