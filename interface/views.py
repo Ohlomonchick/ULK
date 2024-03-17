@@ -273,12 +273,14 @@ def start_lab(request):
         if username and lab_name:
             user = User.objects.filter(username = username).first()
             lab = Lab.objects.filter(name = lab_name).first()
+            logging.debug(lab)
+            logging.debug(user)
             if user and lab:
                 issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user)
                 if issue and not lab.answer_flag:
                     data = {
                         "variant":1,
-                        "task": create_var_text(hardcode, user.second_name)
+                        "task": create_var_text(hardcode, user.last_name)
                     }
                     return JsonResponse(data)
                 else:

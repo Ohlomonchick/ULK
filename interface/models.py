@@ -114,8 +114,8 @@ class Competition(models.Model):
 class IssuedLabs(models.Model):
     lab = models.ForeignKey(Lab, related_name="lab_for_issue", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    date_of_appointment = models.DateField('Дата назначения')
-    end_date = models.DateField('Дата окончания')
+    date_of_appointment = models.DateTimeField('Дата назначения')
+    end_date = models.DateTimeField('Дата окончания')
     done = models.BooleanField('Завершено',default = False)
 
     # def __str__(self):
