@@ -8,6 +8,7 @@ from rest_framework import serializers
 import requests
 import os
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 
 class Lab(models.Model):
@@ -109,6 +110,8 @@ class Competition(models.Model):
     def clean(self):
         if self.start >= self.finish:
             raise ValidationError("Начало должно быть позже конца!")
+        if self.finish <= timezone.now():
+            raise ValidationError("Соревнование уже закончилось!")
 
     class Meta:
         verbose_name = 'Соревнование'

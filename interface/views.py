@@ -126,7 +126,12 @@ class CompetitionDetailView(DetailView):
 
     @staticmethod
     def get_timer(competition):
-        delta = (competition.finish - timezone.now()).seconds
+        if competition.finish <= timezone.now():
+            delta = 0
+        else:
+            delta = (competition.finish - timezone.now())
+            delta = delta.seconds + delta.days * 24 * 60 * 60
+
         seconds = delta % 60
         delta //= 60
         minutes = delta % 60
