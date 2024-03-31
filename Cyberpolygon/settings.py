@@ -84,7 +84,7 @@ WSGI_APPLICATION = 'Cyberpolygon.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-if os.environ.get('USE_POSTGRES', ''):
+if not os.environ.get('USE_POSTGRES', ''):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
