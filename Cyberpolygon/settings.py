@@ -84,7 +84,7 @@ WSGI_APPLICATION = 'Cyberpolygon.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-if not os.environ.get('USE_POSTGRES', ''):
+if os.environ.get('USE_POSTGRES', ''):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -94,7 +94,7 @@ if not os.environ.get('USE_POSTGRES', ''):
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
             'NAME': 'postgres',
             'USER': os.environ.get('DB_USER', 'postgres'),
             'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
