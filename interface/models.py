@@ -86,9 +86,15 @@ class User(AbstractUser):
     
     def save(self, *args, **kwargs):
         if not self.pk:
-            self.username = self.last_name + "_" + self.first_name
-            self.set_password("test.test") 
-        super(User, self).save(args, kwargs)
+            if not self.username:
+                self.username = self.last_name + "_" + self.first_name
+                self.set_password("test.test")
+
+            if not self.platoon_id:
+                default_platoon, created = Platoon.objects.get_or_create(number=0)
+                self.platoon = default_platoon
+
+        super(User, self).save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Пользователь'
