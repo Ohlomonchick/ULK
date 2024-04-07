@@ -34,7 +34,7 @@ class MyUserAdmin(UserAdmin):
     search_fields = ("platoon",)
 
 class CompetitionAdmin(admin.ModelAdmin):
-    exclude = ('slug', )
+    exclude = ('slug', 'participants')
     list_display = ("start", "lab")
 
 
