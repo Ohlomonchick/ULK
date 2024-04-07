@@ -112,6 +112,7 @@ class Competition(models.Model):
                                 null=True)
 
     platoons = models.ManyToManyField(Platoon)
+    participants = models.IntegerField("Количество участников", null=True, default=0)
 
     def clean(self):
         if self.start >= self.finish:
@@ -126,6 +127,8 @@ class Competition(models.Model):
     def save(self, *args, **kwargs):
         self.slug = slugify(self.lab.name + str(self.start))
         super(Competition, self).save(*args, **kwargs)
+        self.participants = User.objects.filter(platoon__in=self.platoons.all()).count()
+        super(Competition, self).save(*args, **kwargs)
 
 
 class IssuedLabs(models.Model):
@@ -133,7 +136,7 @@ class IssuedLabs(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     date_of_appointment = models.DateTimeField('Дата назначения')
     end_date = models.DateTimeField('Дата окончания')
-    done = models.BooleanField('Завершено',default = False)
+    done = models.BooleanField('Завершено', default=False)
 
     # def __str__(self):
     #     return str(self.lab.name) + " " + str(self.user.username)

@@ -18,6 +18,9 @@
                     </div>
                 </div>
             </div>
+            {% if progress %}
+                <progress class="progress is-link" value="{{ progress }}" max="100">{{ progress }}%</progress>
+            {% endif %}
             {% if solutions %}
                 <table class="table">
                   <thead>

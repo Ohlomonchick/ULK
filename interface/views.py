@@ -76,14 +76,13 @@ class CompetitionListView(ListView):
         queryset = []
         current_time = timezone.now()
         if self.request.user.is_authenticated:
-            queryset = Competition.objects.all()
+            queryset = Competition.objects.order_by("-start").all()
             if not self.request.user.is_staff:
                 queryset = queryset.filter(
                     platoons__in=[self.request.user.platoon],
                     start__lte=current_time,
                     finish__gte=current_time
                 )
-            queryset.order_by("start")
         return queryset
 
 
@@ -118,6 +117,11 @@ class CompetitionDetailView(DetailView):
                 pos += 1
 
             context["solutions"] = solutions
+
+            if not str(competition.participants).isnumeric() or int(competition.participants) == 0:
+                context["progress"] = 100
+            else:
+                context["progress"] = len(solutions) / int(competition.participants)
 
         context["object"] = competition
         context["delta"] = CompetitionDetailView.get_timer(context["object"])
