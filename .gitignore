@@ -1,7 +1,5 @@
 /venv/
-/static/rest_framework
-/static/jet
-/static/summernote
+/static/
 *sqlite3
 
 # Byte-compiled / optimized / DLL files
