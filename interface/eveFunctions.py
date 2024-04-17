@@ -2,7 +2,7 @@ import requests
 from transliterate import translit
 import logging
 import json
-from interface.eveNodesData import NodesData, ConnectorsData
+from interface.eveNodesData import NodesData, ConnectorsData, NetworksData, Connectors2CloudData
 
 def pf_login(url, name, password):
     url2 = url + '/store/public/auth/login/login'
@@ -220,14 +220,6 @@ def create_node(url, node_params, cookie, xsrf):
 
 
 def create_p2p(url, p2p_params, cookie):
-    p2p_params = {
-        "name": p2p_params["name"],
-        "src_id": p2p_params["src"],
-        "src_if": p2p_params["srcif"],
-        "dest_id": p2p_params["dest"],
-        "dest_if": p2p_params["destif"]
-    }
-
     try:
         r = requests.post ( \
                 url + '/api/labs/session/networks/p2p', \
@@ -250,6 +242,33 @@ def destroy_session(url, lab_session_id, cookie):
     )
     logging.debug(r)
 
+def create_network(url, net_params, cookie):
+    try:
+        r = requests.post ( \
+                url + '/api/labs/session/networks/add', \
+                json = net_params, \
+                cookies = cookie, \
+                verify = False \
+        )
+        logging.debug("Node {} has been created {}\nServer response\t{}".format(r))
+    except Exception as e:
+        r = "False"
+        logging.debug("Error with creating node\n{}\n".format(e))
+
+def create_p2p_nat(url, p2p_params, cookie):
+    try:
+        r = requests.post ( \
+                url + '/api/labs/session/interfaces/edit', \
+                json = p2p_params, \
+                cookies = cookie, \
+                verify = False \
+        )
+        logging.debug("Node {} has been created {}\nServer response\t{}".format(r))
+    except Exception as e:
+        r = "False"
+        logging.debug("Error with creating node\n{}\n".format(e))
+
+
 def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, username):
     username = translit(username, reversed=True)
     lab_path += "/" + username
@@ -264,7 +283,7 @@ def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, 
 
     r = get_sessions_count(url, cookie).json()
     count_labs = r["data"]
-    logging.debug("\nFound", count_labs,"running labs\n")
+    logging.debug(count_labs)
 
     response_json = filter_session(url, cookie, xsrf, 1, count_labs)
 
@@ -297,7 +316,13 @@ def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, 
     for node in NodesData[lab_name]:
         create_node(url, node, cookie, xsrf)
 
+    for network in NetworksData[lab_name]:
+        create_network(url, network, cookie)
+
     for connector in ConnectorsData[lab_name]:
         create_p2p(url, connector, cookie)
+
+    for cloudConnector in Connectors2CloudData[lab_name]:
+        create_p2p_nat(url, cloudConnector, cookie)
 
     destroy_session(url, sess_id, cookie)
