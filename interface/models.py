@@ -127,8 +127,6 @@ class Competition(models.Model):
     def save(self, *args, **kwargs):
         self.slug = slugify(self.lab.name + str(self.start))
         super(Competition, self).save(*args, **kwargs)
-        self.participants = User.objects.filter(platoon__in=self.platoons.all()).count()
-        super(Competition, self).save(*args, **kwargs)
 
 
 class IssuedLabs(models.Model):

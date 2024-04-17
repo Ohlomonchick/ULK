@@ -3,7 +3,7 @@ from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 
 from .models import *
-from .forms import CustomUserCreationForm
+from .forms import CustomUserCreationForm, CompetitionForm
 
 
 class SomeModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
@@ -41,8 +41,11 @@ class MyUserAdmin(UserAdmin):
 
 
 class CompetitionAdmin(admin.ModelAdmin):
+    form = CompetitionForm
+    add_form = CompetitionForm
     exclude = ('slug', 'participants')
     list_display = ("start", "lab")
+    search_fields = ['lab__name']
 
 
 admin.site.register(IssuedLabs, IssuedLabsModel)

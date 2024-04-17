@@ -1,5 +1,5 @@
 from django import forms
-from .models import User
+from .models import User, Competition
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 
@@ -50,3 +50,22 @@ class CustomUserCreationForm(UserCreationForm):
             raise ValidationError("Пароли не совпадают")
 
         return password2
+
+
+class CompetitionForm(forms.ModelForm):
+    class Meta:
+        fields = '__all__'
+        model = Competition
+
+    def save(self, commit=True):
+        instance = super(CompetitionForm, self).save(commit=False)
+        instance.save()
+
+        if 'platoons' in self.cleaned_data:
+            instance.platoons.set(self.cleaned_data['platoons'])
+
+            # Re-save the instance if additional fields like participants need to be updated
+        instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
+        instance.save()
+
+        return instance
