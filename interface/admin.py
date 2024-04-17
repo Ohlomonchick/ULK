@@ -3,11 +3,13 @@ from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 
 from .models import *
+from .forms import CustomUserCreationForm
 
 
 class SomeModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     summernote_fields = '__all__'
     exclude = ('slug',)
+
 
 class IssuedLabsModel(admin.ModelAdmin):
     list_display = ("lab", "user", "end_date", "done")
@@ -17,10 +19,14 @@ class IssuedLabsModel(admin.ModelAdmin):
 
     fieldsets = admin.ModelAdmin.fieldsets
 
+
 class MyUserAdmin(UserAdmin):
+    add_form = CustomUserCreationForm
     list_display = ("username", "is_staff", "platoon")
+    model = User
     fieldsets = UserAdmin.fieldsets
     fieldsets = ((None, {'fields': ('username', 'password', 'platoon')}), ) + fieldsets[1:]
+
     add_fieldsets = (
         (None, {
             "classes": ("wide",),
@@ -31,12 +37,12 @@ class MyUserAdmin(UserAdmin):
     )
     list_filter = ("is_staff", "platoon")
 
-    search_fields = ("platoon",)
+    search_fields = ("first_name", "last_name")
+
 
 class CompetitionAdmin(admin.ModelAdmin):
     exclude = ('slug', 'participants')
     list_display = ("start", "lab")
-
 
 
 admin.site.register(IssuedLabs, IssuedLabsModel)

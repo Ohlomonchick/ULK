@@ -119,11 +119,11 @@ class Competition(models.Model):
         if self.start >= self.finish:
             raise ValidationError("Начало должно быть позже конца!")
         if self.finish <= timezone.now():
-            raise ValidationError("Соревнование уже закончилось!")
+            raise ValidationError("Экзамен уже закончился!")
 
     class Meta:
-        verbose_name = 'Соревнование'
-        verbose_name_plural = 'Соревнования'
+        verbose_name = 'Экзамен'
+        verbose_name_plural = 'Экзамены'
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.lab.name + str(self.start))

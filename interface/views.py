@@ -235,9 +235,9 @@ def registration(request):
                         return redirect('registration/change_password')
                     return redirect('/cyberpolygon/labs')
                 else:
-                    form = SignUpForm()    
+                    form.add_error("platoon", "В этом взводе нет такого пользователя")
             else:
-                form = SignUpForm()
+                form.add_error("password", "Неправильный логин или пароль")
     else:
         form = SignUpForm()
     return render(request, 'registration/reg_user.html', {'form': form})
