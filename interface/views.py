@@ -8,48 +8,16 @@ from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
 from django.shortcuts import render, redirect
 from django.utils import timezone
+from interface.eveFunctions import pf_login, create_directory, create_user, logout
 
 from interface.serializers import *
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
 from django.http.response import JsonResponse
 import json
-import requests
 
 
-def login(url, name, password):
-    url2 = url + '/store/public/auth/login/login'
-    header1 = {
-       'Content-Type': 'application/json;charset=UTF-8'
-    }
-    session = requests.Session()
-    r1 = session.get(url, headers = header1, verify = False)
-    header2 = {
-        'Content-Type': 'application/json;charset=UTF-8',
-        'Cookie': f'_session={session.cookies.get_dict()["_session"]}',
-    }
-    payload2 = json.dumps(
-        {
-            'username':''+name+'',
-            'password':''+password+'',
-            'html':'0','captcha':''
-        }
-    )
-    r2 = requests.post(url2, headers = header2, data = payload2, verify = False)
-    return(r2.cookies, session.cookies.get_dict()["_session"])
 
-def create_user(url, username, password, user_role, cookie):
-    user_params = [{"username":username,"password":password,"role":"2","user_status":"1","active_time":"","expired_time":"","user_workspace":f"/Practice work/Test_Labs/api_test_dir/{username}","note":"","max_node":"","max_node_lab":""}]
-    try: 
-        r = requests.post(
-            url = url + '/store/public/admin/users/offAdd', \
-            json = user_params, \
-            cookies = cookie, \
-            verify = False
-        )
-        logging.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(username, password, workspace, r.text))
-    except Exception as e:
-        logging.debug("Error with creating user\n{}\n".format(e))
 
 
 class LabDetailView(DetailView):
@@ -286,8 +254,10 @@ def change_password(request):
             url = "http://172.18.4.160"
             Login = 'pnet_scripts'
             Pass = 'eve'
-            cookie, xsrf = login(url, Login, Pass)
-            create_user(url, user.username, request.POST.get('password1'), user_role, cookie)
+            cookie, xsrf = pf_login(url, Login, Pass)
+            create_directory(url, "/Practice work/Test_Labs/api_test_dir", user.username, cookie)
+            create_user(url, user.username, request.POST.get('password1'), '1', cookie)
+            logout(url)
             return redirect('/cyberpolygon/labs')
         else:
             form = ChangePasswordForm()

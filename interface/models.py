@@ -9,7 +9,8 @@ import requests
 import os
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-
+import logging
+from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors
 
 class Lab(models.Model):
     name = models.CharField('Имя', max_length=255, primary_key=True)
@@ -126,6 +127,17 @@ class Competition(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.lab.name + str(self.start))
+        # logging.debug(msg = self.platoons.all())
+        # AllUsers = User.objects.filter(platoon_id=self.platoons.all())
+        # logging.debug(msg = AllUsers)
+        # url = "http://172.18.4.160"
+        # Login = 'pnet_scripts'
+        # Pass = 'eve'
+        # cookie, xsrf = pf_login(url, Login, Pass)
+        # for user in AllUsers:
+        #     create_lab(url, self.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+        #     create_all_lab_nodes_and_connectiors(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+        # logout(url)
         super(Competition, self).save(*args, **kwargs)
 
 
@@ -135,6 +147,17 @@ class IssuedLabs(models.Model):
     date_of_appointment = models.DateTimeField('Дата назначения')
     end_date = models.DateTimeField('Дата окончания')
     done = models.BooleanField('Завершено', default=False)
+
+    def save(self, *args, **kwargs):
+
+        url = "http://172.18.4.160"
+        Login = 'pnet_scripts'
+        Pass = 'eve'
+        cookie, xsrf = pf_login(url, Login, Pass)
+        create_lab(url, self.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
+        create_all_lab_nodes_and_connectiors(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
+        logout(url)
+        super(IssuedLabs, self).save(*args, **kwargs)
 
     # def __str__(self):
     #     return str(self.lab.name) + " " + str(self.user.username)
