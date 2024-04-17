@@ -3,7 +3,7 @@ from django.utils.text import slugify
 from django_summernote.models import AbstractAttachment
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-from django.template.defaultfilters import slugify
+from slugify import slugify
 from rest_framework import serializers
 import requests
 import os
@@ -27,7 +27,7 @@ class Lab(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)
-
+        print(self.slug)
         address = os.environ.get('CREATE_ADDRESS', "")
         port = os.environ.get('CREATE_PORT', "")
 

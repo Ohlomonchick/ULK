@@ -14,6 +14,11 @@ class SignUpForm(forms.ModelForm):
         fields = ["first_name", "last_name", "platoon"]
         model = User
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['first_name'].widget.attrs['autocomplete'] = 'off'
+        self.fields['last_name'].widget.attrs['autocomplete'] = 'off'
+
 
 class ChangePasswordForm(forms.Form):
     password1 = forms.CharField(widget=forms.PasswordInput(), label = " Новый пароль")
@@ -56,6 +61,11 @@ class CompetitionForm(forms.ModelForm):
     class Meta:
         fields = '__all__'
         model = Competition
+
+    def __init__(self, *args, **kwargs):
+        super(CompetitionForm, self).__init__(*args, **kwargs)
+        self.fields['start'].widget.attrs['autocomplete'] = 'off'
+        self.fields['finish'].widget.attrs['autocomplete'] = 'off'
 
     def save(self, commit=True):
         instance = super(CompetitionForm, self).save(commit=False)
