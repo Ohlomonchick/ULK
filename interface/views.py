@@ -118,6 +118,8 @@ class CompetitionDetailView(DetailView):
                 user = User.objects.get(pk=solution["user_id"])
                 solution["user"] = user
                 solution["pos"] = str(pos)
+                solution["spent"] = str(solution["datetime"] - competition.start).split(".")[0]
+
                 pos += 1
 
             context["solutions"] = solutions
@@ -125,7 +127,7 @@ class CompetitionDetailView(DetailView):
             if not str(competition.participants).isnumeric() or int(competition.participants) == 0:
                 context["progress"] = 100
             else:
-                context["progress"] = len(solutions) / int(competition.participants)
+                context["progress"] = round(len(solutions) / int(competition.participants) * 100)
 
         context["object"] = competition
         context["delta"] = CompetitionDetailView.get_timer(context["object"])

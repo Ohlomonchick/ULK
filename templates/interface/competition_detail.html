@@ -1,6 +1,7 @@
 
 {% extends 'interface/base.html' %}
 
+
 {% block content %}
     <div class="columns is-centered">
         <div class="column is-two-thirds">
@@ -19,7 +20,7 @@
                 </div>
             </div>
             {% if progress %}
-                <progress class="progress is-link" value="{{ progress }}" max="100">{{ progress }}%</progress>
+                <progress class="progress is-success" value="{{ progress }}" max="100">{{ progress }}%</progress>
             {% endif %}
             {% if solutions %}
                 <table class="table">
@@ -29,7 +30,8 @@
                         <th>Фамилия</th>
                         <th>Имя</th>
                         <th>Взвод</th>
-                        <th>Время</th>
+                        <th>Затраченное время</th>
+                        <th>Время сдачи</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -39,7 +41,8 @@
                       <td>{{ solution.user.first_name }}</td>
                       <td>{{ solution.user.last_name }}</td>
                       <td>{{ solution.user.platoon }}</td>
-                      <td>{{ solution.datetime }}</td>
+                        <td>{{ solution.spent }}</td>
+                        <td>{{ solution.datetime }}</td>
                      </tr>
                   {% endfor  %}
                   </tbody>
