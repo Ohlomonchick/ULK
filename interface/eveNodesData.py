@@ -141,17 +141,17 @@ p2p_kali = {
 }
 
 NodesData = {
-    "Wordpress US Army" : [router_params, server_params, kali_params]
+    "Wordpress" : [router_params, server_params, kali_params]
 }
 
 ConnectorsData = {
-    "Wordpress US Army" : [p2p_server, p2p_kali]
+    "Wordpress" : [p2p_server, p2p_kali]
 }
 
 Connectors2CloudData = {
-    "Wordpress US Army" : [p2Cloud_params]
+    "Wordpress" : [p2Cloud_params]
 }
 
 NetworksData = {
-    "Wordpress US Army" : [net_params]
+    "Wordpress" : [net_params]
 }
