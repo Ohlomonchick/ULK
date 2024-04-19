@@ -1,5 +1,5 @@
 import requests
-from transliterate import translit
+from slugify import slugify
 import logging
 import json
 from interface.eveNodesData import NodesData, ConnectorsData, NetworksData, Connectors2CloudData
@@ -26,7 +26,7 @@ def pf_login(url, name, password):
     return(r2.cookies, session.cookies.get_dict()["_session"])
 
 def create_user(url, username, password, user_role, cookie):
-    username = translit(username, reversed=True)
+    username = slugify(username)
     user_params = {
         "data": [
             {
@@ -57,7 +57,7 @@ def create_user(url, username, password, user_role, cookie):
         pass
 
 def create_directory(url, path, dir_name, cookie):
-    dir_name = translit(dir_name, reversed=True)
+    dir_name = slugify(dir_name)
     directory = {
         "path": path,
         "name": dir_name
@@ -80,7 +80,7 @@ def logout(url):
 
 
 def create_lab(url, lab_name, lab_description, lab_path, cookie, xsrf, username):
-    username = translit(username, reversed=True)
+    username = slugify(username)
     lab_parameters = {
         "author":username,
         "description": f"{lab_description}",
@@ -270,7 +270,7 @@ def create_p2p_nat(url, p2p_params, cookie):
 
 
 def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, username):
-    username = translit(username, reversed=True)
+    username = slugify(username)
     lab_path += "/" + username
 
 

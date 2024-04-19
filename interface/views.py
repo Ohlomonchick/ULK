@@ -284,7 +284,7 @@ def create_var_text(text, second_name):
     new_var = rf"""/testdir/ 1 1 1 1 1 1 1 1 1 1
 ./ {second_name}d1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
 {second_name}d1/ {second_name}d2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
-{second_name}1/ {second_name}f1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
+{second_name}d1/ {second_name}f1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
 {second_name}d1/ {second_name}f3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
     return new_var
 
