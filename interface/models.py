@@ -127,17 +127,6 @@ class Competition(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.lab.name + str(self.start))
-        # logging.debug(msg = self.platoons.all())
-        # AllUsers = User.objects.filter(platoon_id=self.platoons.all())
-        # logging.debug(msg = AllUsers)
-        # url = "http://172.18.4.160"
-        # Login = 'pnet_scripts'
-        # Pass = 'eve'
-        # cookie, xsrf = pf_login(url, Login, Pass)
-        # for user in AllUsers:
-        #     create_lab(url, self.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-        #     create_all_lab_nodes_and_connectiors(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-        # logout(url)
         super(Competition, self).save(*args, **kwargs)
 
 
