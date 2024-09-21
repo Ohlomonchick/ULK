@@ -17,8 +17,8 @@ class SignUpForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['first_name'].widget.attrs['autocomplete'] = 'off'
-        self.fields['last_name'].widget.attrs['autocomplete'] = 'off'
+        for name in self.fields.keys():
+            self.fields[name].widget.attrs['autocomplete'] = 'off'
 
 
 class ChangePasswordForm(forms.Form):
@@ -34,6 +34,8 @@ class CustomUserCreationForm(UserCreationForm):
         super().__init__(*args, **kwargs)
         self.fields['password1'].required = False
         self.fields['password2'].required = False
+        for name in self.fields.keys():
+            self.fields[name].widget.attrs['autocomplete'] = 'off'
 
     class Meta:
         model = User
