@@ -1,0 +1,76 @@
+{% extends 'interface/base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block extra_css %}
+    <style>
+
+        html {
+            background-color: hsl(0, 0%, 7%);
+        }
+
+        footer .content p strong {
+            color: white;
+        }
+
+        /* Background Video - Parallax Effect */
+        #bg-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Makes sure the video covers the entire viewport */
+            z-index: -1; /* Ensures the video is behind the form */
+            will-change: transform; /* Optimizes performance for the scroll effect */
+        }
+
+        .input {
+            border-radius: 0.3rem;
+        }
+    </style>
+{% endblock %}
+
+{% block background_video %}
+<video autoplay muted loop id="bg-video">
+    <source src="{% static 'videos/soldier_upscaled.mp4' %}" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
+{% endblock %}
+
+
+{% block content %}
+    <div class="columns is-centered is-vcentered is-fullheight">
+        <div class="column is-5-desktop is-6-tablet">
+            <div class="box">
+                {% block form_title %} {% endblock %}
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="field">
+                            <label class="label" for="{{ field.auto_id }}">{{ field.label }}</label>
+                            <div class="control is-expanded">
+                                {{ field|add_class:"input" }}
+                            </div>
+                        </div>
+                        {% if field.errors %}
+                                <p class=" help is-danger">{{ field.errors.as_text }}</p>
+                        {% endif %}
+                    {% endfor %}
+                    {% block button %} {% endblock %}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* For scrolling background */
+        window.onscroll = function() {
+            var scrollPos = window.scrollY;
+            document.getElementById('bg-video').style.transform = 'translateY(' + scrollPos * (-1) + 'px)';
+        };
+    </script>
+    {% block extra_script %} {% endblock %}
+{% endblock %}
+
+{% block footer_class %}has-background-black-bis has-text-white-bis glass-footer{% endblock %}

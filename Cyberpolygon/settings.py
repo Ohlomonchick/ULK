@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_simple_bulma',
     'django_summernote',
+    'widget_tweaks',
     'interface',
 ]
 
