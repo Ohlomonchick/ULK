@@ -25,12 +25,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-pox3rzla+uyevpp=4_zxq86riks*4)gg2ztv&h2i2xdqan9wik'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('PROD', 'False') == 'False'
 
 ALLOWED_HOSTS = ['*']
-
-
-
 
 # Application definition
 
@@ -80,10 +77,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'Cyberpolygon.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 if not os.environ.get('USE_POSTGRES', ''):
     DATABASES = {
@@ -139,9 +132,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-STATICFILES_DIRS = ('assets',)
+if DEBUG:
+    STATIC_URL = 'static/'
+    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'assets')]
+else:
+    STATIC_URL = '/static/'
+    STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 STATICFILES_FINDERS = [
   # First add the two default Finders, since this will overwrite the default.

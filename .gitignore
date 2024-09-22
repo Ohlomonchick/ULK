@@ -129,7 +129,8 @@ celerybeat.pid
 .venv
 env/
 venv/
-ENV/
+venv/
+polygon_linux/
 env.bak/
 venv.bak/
 
