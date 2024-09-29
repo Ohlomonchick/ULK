@@ -8,97 +8,114 @@
     <title>Киберполигон</title>
 <link rel="shortcut icon" type="image/png" href="{% static 'icons/letter-k.png' %}"/>
 <!-- ... -->
+<style>
+    .flex-wrapper {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+</style>
     {% block extra_css %}
     {% endblock %}
 </head>
 
-<nav class="navbar is-black" role="navigation" aria-label="main navigation">
-  <div class="navbar-brand">
-    <a class="navbar-item">
-      <h1><strong>КИБЕРПОЛИГОН</strong></h1>
-    </a>
-
-{#    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">#}
-{#      <span aria-hidden="true"></span>#}
-{#      <span aria-hidden="true"></span>#}
-{#      <span aria-hidden="true"></span>#}
-{#    </a>#}
-  </div>
-
-{#  <div id="navbarBasicExample" class="navbar-menu">#}
-    <div class="navbar-start">
-      {% if  user.is_authenticated %}
-      <a class="navbar-item" href="{% url 'interface:lab-list' %}">
-      {% else %}
-      <a class="navbar-item" href="{% url 'reg' %}">
-      {% endif %}
-        Главная
-      </a>
-
-      {% if user.is_authenticated %}
-        <a class="navbar-item" href="{% url 'interface:competition-list' %}">
-          Экзамены
-        </a>
-      {% endif %}
-      
-      {% if user.is_superuser %}
-        <a class="navbar-item" href = "{% url 'interface:platoon-list' %}">
-          Список взводов
-        </a>
-      {% endif %}
-    </div>
-
-    <div class="navbar-end">
-      <div class="navbar-item">
-        <div class="buttons">
-            {% if user.is_authenticated %}
-                {% if user.is_superuser %}
-                    <a class="button is-light" href="{% url 'admin:index' %}">
-                        <strong>Админ-панель</strong>
-                    </a>
-                {% else %}
-                  <a class="button is-light" href="{% url 'ch_pass' %}">
-                    <strong>Сменить пароль</strong>
-                  </a>
-                {% endif %}
-                <form class="m-0" method="post" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button class="button is-light" type="submit"><strong>Выйти</strong></button>
-                </form>
-            {% else %}
-              <a class="button is-primary" href="{% url 'reg' %}">
-                <strong>Войти как участник</strong>
-              </a>
-              <a class="button is-light" href="{% url 'login' %}">
-                <strong>Войти как администратор</strong>
-              </a>
-            {% endif %}
-        </div>
-      </div>
-    </div>
-{#  </div>#}
-</nav>
 
 
 <body>
-    {% block background_video %}
-    <!-- Optional: Block to add a background video in derived templates -->
-    {% endblock %}
-    <section class="hero is-fullheight-with-navbar">
-        <div class="hero-body">
-            <div class="container">
-                {% block content %}
-                {% endblock %}
+    <div class="flex-wrapper">
+        <nav class="navbar is-black" role="navigation" aria-label="main navigation">
+          <div class="navbar-brand">
+              <figure class="image is-64x64">
+                  <img src="{% static 'icons/vuz_logo.png' %}" />
+              </figure>
+            <a class="navbar-item pl-1 pr-1">
+              <h1><strong>КИБЕРПОЛИГОН</strong></h1>
+            </a>
+
+        {#    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">#}
+        {#      <span aria-hidden="true"></span>#}
+        {#      <span aria-hidden="true"></span>#}
+        {#      <span aria-hidden="true"></span>#}
+        {#    </a>#}
+          </div>
+
+            <div class="navbar-start">
+              {% if  user.is_authenticated %}
+              <a class="navbar-item" href="{% url 'interface:lab-list' %}">
+              {% else %}
+              <a class="navbar-item" href="{% url 'reg' %}">
+              {% endif %}
+                Главная
+              </a>
+
+              {% if user.is_authenticated %}
+                <a class="navbar-item" href="{% url 'interface:competition-list' %}">
+                  Экзамены
+                </a>
+              {% endif %}
+
+              {% if user.is_superuser %}
+                <a class="navbar-item" href = "{% url 'interface:platoon-list' %}">
+                  Список взводов
+                </a>
+              {% endif %}
             </div>
-        </div>
-    </section>
+
+            <div class="navbar-end">
+              <div class="navbar-item">
+                <div class="buttons">
+                    {% if user.is_authenticated %}
+                        {% if user.is_superuser %}
+                            <a class="button is-light" href="{% url 'admin:index' %}">
+                                <strong>Админ-панель</strong>
+                            </a>
+                        {% else %}
+                          <a class="button is-light" href="{% url 'ch_pass' %}">
+                            <strong>Сменить пароль</strong>
+                          </a>
+                        {% endif %}
+                        <form class="m-0" method="post" action="{% url 'logout' %}">
+                            {% csrf_token %}
+                            <button class="button is-light" type="submit"><strong>Выйти</strong></button>
+                        </form>
+                    {% else %}
+                      <a class="button is-primary" href="{% url 'reg' %}">
+                        <strong>Войти как участник</strong>
+                      </a>
+                      <a class="button is-light" href="{% url 'login' %}">
+                        <strong>Войти как администратор</strong>
+                      </a>
+                    {% endif %}
+                </div>
+              </div>
+            </div>
+        </nav>
+
+        {% block background_video %}
+        <!-- Optional: Block to add a background video in derived templates -->
+        {% endblock %}
+        {% block title_image %}
+            <!-- Optional: Block to add an image with text on it -->
+        {% endblock %}
+
+        <section class="hero is-flex-grow-1">
+            <div class="hero-body is-flex-grow-1 is-flex is-align-items-center">
+                <div class="container is-flex-grow-1">
+                    {% block content %}
+                    {% endblock %}
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer {% block footer_class %} {% endblock %} mt-auto">
+          <div class="content has-text-centered">
+            <p>
+              Разработано в <strong>ВУЦ НИУ ВШЭ</strong>
+            </p>
+          </div>
+        </footer>
+
+    </div>
 </body>
 
 
-<footer class="footer {% block footer_class %} {% endblock %} mt-auto">
-  <div class="content has-text-centered">
-    <p>
-      Разработано в <strong>ВУЦ НИУ ВШЭ</strong>
-    </p>
-  </div>
-</footer>

@@ -1,10 +1,26 @@
 {% extends 'interface/base.html' %}
+{% load static %}
+
+{% block title_image %}
+<section class="hero is-clipped is-medium" style="
+        background-image: url({% static "images/artillery.jpg" %});
+        background-repeat: no-repeat; /* Prevents the image from repeating */
+        background-size: cover;
+        background-position: 0 -22vh;
+        ">
+    <div class="hero-body pb-3">
+        <div class="container is-flex-grow-1">
+            <h1 class="title is-1 has-text-white" style="text-shadow: 2px 2px #00363a">Взвода</h1>
+        </div>
+    </div>
+</section>
+{% endblock %}
 
 {% block content %}
 {% if user.is_superuser %}
 <div class="block">
 
-<h1 class="title is-1">Взвода</h1>
+{#<h1 class="title is-1">Взвода</h1>#}
 <ul>
 {% for plat, info in object_list.items %}
     <div class="box">

@@ -1,9 +1,22 @@
 {% extends 'interface/base.html' %}
+{% load static %}
+
+{% block title_image %}
+<section class="hero is-clipped is-medium" style="
+        background-image: url({% static "images/krishna-pandey-KNZHyTpre18-unsplash.jpg" %});
+        background-repeat: no-repeat; /* Prevents the image from repeating */
+        background-size: cover;
+        ">
+    <div class="hero-body pb-3">
+        <div class="container is-flex-grow-1">
+            <h1 class="title is-1 has-text-white" style="text-shadow: 2px 2px #00363a">Доступные экзамены</h1>
+        </div>
+    </div>
+</section>
+{% endblock %}
 
 {% block content %}
 <div class="block">
-
-<h1 class="title is-1">Доступные экзамены</h1>
 <ul>
 {% for comp in object_list %}
     <div class="box">
