@@ -1,8 +1,8 @@
 server {
-    listen 192.168.100.10:80;
+    listen {%ip%};
 
     location /static/ {
-        alias {%media%};
+        alias {%static%};
     }
 
     location /media/ {
