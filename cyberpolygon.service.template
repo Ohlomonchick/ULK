@@ -5,7 +5,7 @@ StandardOutput=syslog
 StandardError=syslog
 
 [Service]
-User=dmitry
+User=root
 WorkingDirectory={%workdir%}
 ExecStart={%run_script%}
 Restart=always
