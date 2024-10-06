@@ -9,3 +9,10 @@ with open('nginx.conf.template') as f:
     # string = string.replace('{%ip%}', ip)
     with open('nginx.conf', mode='w', encoding='utf-8') as write_f:
         write_f.write(string)
+
+with open('cyberpolygon.service.template') as f:
+    string = f.read()
+    string = string.replace('{%workdir%}', os.getcwd())
+    string = string.replace('{%run_script%}', os.path.abspath('run_prod.sh'))
+    with open('cyberpolygon.service', mode='w', encoding='utf-8') as write_f:
+        write_f.write(string)

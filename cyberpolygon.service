@@ -1,0 +1,14 @@
+[Unit]
+Description=Cyberpolygon-interface
+After=network.target
+StandardOutput=syslog
+StandardError=syslog
+
+[Service]
+User=dmitry
+WorkingDirectory=/mnt/c/Users/Dmitry/PycharmProjects/Cyberpolygon
+ExecStart=/mnt/c/Users/Dmitry/PycharmProjects/Cyberpolygon/run_prod.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
