@@ -80,6 +80,7 @@ class CompetitionForm(forms.ModelForm):
             # Re-save the instance if additional fields like participants need to be updated
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
         instance.save()
+        instance.save()
         # logging.debug(msg = instance.platoons.all())
         # AllUsers = User.objects.filter(platoon_id=instance.platoons.all())
         # logging.debug(msg = AllUsers)
