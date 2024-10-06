@@ -62,6 +62,11 @@
             </div>
 
             <div class="navbar-end">
+                {% if pnet_username %}
+                    <div class="navbar-item">
+                        <h4 class="title is-6 has-text-white">Ваше имя в PNET: {{ pnet_username }}</h4>
+                    </div>
+                {% endif %}
               <div class="navbar-item">
                 <div class="buttons">
                     {% if user.is_authenticated %}
