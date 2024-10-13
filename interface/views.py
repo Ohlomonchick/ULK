@@ -130,29 +130,8 @@ class CompetitionDetailView(DetailView):
                 context["progress"] = round(len(solutions) / int(competition.participants) * 100)
 
         context["object"] = competition
-        context["delta"] = CompetitionDetailView.get_timer(context["object"])
 
         return context
-
-    @staticmethod
-    def get_timer(competition):
-        if competition.finish <= timezone.now():
-            delta = 0
-        else:
-            delta = (competition.finish - timezone.now())
-            delta = delta.seconds + delta.days * 24 * 60 * 60
-
-        seconds = delta % 60
-        delta //= 60
-        minutes = delta % 60
-        hours = delta // 60
-
-        out = {"hours": hours, "minutes": minutes, "seconds": seconds}
-        for key, value in out.items():
-            n_value = str(value)
-            n_value = (2 - len(n_value)) * "0" + n_value
-            out[key] = n_value
-        return out
 
 
 class PlatoonDetailView(DetailView):

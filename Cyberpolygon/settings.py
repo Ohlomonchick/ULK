@@ -81,7 +81,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Cyberpolygon.wsgi.application'
 
-if not os.environ.get('USE_POSTGRES', ''):
+if not os.environ.get('Lj,', ''):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -135,8 +135,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'assets')]
+STATIC_URL = '/static/'
 if not DEBUG:
-    STATIC_URL = '/static/'
     STATIC_ROOT = '/static'
 
 STATICFILES_FINDERS = [
