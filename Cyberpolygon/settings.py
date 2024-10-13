@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_simple_bulma',
     'django_summernote',
+    'widget_tweaks',
     'interface',
 ]
 
@@ -72,6 +73,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'interface.context_processors.pnet_username',
             ],
         },
     },
