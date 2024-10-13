@@ -2,11 +2,11 @@ server {
     listen {%ip%};
 
     location /static/ {
-        alias /static;
+        alias /static/;
     }
 
     location /media/ {
-        alias /media;
+        alias /media/;
     }
 
     location / {
