@@ -1,2 +1,2 @@
-systemctl restart cyberpolygon nginx
+systemctl restart cyberpolygon
 systemctl restart nginx

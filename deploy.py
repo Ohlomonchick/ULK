@@ -3,8 +3,6 @@ import sys
 
 with open('nginx.conf.template') as f:
     string = f.read()
-    string = string.replace('{%media%}', os.path.abspath('media'))
-    string = string.replace('{%static%}', os.path.abspath('static'))
 
     ip = '192.168.100.10:80'
     if len(sys.argv) > 1:
