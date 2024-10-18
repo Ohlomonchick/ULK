@@ -112,7 +112,7 @@ class Competition(models.Model):
                                 verbose_name="Лабораторная работа",
                                 null=True)
 
-    platoons = models.ManyToManyField(Platoon)
+    platoons = models.ManyToManyField(Platoon, verbose_name="Взвода")
     participants = models.IntegerField("Количество участников", null=True, default=0)
 
     def clean(self):

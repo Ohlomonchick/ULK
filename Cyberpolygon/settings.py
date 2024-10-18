@@ -25,12 +25,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-pox3rzla+uyevpp=4_zxq86riks*4)gg2ztv&h2i2xdqan9wik'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('PROD', 'False') == 'False'
 
+CSRF_TRUSTED_ORIGINS = ['http://172.18.4.200:8080']
 ALLOWED_HOSTS = ['*']
-
-
-
 
 # Application definition
 
@@ -46,6 +44,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_simple_bulma',
     'django_summernote',
+    'widget_tweaks',
     'interface',
 ]
 
@@ -74,16 +73,13 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'interface.context_processors.pnet_username',
             ],
         },
     },
 ]
 
 WSGI_APPLICATION = 'Cyberpolygon.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 if not os.environ.get('USE_POSTGRES', ''):
     DATABASES = {
@@ -138,10 +134,10 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
-
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-STATICFILES_DIRS = ('assets',)
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'assets')]
+if not DEBUG:
+    STATIC_URL = '/static/'
+    STATIC_ROOT = '/static'
 
 STATICFILES_FINDERS = [
   # First add the two default Finders, since this will overwrite the default.
@@ -158,7 +154,10 @@ STATICFILES_FINDERS = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+if DEBUG:
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+else:
+    MEDIA_ROOT = '/media/'
 
 SUMMERNOTE_THEME = 'bs4'
 

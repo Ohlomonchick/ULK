@@ -17,8 +17,8 @@ class SignUpForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['first_name'].widget.attrs['autocomplete'] = 'off'
-        self.fields['last_name'].widget.attrs['autocomplete'] = 'off'
+        for name in self.fields.keys():
+            self.fields[name].widget.attrs['autocomplete'] = 'off'
 
 
 class ChangePasswordForm(forms.Form):
@@ -34,6 +34,8 @@ class CustomUserCreationForm(UserCreationForm):
         super().__init__(*args, **kwargs)
         self.fields['password1'].required = False
         self.fields['password2'].required = False
+        for name in self.fields.keys():
+            self.fields[name].widget.attrs['autocomplete'] = 'off'
 
     class Meta:
         model = User
@@ -78,7 +80,7 @@ class CompetitionForm(forms.ModelForm):
             # Re-save the instance if additional fields like participants need to be updated
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
         instance.save()
-        AllUsers = User.objects.filter(platoon_id__in=instance.platoons.all())
+        AllUsers = User.objects.filter(platoon_id=instance.platoons.all())
         url = "http://172.18.4.160"
         Login = 'pnet_scripts'
         Pass = 'eve'

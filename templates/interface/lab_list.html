@@ -1,19 +1,32 @@
 {% extends 'interface/base.html' %}
+{% load static %}
+
+{#{% block title_image %}#}
+{#<section class="hero is-clipped is-medium" style="#}
+{#        background-image: url({% static "images/computers.jpg" %});#}
+{#        background-repeat: no-repeat; /* Prevents the image from repeating */#}
+{#        background-size: cover;#}
+{#        ">#}
+{#    <div class="hero-body pb-3">#}
+{#        <div class="container is-flex-grow-1">#}
+{#            <h1 class="title is-1 has-text-white" style="text-shadow: 2px 2px #00363a">Лабораторные работы</h1>#}
+{#        </div>#}
+{#    </div>#}
+{#</section>#}
+{#{% endblock %}#}
+
 
 {% block content %}
-<div class="block">
-
-<h1 class="title is-1">Лабораторные работы</h1>
-<ul>
-{% for lab in object_list %}
-    <div class="box">
-        <h2 class="title is-3 is-link"><a href="{% url 'interface:lab-list' %}{{ lab.slug }}">{{ lab.name }}</a></h2>
+    <div class="block">
+        <h1 class="title is-1">Лабораторные работы</h1>
+        <ul>
+        {% for lab in object_list %}
+            <div class="box" style="border: thin solid darkslategray;">
+                <h2 class="title is-3 is-link"><a href="{% url 'interface:lab-list' %}{{ lab.slug }}">{{ lab.name }}</a></h2>
+            </div>
+        {% empty %}
+            <li>Лабораторных работ нет.</li>
+        {% endfor %}
+        </ul>
     </div>
-{% empty %}
-    <li>Лабораторных работ нет.</li>
-{% endfor %}
-</ul>
-
-
-</div>
 {% endblock %}

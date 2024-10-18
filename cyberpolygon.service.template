@@ -1,0 +1,14 @@
+[Unit]
+Description=Cyberpolygon-interface
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory={%workdir%}
+ExecStart={%run_script%}
+Restart=always
+StandardOutput=append:/var/log/syslog
+StandardError=append:/var/log/syslog
+
+[Install]
+WantedBy=multi-user.target
