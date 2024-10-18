@@ -10,7 +10,7 @@ import os
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 import logging
-from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors
+from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors, delete_lab_with_session_destroy
 
 class Lab(models.Model):
     name = models.CharField('Имя', max_length=255, primary_key=True)
@@ -121,6 +121,17 @@ class Competition(models.Model):
         if self.finish <= timezone.now():
             raise ValidationError("Экзамен уже закончился!")
 
+    def delete(self, *args, **kwargs):
+        url = "http://172.18.4.160"
+        Login = 'pnet_scripts'
+        Pass = 'eve'
+        cookie, xsrf = pf_login(url, Login, Pass)
+        AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
+        for user in AllUsers:
+            delete_lab_with_session_destroy(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+        logout(url)
+        super(Competition, self).delete(*args, **kwargs)
+
     class Meta:
         verbose_name = 'Экзамен'
         verbose_name_plural = 'Экзамены'
@@ -147,6 +158,15 @@ class IssuedLabs(models.Model):
         create_all_lab_nodes_and_connectiors(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
         logout(url)
         super(IssuedLabs, self).save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        url = "http://172.18.4.160"
+        Login = 'pnet_scripts'
+        Pass = 'eve'
+        cookie, xsrf = pf_login(url, Login, Pass)
+        delete_lab_with_session_destroy(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
+        logout(url)
+        super(IssuedLabs, self).delete(*args, **kwargs)
 
     # def __str__(self):
     #     return str(self.lab.name) + " " + str(self.user.username)

@@ -51,10 +51,8 @@ def create_user(url, username, password, user_role, cookie):
             verify = False
         )
         logging.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(username, password, f"/Practice work/Test_Labs/api_test_dir/{username}", r.text))
-        # logging.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t".format(username, password, f"/Practice work/Test_Labs/api_test_dir/{username}"))
     except Exception as e:
-        # logging.debug("Error with creating user\n{}\n".format(e))
-        pass
+        logging.debug("Error with creating user\n{}\n".format(e))
 
 def create_directory(url, path, dir_name, cookie):
     dir_name = slugify(dir_name)
@@ -105,7 +103,7 @@ def create_lab(url, lab_name, lab_description, lab_path, cookie, xsrf, username)
             cookies = cookie, \
             verify = False \
         )
-        logging.debug("Lab created at path {}\nServer response\t{}".format(r.json()))
+        logging.debug("Lab created at path {}\nServer response\t{}".format(f"{lab_path}/{username}", r.json()["message"]))
     except Exception as e:
         logging.debug("Error with creating lab\n{}\n".format(e))
 
@@ -213,7 +211,7 @@ def create_node(url, node_params, cookie, xsrf):
                 cookies = cookie, \
                 verify = False \
         )
-        logging.debug("Node {} has been created {}\nServer response\t{}".format(r))
+        logging.debug("Node {} has been created\nServer response\t{}".format(node_params["template"], r.json()["message"]))
     except Exception as e:
         r = "False"
         logging.debug("Error with creating node\n{}\n".format(e))
@@ -227,10 +225,10 @@ def create_p2p(url, p2p_params, cookie):
                 cookies = cookie, \
                 verify = False \
         )
-        logging.debug("Node {} has been created {}\nServer response\t{}".format(r))
+        logging.debug("P2P {} has been created \nServer response\t{}".format(p2p_params["name"], r.json()["message"]))
     except Exception as e:
         r = "False"
-        logging.debug("Error with creating node\n{}\n".format(e))
+        logging.debug("Error with creating P2P\n{}\n".format(e))
 
 def destroy_session(url, lab_session_id, cookie):
     lab_session_id = '{"lab_session":"' + str(lab_session_id) + '"}'
@@ -250,10 +248,10 @@ def create_network(url, net_params, cookie):
                 cookies = cookie, \
                 verify = False \
         )
-        logging.debug("Node {} has been created {}\nServer response\t{}".format(r))
+        logging.debug("Network {} has been created \nServer response\t{}".format(net_params["name"], r.json()["message"]))
     except Exception as e:
         r = "False"
-        logging.debug("Error with creating node\n{}\n".format(e))
+        logging.debug("Error with creating network\n{}\n".format(e))
 
 def create_p2p_nat(url, p2p_params, cookie):
     try:
@@ -263,10 +261,25 @@ def create_p2p_nat(url, p2p_params, cookie):
                 cookies = cookie, \
                 verify = False \
         )
-        logging.debug("Node {} has been created {}\nServer response\t{}".format(r))
+        logging.debug("P2P_NAT {} has been created\nServer response\t{}".format(p2p_params["node_id"], r.json()["message"]))
     except Exception as e:
         r = "False"
-        logging.debug("Error with creating node\n{}\n".format(e))
+        logging.debug("Error with creating P2P_NAT\n{}\n".format(e))
+
+def delete_lab(url, cookie, lab_path):
+    try:
+        path = '{"path":"' + str(lab_path) + '.unl"}'
+        r = requests.delete ( \
+            url + '/api/labs', \
+            data = path, \
+            cookies = cookie, \
+            verify = False \
+        )
+    except Exception as e:
+        r = "False"
+        logging.debug("Error with deleting lab\n{}\n".format(e))
+
+    return r
 
 
 def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, username):
@@ -326,3 +339,31 @@ def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, 
         create_p2p_nat(url, cloudConnector, cookie)
 
     destroy_session(url, sess_id, cookie)
+
+def delete_lab_with_session_destroy(url, lab_name, lab_path, cookie, xsrf, username):
+    username = slugify(username)
+    lab_path += "/" + username
+
+
+    lab_slash_name = "/" + lab_name
+    lab = lab_path + lab_slash_name
+    logging.debug(lab)
+
+    users = filter_user(url, cookie, xsrf).json()
+
+    r = get_sessions_count(url, cookie).json()
+    count_labs = r["data"]
+    logging.debug(count_labs)
+
+    response_json = filter_session(url, cookie, xsrf, 1, count_labs)
+
+    response_json = response_json.json()
+
+    for item in response_json["data"]["data_table"]:
+        if item["lab_session_path"] == lab + '.unl': 
+            destroy_session(url, item["lab_session_id"], cookie)
+            logging.debug(r)
+
+    r = delete_lab(url, cookie, lab).json()
+    logging.debug(r)
+    

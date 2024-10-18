@@ -78,16 +78,14 @@ class CompetitionForm(forms.ModelForm):
             # Re-save the instance if additional fields like participants need to be updated
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
         instance.save()
-        # logging.debug(msg = instance.platoons.all())
-        # AllUsers = User.objects.filter(platoon_id=instance.platoons.all())
-        # logging.debug(msg = AllUsers)
-        # url = "http://172.18.4.160"
-        # Login = 'pnet_scripts'
-        # Pass = 'eve'
-        # cookie, xsrf = pf_login(url, Login, Pass)
-        # for user in AllUsers:
-        #     create_lab(url, instance.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-        #     create_all_lab_nodes_and_connectiors(url, instance.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-        # logout(url)
+        AllUsers = User.objects.filter(platoon_id__in=instance.platoons.all())
+        url = "http://172.18.4.160"
+        Login = 'pnet_scripts'
+        Pass = 'eve'
+        cookie, xsrf = pf_login(url, Login, Pass)
+        for user in AllUsers:
+            create_lab(url, instance.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+            create_all_lab_nodes_and_connectiors(url, instance.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+        logout(url)
 
         return instance

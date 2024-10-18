@@ -18,6 +18,10 @@ class IssuedLabsModel(admin.ModelAdmin):
     # search_fields = ("user",)
 
     fieldsets = admin.ModelAdmin.fieldsets
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            obj.delete()
+        
 
 
 class MyUserAdmin(UserAdmin):
@@ -46,6 +50,10 @@ class CompetitionAdmin(admin.ModelAdmin):
     exclude = ('slug', 'participants')
     list_display = ("start", "lab")
     search_fields = ['lab__name']
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            obj.delete()
 
 
 admin.site.register(IssuedLabs, IssuedLabsModel)
