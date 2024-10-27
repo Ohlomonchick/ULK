@@ -9,14 +9,27 @@ import requests
 import os
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-import logging
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors, delete_lab_with_session_destroy
+from .validators import validate_top_level_array
+import json
+
+
+def default_json():
+    return [{}]
+
 
 class Lab(models.Model):
     name = models.CharField('Имя', max_length=255, primary_key=True)
     description = models.TextField('Описание')
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True,null=True)
     slug = models.SlugField('Название в адресной строке', unique=True)
+
+    NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
+    ConnectorsData = models.JSONField('Коннекторы', default=default_json, validators=[validate_top_level_array])
+    Connectors2CloudData = models.JSONField(
+        'Облачные коннекторы', default=default_json, validators=[validate_top_level_array]
+    )
+    NetworksData = models.JSONField('Сети', default=default_json, validators=[validate_top_level_array])
 
     def __str__(self):
         return str(self.name)
@@ -50,7 +63,7 @@ class Answers(models.Model):
     datetime = models.DateTimeField(null=True)
 
     def __str__(self):
-        return str(self.lab.name + " " +self.user.username)
+        return str(self.lab.name + " " + self.user.username)
 
     class Meta:
         verbose_name = 'Ответ'
@@ -155,7 +168,7 @@ class IssuedLabs(models.Model):
         Pass = 'eve'
         cookie, xsrf = pf_login(url, Login, Pass)
         create_lab(url, self.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
-        create_all_lab_nodes_and_connectiors(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
+        create_all_lab_nodes_and_connectiors(url, self.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
         logout(url)
         super(IssuedLabs, self).save(*args, **kwargs)
 

@@ -87,7 +87,7 @@ class CompetitionForm(forms.ModelForm):
         cookie, xsrf = pf_login(url, Login, Pass)
         for user in AllUsers:
             create_lab(url, instance.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-            create_all_lab_nodes_and_connectiors(url, instance.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+            create_all_lab_nodes_and_connectiors(url, instance.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
         logout(url)
 
         return instance

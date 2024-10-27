@@ -2,7 +2,7 @@ import requests
 from slugify import slugify
 import logging
 import json
-from interface.eveNodesData import NodesData, ConnectorsData, NetworksData, Connectors2CloudData
+
 
 def pf_login(url, name, password):
     url2 = url + '/store/public/auth/login/login'
@@ -282,7 +282,8 @@ def delete_lab(url, cookie, lab_path):
     return r
 
 
-def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, username):
+def create_all_lab_nodes_and_connectiors(url, lab_object, lab_path, cookie, xsrf, username):
+    lab_name = lab_object.name
     username = slugify(username)
     lab_path += "/" + username
 
@@ -308,7 +309,7 @@ def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, 
         if item["lab_session_path"] == lab + '.unl': 
             username = ""
             for user in users["data"]["data_table"]:
-                if user["pod"] == item["lab_session_pod"] :
+                if user["pod"] == item["lab_session_pod"]:
                     username = user["username"]   
             session = [
                         item["lab_session_id"], 
@@ -326,16 +327,16 @@ def create_all_lab_nodes_and_connectiors(url, lab_name, lab_path, cookie, xsrf, 
     
     join_session(url, sess_id, cookie)
 
-    for node in NodesData[lab_name]:
+    for node in lab_object.NodesData:
         create_node(url, node, cookie, xsrf)
 
-    for network in NetworksData[lab_name]:
+    for network in lab_object.NetworksData:
         create_network(url, network, cookie)
 
-    for connector in ConnectorsData[lab_name]:
+    for connector in lab_object.ConnectorsData:
         create_p2p(url, connector, cookie)
 
-    for cloudConnector in Connectors2CloudData[lab_name]:
+    for cloudConnector in lab_object.Connectors2CloudData:
         create_p2p_nat(url, cloudConnector, cookie)
 
     destroy_session(url, sess_id, cookie)

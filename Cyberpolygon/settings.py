@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django_simple_bulma',
     'django_summernote',
     'widget_tweaks',
+    'django_json_widget',
     'interface',
 ]
 
@@ -136,7 +137,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'assets')]
 STATIC_URL = '/static/'
-if not DEBUG:
+if DEBUG:
+    STATIC_ROOT = 'static'
+else:
     STATIC_ROOT = '/static'
 
 STATICFILES_FINDERS = [
