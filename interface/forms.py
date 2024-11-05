@@ -37,6 +37,8 @@ class CustomUserCreationForm(UserCreationForm):
         for name in self.fields.keys():
             self.fields[name].widget.attrs['autocomplete'] = 'off'
 
+        self.fields['password1'].help_text = 'По умолчанию пользователи создаются с паролем "test.test", но вы можете задать свой'
+
     class Meta:
         model = User
         fields = ("username", "first_name", "last_name", "platoon")
@@ -44,8 +46,12 @@ class CustomUserCreationForm(UserCreationForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         password = self.cleaned_data.get("password1")
-        if password:
+        if password and len(password):
             user.set_password(password)
+        else:
+            default_password = "test.test"
+            user.set_password(default_password)
+
         if commit:
             user.save()
         return user
