@@ -9,20 +9,30 @@ import requests
 import os
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors, delete_lab_with_session_destroy
+from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors, \
+    delete_lab_with_session_destroy
 from .validators import validate_top_level_array
-import json
+from .config import *
 
 
 def default_json():
     return [{}]
 
 
+def get_platform_choices():
+    return [
+        ("PN", "PNETLab"),
+        ("NO", "Без платформы"),
+        ("PT", "Packet Tracer")
+    ]
+
+
 class Lab(models.Model):
     name = models.CharField('Имя', max_length=255, primary_key=True)
     description = models.TextField('Описание')
-    answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True,null=True)
+    answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)
     slug = models.SlugField('Название в адресной строке', unique=True)
+    platform = models.CharField(max_length=3, choices=get_platform_choices, default="NO")
 
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
     ConnectorsData = models.JSONField('Коннекторы', default=default_json, validators=[validate_top_level_array])
@@ -44,11 +54,16 @@ class Lab(models.Model):
         address = os.environ.get('CREATE_ADDRESS', "")
         port = os.environ.get('CREATE_PORT', "")
 
-        if port and address:
+        if port and address and self.get_platform() == "PN":
             serializer = LabSerializer(self)
             requests.post(f"http://{address}:{port}", data=serializer.data)
 
         super(Lab, self).save(*args, **kwargs)
+
+    def get_platform(self):
+        if settings.DEBUG:
+            return "NO"
+        return self.platform
 
 
 class LabSerializer(serializers.ModelSerializer):
@@ -97,7 +112,7 @@ class User(AbstractUser):
                                 on_delete=models.CASCADE,
                                 verbose_name="взвод",
                                 null=True)
-    
+
     def save(self, *args, **kwargs):
         if not self.pk:
             if not self.username:
@@ -120,10 +135,10 @@ class Competition(models.Model):
     start = models.DateTimeField("Начало")
     finish = models.DateTimeField("Конец")
     lab = models.ForeignKey(Lab,
-                                related_name="competitions",
-                                on_delete=models.CASCADE,
-                                verbose_name="Лабораторная работа",
-                                null=True)
+                            related_name="competitions",
+                            on_delete=models.CASCADE,
+                            verbose_name="Лабораторная работа",
+                            null=True)
 
     platoons = models.ManyToManyField(Platoon, verbose_name="Взвода")
     participants = models.IntegerField("Количество участников", null=True, default=0)
@@ -135,14 +150,15 @@ class Competition(models.Model):
             raise ValidationError("Экзамен уже закончился!")
 
     def delete(self, *args, **kwargs):
-        url = "http://172.18.4.160"
-        Login = 'pnet_scripts'
-        Pass = 'eve'
-        cookie, xsrf = pf_login(url, Login, Pass)
-        AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
-        for user in AllUsers:
-            delete_lab_with_session_destroy(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-        logout(url)
+        if self.lab.get_platform() == "PN":
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+            AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
+            for user in AllUsers:
+                delete_lab_with_session_destroy(PNET_URL, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie,
+                                                xsrf, user.username)
+            logout(PNET_URL)
         super(Competition, self).delete(*args, **kwargs)
 
     class Meta:
@@ -162,23 +178,26 @@ class IssuedLabs(models.Model):
     done = models.BooleanField('Завершено', default=False)
 
     def save(self, *args, **kwargs):
-
-        url = "http://172.18.4.160"
-        Login = 'pnet_scripts'
-        Pass = 'eve'
-        cookie, xsrf = pf_login(url, Login, Pass)
-        create_lab(url, self.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
-        create_all_lab_nodes_and_connectiors(url, self.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
-        logout(url)
+        if self.lab.get_platform() == "PN":
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+            create_lab(PNET_URL, self.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
+                       self.user.username)
+            create_all_lab_nodes_and_connectiors(PNET_URL, self.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
+                                                 self.user.username)
+            logout(PNET_URL)
         super(IssuedLabs, self).save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        url = "http://172.18.4.160"
-        Login = 'pnet_scripts'
-        Pass = 'eve'
-        cookie, xsrf = pf_login(url, Login, Pass)
-        delete_lab_with_session_destroy(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, self.user.username)
-        logout(url)
+        if self.lab.get_platform() == "PN":
+            url = PNET_URL
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(url, Login, Pass)
+            delete_lab_with_session_destroy(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
+                                            self.user.username)
+            logout(url)
         super(IssuedLabs, self).delete(*args, **kwargs)
 
     # def __str__(self):
