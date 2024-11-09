@@ -17,9 +17,6 @@ from django.http.response import JsonResponse
 import json
 
 
-
-
-
 class LabDetailView(DetailView):
     model = Lab
 
@@ -35,10 +32,12 @@ class LabDetailView(DetailView):
         lab = context["object"]
         if request.user.is_authenticated:
             now = timezone.now()
-            issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=request.user, end_date__gte = now, date_of_appointment__lte = now ).exclude(done = True).first()
-            comps = Competition.objects.filter(lab=context["object"], start__lte=now, finish__gte = now).first()
+            issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=request.user, end_date__gte=now,
+                                                  date_of_appointment__lte=now).exclude(done=True).first()
+            comps = Competition.objects.filter(lab=context["object"], start__lte=now, finish__gte=now).first()
             if comps:
-                answers = Answers.objects.filter(lab=context["object"],user=request.user, datetime__lte = comps.finish, datetime__gte = comps.start).first()
+                answers = Answers.objects.filter(lab=context["object"], user=request.user, datetime__lte=comps.finish,
+                                                 datetime__gte=comps.start).first()
             if issuedLab or comps and (answers is None):
                 answer = request.GET.get("answer_flag")
                 if answer:
@@ -109,7 +108,7 @@ class CompetitionDetailView(DetailView):
         if self.request.user.is_staff:
             solutions = Answers.objects.filter(
                 lab=competition.lab,
-                user__platoon__in=competition.platoons.all(), 
+                user__platoon__in=competition.platoons.all(),
                 datetime__lte=competition.finish,
                 datetime__gte=competition.start
             ).order_by('datetime').values()
@@ -161,14 +160,14 @@ class PlatoonDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        user_list = User.objects.filter(platoon = context["platoon"]).exclude(username = "admin")
+        user_list = User.objects.filter(platoon=context["platoon"]).exclude(username="admin")
         context["user_list"] = user_list
-        competitions ={}
-        comps = Competition.objects.filter(platoons = context["platoon"])
+        competitions = {}
+        comps = Competition.objects.filter(platoons=context["platoon"])
         for comp in comps:
             if (comp.finish - timezone.now()).seconds < 0:
                 competitions[comp] = False
-            else: 
+            else:
                 competitions[comp] = True
         context["competitions"] = competitions
         logging.debug(context)
@@ -183,18 +182,28 @@ class PlatoonListView(ListView):
         context = super().get_context_data(**kwargs)
         platoons_progress = {}
         for platoon in context["object_list"]:
-            platoons_progress[platoon] = {"total":0, "submitted":0, "progress":0}
-            user_list = User.objects.filter(platoon = platoon).exclude(username = "admin")
-            for user in user_list:
-                platoons_progress[platoon]["total"] += len(IssuedLabs.objects.filter(user = user))
-                platoons_progress[platoon]["submitted"] += len(IssuedLabs.objects.filter(user = user).exclude(done = False))
-            if platoons_progress[platoon]["total"] == 0:
-                platoons_progress[platoon]["progress"] = 100
-            else:
-                platoons_progress[platoon]["progress"] += int((platoons_progress[platoon]["submitted"] / platoons_progress[platoon]["total"]) * 100)
+            if platoon.number != 0:
+                platoons_progress[platoon] = PlatoonListView.get_platoon_progress(platoon)
+
         context["object_list"] = platoons_progress
         logging.debug(context)
         return context
+
+    @staticmethod
+    def get_platoon_progress(platoon):
+        progress_dict = {"total": 0, "submitted": 0, "progress": 0}
+        user_list = User.objects.filter(platoon=platoon).exclude(username="admin")
+
+        for user in user_list:
+            progress_dict["total"] += len(IssuedLabs.objects.filter(user=user))
+            progress_dict["submitted"] += len(IssuedLabs.objects.filter(user=user).exclude(done=False))
+        if progress_dict["total"] == 0:
+            progress_dict["progress"] = 0
+        else:
+            progress_dict["progress"] += int((progress_dict["submitted"] / progress_dict["total"]) * 100)
+
+        return progress_dict
+
 
 
 class UserDetailView(DetailView):
@@ -203,13 +212,13 @@ class UserDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["user"] = User.objects.filter(username = "admin").first()
-        issues = IssuedLabs.objects.filter(user = context["object"])
+        context["user"] = User.objects.filter(username="admin").first()
+        issues = IssuedLabs.objects.filter(user=context["object"])
         object_list = issues
         context["object_list"] = object_list
         total = len(issues)
         context["total"] = total
-        submitted = len(IssuedLabs.objects.filter(user = context["object"]).exclude(done = False))
+        submitted = len(IssuedLabs.objects.filter(user=context["object"]).exclude(done=False))
         context["submitted"] = submitted
         if total == 0:
             progress = 100
@@ -224,12 +233,12 @@ def registration(request):
     if request.method == 'POST':
         form = SignUpForm(request.POST)
         platoon = int(request.POST.get('platoon'))
-        platoon = Platoon.objects.get(id = platoon)
+        platoon = Platoon.objects.get(id=platoon)
         form.platoon = platoon
         if form.is_valid():
             usname = request.POST.get('last_name') + "_" + request.POST.get('first_name')
             passwd = request.POST.get('password')
-            user = authenticate(username = usname, password = passwd)
+            user = authenticate(username=usname, password=passwd)
             if user:
                 if user.platoon == platoon:
                     login(request, user)
@@ -267,11 +276,10 @@ def change_password(request):
         form = ChangePasswordForm()
     return render(request, 'registration/change_password.html', {'form': form})
 
+
 class AnswerAPIView(viewsets.ModelViewSet):
     queryset = Answers.objects.all()
     serializer_class = AnswerSerializer
-
-
 
 
 # Хардкодный ответ (генерация потом)
@@ -280,7 +288,9 @@ hardcode = r"""/testdir/ 1 1 1 1 1 1 1 1 1 1
 Горяиновd1/ Горяиновd2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
 Горяиновd1/ Горяиновf1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
 Горяиновd1/ Горяиновf3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
-# 
+
+
+#
 
 def create_var_text(text, second_name):
     new_var = rf"""/testdir/ 1 1 1 1 1 1 1 1 1 1
@@ -290,6 +300,7 @@ def create_var_text(text, second_name):
 {second_name}d1/ {second_name}f3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
     return new_var
 
+
 @api_view(['GET'])
 def start_lab(request):
     if request.method == 'GET':
@@ -298,24 +309,24 @@ def start_lab(request):
         username = data.get("username")
         lab_name = data.get("lab")
         if username and lab_name:
-            user = User.objects.filter(username = username).first()
-            lab = Lab.objects.filter(name = lab_name).first()
+            user = User.objects.filter(username=username).first()
+            lab = Lab.objects.filter(name=lab_name).first()
             logging.debug(lab)
             logging.debug(user)
             if user and lab:
-                issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user)
+                issue = IssuedLabs.objects.filter(lab_id=lab, user_id=user)
                 if issue and not lab.answer_flag:
                     data = {
-                        "variant":1,
+                        "variant": 1,
                         "task": create_var_text(hardcode, user.last_name)
                     }
                     return JsonResponse(data)
                 else:
-                    return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND) 
+                    return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND)
             else:
-                return JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND) 
+                return JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND)
         else:
-                return JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST) 
+            return JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -326,10 +337,10 @@ def end_lab(request):
         username = data.get("username")
         lab_name = data.get("lab")
         if username and lab_name:
-            user = User.objects.filter(username = username).first()
-            lab = Lab.objects.filter(name = lab_name).first()
+            user = User.objects.filter(username=username).first()
+            lab = Lab.objects.filter(name=lab_name).first()
             if user and lab:
-                issue = IssuedLabs.objects.filter(lab_id = lab, user_id = user).exclude(done = True).first()
+                issue = IssuedLabs.objects.filter(lab_id=lab, user_id=user).exclude(done=True).first()
                 if issue and not lab.answer_flag and not issue.done:
                     ans = Answers(lab=lab, user=user, datetime=timezone.now())
                     ans.save()
@@ -337,8 +348,8 @@ def end_lab(request):
                     issue.save()
                     return JsonResponse({'message': 'Task finished'})
                 else:
-                    return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND) 
+                    return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND)
             else:
-                return JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND) 
+                return JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND)
         else:
-                return JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)
+            return JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)

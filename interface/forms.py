@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 import logging
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors
+from .config import *
+
 
 class LabAnswerForm(forms.Form):
     answer_flag = forms.CharField(label="Флаг:", widget=forms.TextInput(attrs={'class': 'input', 'type': 'text'}))
@@ -80,14 +82,15 @@ class CompetitionForm(forms.ModelForm):
             # Re-save the instance if additional fields like participants need to be updated
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
         instance.save()
-        AllUsers = User.objects.filter(platoon_id=instance.platoons.all())
-        url = "http://172.18.4.160"
-        Login = 'pnet_scripts'
-        Pass = 'eve'
-        cookie, xsrf = pf_login(url, Login, Pass)
-        for user in AllUsers:
-            create_lab(url, instance.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-            create_all_lab_nodes_and_connectiors(url, instance.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-        logout(url)
+
+        if instance.lab.get_platform() == "PN":
+            AllUsers = User.objects.filter(platoon_id=instance.platoons.all())
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+            for user in AllUsers:
+                create_lab(PNET_URL, instance.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+                create_all_lab_nodes_and_connectiors(PNET_URL, instance.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+            logout(PNET_URL)
 
         return instance
