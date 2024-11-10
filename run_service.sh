@@ -1,6 +1,8 @@
 #!/bin/bash
 chmod 755 run_prod.sh
 export PROD=True
+export USE_POSTGRES=yes
+export DB_HOST=192.168.100.5
 python3 deploy.py
 
 python3 manage.py collectstatic --noinput

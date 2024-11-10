@@ -1,0 +1,15 @@
+.jsoneditor {
+    border-bottom-color: rgb(111, 126, 149) !important;
+    border-color: rgb(111, 126, 149) !important;
+    border-radius: 10px !important;
+}
+
+.jsoneditor-statusbar {
+    border-radius: 0 0 10px 10px !important;
+}
+
+.jsoneditor-menu {
+    border-radius: 10px 10px 0 0 !important;
+    border-bottom-color: rgb(111, 126, 149) !important;
+    background-color: rgb(111, 126, 149) !important;
+}

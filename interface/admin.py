@@ -1,14 +1,29 @@
 from django.contrib import admin
 from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
+from django_json_widget.widgets import JSONEditorWidget
 
 from .models import *
 from .forms import CustomUserCreationForm, CompetitionForm
+from django.db.models import JSONField
+import json
+
+
+class CustomJSONEditorWidget(JSONEditorWidget):
+
+    class Media:
+        css = {
+            'all': ('admin/css/json_admin.css',)
+        }
 
 
 class SomeModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
-    summernote_fields = '__all__'
-    exclude = ('slug',)
+    summernote_fields = 'description'
+    formfield_overrides = {
+        JSONField: {
+            'widget': CustomJSONEditorWidget(width="50%", height="30vh")
+        },
+    }
 
 
 class IssuedLabsModel(admin.ModelAdmin):
@@ -18,6 +33,10 @@ class IssuedLabsModel(admin.ModelAdmin):
     # search_fields = ("user",)
 
     fieldsets = admin.ModelAdmin.fieldsets
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            obj.delete()
+        
 
 
 class MyUserAdmin(UserAdmin):
@@ -46,6 +65,10 @@ class CompetitionAdmin(admin.ModelAdmin):
     exclude = ('slug', 'participants')
     list_display = ("start", "lab")
     search_fields = ['lab__name']
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            obj.delete()
 
 
 admin.site.register(IssuedLabs, IssuedLabsModel)
