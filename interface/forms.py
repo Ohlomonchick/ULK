@@ -72,15 +72,6 @@ class CompetitionForm(forms.ModelForm):
         self.fields['start'].widget.attrs['autocomplete'] = 'off'
         self.fields['finish'].widget.attrs['autocomplete'] = 'off'
 
-        self.fields['level'].widget.attrs.update({
-            'style': 'width: 200px;'  # Adjust the width as needed
-        })
-
-        # self.fields['tasks'] = forms.ModelMultipleChoiceField(
-        #     widget=forms.CheckboxSelectMultiple,
-        #     queryset=LabTask.objects.filter(lab=self.instance.lab)
-        # )
-
         if self.instance and self.instance.lab:
             # Filter options to those belonging to the selected lab
             self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
@@ -93,7 +84,7 @@ class CompetitionForm(forms.ModelForm):
         if 'platoons' in self.cleaned_data:
             instance.platoons.set(self.cleaned_data['platoons'])
         if 'tasks' in self.cleaned_data:
-            instance.options.set(self.cleaned_data['tasks'])
+            instance.tasks.set(self.cleaned_data['tasks'])
 
             # Re-save the instance if additional fields like participants need to be updated
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()

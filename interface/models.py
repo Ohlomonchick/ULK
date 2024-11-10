@@ -206,6 +206,9 @@ class IssuedLabs(models.Model):
     date_of_appointment = models.DateTimeField('Дата назначения')
     end_date = models.DateTimeField('Дата окончания')
     done = models.BooleanField('Завершено', default=False)
+    level = models.ForeignKey(LabLevel, related_name="issued", on_delete=models.CASCADE,
+                              verbose_name="Вариант", null=True)
+    tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
 
     def save(self, *args, **kwargs):
         if self.lab.get_platform() == "PN":
