@@ -10,20 +10,31 @@ import json
 
 
 class CustomJSONEditorWidget(JSONEditorWidget):
-
     class Media:
         css = {
             'all': ('admin/css/json_admin.css',)
         }
 
 
-class SomeModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
+class LabLevelInline(admin.TabularInline):
+    model = LabLevel
+    extra = 1  # Display one empty level form by default
+    fields = ["level_number", "description"]
+
+
+class LabTaskInline(admin.TabularInline):
+    model = LabTask
+    extra = 1  # Shows one empty form by default
+
+
+class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     summernote_fields = 'description'
     formfield_overrides = {
         JSONField: {
             'widget': CustomJSONEditorWidget(width="50%", height="30vh")
         },
     }
+    inlines = [LabLevelInline, LabTaskInline]
 
 
 class IssuedLabsModel(admin.ModelAdmin):
@@ -31,13 +42,12 @@ class IssuedLabsModel(admin.ModelAdmin):
     list_filter = ("user", "lab")
     exclude = ('done', )
     # search_fields = ("user",)
-
     fieldsets = admin.ModelAdmin.fieldsets
+
     def delete_queryset(self, request, queryset):
         for obj in queryset:
             obj.delete()
         
-
 
 class MyUserAdmin(UserAdmin):
     add_form = CustomUserCreationForm
@@ -72,7 +82,7 @@ class CompetitionAdmin(admin.ModelAdmin):
 
 
 admin.site.register(IssuedLabs, IssuedLabsModel)
-admin.site.register(Lab, SomeModelAdmin)
+admin.site.register(Lab, LabModelAdmin)
 admin.site.register(Platoon, admin.ModelAdmin)
 admin.site.register(Competition, CompetitionAdmin)
 admin.site.register(User, MyUserAdmin)

@@ -130,6 +130,33 @@ class User(AbstractUser):
         verbose_name_plural = 'Пользователи'
 
 
+class LabLevel(models.Model):
+    lab = models.ForeignKey(Lab, related_name="levels", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
+    level_number = models.PositiveIntegerField("Вариант")
+    description = models.TextField("Описание варианта")
+
+    class Meta:
+        verbose_name = "Вариант"
+        verbose_name_plural = "Варианты"
+        ordering = ["lab", "level_number"]
+
+    def __str__(self):
+        return f"Вариант {self.level_number} - {self.description}"
+
+
+class LabTask(models.Model):
+    lab = models.ForeignKey(Lab, related_name="options", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
+    task_id = models.CharField("Идентификатор задания", max_length=255, null=True)
+    description = models.TextField("Описание задания", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Задание"
+        verbose_name_plural = "Задания"
+
+    def __str__(self):
+        return self.description
+
+
 class Competition(models.Model):
     slug = models.SlugField('Название в адресной строке', unique=True)
     start = models.DateTimeField("Начало")
@@ -142,6 +169,9 @@ class Competition(models.Model):
 
     platoons = models.ManyToManyField(Platoon, verbose_name="Взвода")
     participants = models.IntegerField("Количество участников", null=True, default=0)
+    level = models.ForeignKey(LabLevel, related_name="competitions", on_delete=models.CASCADE,
+                              verbose_name="Вариант",  null=True)
+    tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
 
     def clean(self):
         if self.start >= self.finish:
