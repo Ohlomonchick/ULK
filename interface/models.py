@@ -22,8 +22,7 @@ def default_json():
 def get_platform_choices():
     return [
         ("PN", "PNETLab"),
-        ("NO", "Без платформы"),
-        ("PT", "Packet Tracer")
+        ("NO", "Без платформы")
     ]
 
 
@@ -61,8 +60,6 @@ class Lab(models.Model):
         super(Lab, self).save(*args, **kwargs)
 
     def get_platform(self):
-        if settings.DEBUG:
-            return "NO"
         return self.platform
 
 
@@ -201,14 +198,25 @@ class Competition(models.Model):
 
 
 class IssuedLabs(models.Model):
-    lab = models.ForeignKey(Lab, related_name="lab_for_issue", on_delete=models.CASCADE)
+    lab = models.ForeignKey(
+        Lab,
+        related_name="lab_for_issue",
+        on_delete=models.CASCADE,
+        verbose_name="Лабораторная работа"
+    )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    date_of_appointment = models.DateTimeField('Дата назначения')
-    end_date = models.DateTimeField('Дата окончания')
+    date_of_appointment = models.DateTimeField('Начало')
+    end_date = models.DateTimeField('Конец')
     done = models.BooleanField('Завершено', default=False)
     level = models.ForeignKey(LabLevel, related_name="issued", on_delete=models.CASCADE,
                               verbose_name="Вариант", null=True)
     tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
+
+    def clean(self):
+        if self.date_of_appointment >= self.end_date:
+            raise ValidationError("Начало должно быть позже конца!")
+        if self.end_date <= timezone.now():
+            raise ValidationError("Экзамен уже закончился!")
 
     def save(self, *args, **kwargs):
         if self.lab.get_platform() == "PN":

@@ -6,7 +6,7 @@ from django_json_widget.widgets import JSONEditorWidget
 from .models import *
 from .forms import CustomUserCreationForm, CompetitionForm
 from django.db.models import JSONField
-import json
+from django import forms
 
 
 class CustomJSONEditorWidget(JSONEditorWidget):
@@ -38,11 +38,10 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
 
 
 class IssuedLabsModel(admin.ModelAdmin):
-    list_display = ("lab", "user", "end_date", "done")
+    list_display = ("lab", "user", "date_of_appointment", "done")
     list_filter = ("user", "lab")
     exclude = ('done', )
     # search_fields = ("user",)
-    fieldsets = admin.ModelAdmin.fieldsets
 
     class Media:
         js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
@@ -75,7 +74,6 @@ class MyUserAdmin(UserAdmin):
 class CompetitionAdmin(admin.ModelAdmin):
     form = CompetitionForm
     add_form = CompetitionForm
-    exclude = ('slug', 'participants')
     list_display = ("start", "lab")
     search_fields = ['lab__name']
 

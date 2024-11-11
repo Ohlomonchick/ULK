@@ -295,11 +295,12 @@ def start_lab(request):
             if user and lab:
                 issue = IssuedLabs.objects.filter(lab_id=lab, user_id=user)
                 # у нас на одного юзера не может назначаться несколько раз одна и та же лаба? пересдача с другим вариантом?
-                if issue and not lab.answer_flag:
+                if issue and lab.answer_flag:
+                    issue = issue[0]
                     data = {
                         "variant": issue.level.level_number,
                         "task": create_var_text(hardcode, user.last_name),
-                        "tasks": LabTaskSerializer(issue.tasks, many=True).data
+                        "tasks": [task.task_id for task in issue.tasks.all()]
                     }
                     return JsonResponse(data)
                 else:

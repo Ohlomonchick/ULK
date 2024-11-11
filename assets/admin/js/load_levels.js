@@ -1,10 +1,16 @@
 $(document).ready(function() {
     const labField = $("#id_lab"); // Original select element
     const labSelect2 = labField.siblings(".select2");
-    console.log(labSelect2.length);
+    const levelsField = $("#id_level");
+    const tasksField = $("#id_tasks");
 
     if (labSelect2.length) {
         const select2Selection = labSelect2.find(".select2-selection__rendered");
+        const labSlug = select2Selection[0].getAttribute("title");
+        if (labSlug === "---------") {
+            levelsField.empty();
+            tasksField.empty();
+        }
 
         const observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
@@ -21,12 +27,9 @@ $(document).ready(function() {
             attributes: true // Watch for attribute changes
         });
     }
-    const levelsField = $("#id_level");
-    const tasksField = $("#id_tasks");
+
     levelsField.siblings(".select2").css('width', '25vw');
     tasksField.siblings(".select2").css('width', '25vw');
-    levelsField.empty();
-    tasksField.empty();
 });
 
 // Define the loadLevels function to fetch and populate levels
