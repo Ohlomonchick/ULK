@@ -1,5 +1,5 @@
 from django import forms
-from .models import User, Competition
+from .models import User, Competition, LabLevel, LabTask
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 import logging
@@ -72,12 +72,19 @@ class CompetitionForm(forms.ModelForm):
         self.fields['start'].widget.attrs['autocomplete'] = 'off'
         self.fields['finish'].widget.attrs['autocomplete'] = 'off'
 
+        if self.instance and self.instance.lab:
+            # Filter options to those belonging to the selected lab
+            self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
+            self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.lab)
+
     def save(self, commit=True):
         instance = super(CompetitionForm, self).save(commit=False)
         instance.save()
 
         if 'platoons' in self.cleaned_data:
             instance.platoons.set(self.cleaned_data['platoons'])
+        if 'tasks' in self.cleaned_data:
+            instance.tasks.set(self.cleaned_data['tasks'])
 
             # Re-save the instance if additional fields like participants need to be updated
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
