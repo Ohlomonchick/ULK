@@ -27,23 +27,23 @@
                   <thead>
                     <tr>
                         <th><abbr title="Позиция">Поз.</abbr></th>
-                        <th>Фамилия</th>
                         <th>Имя</th>
+                        <th>Фамилия</th>
                         <th>Взвод</th>
                         <th>Затраченное время</th>
                         <th>Время сдачи</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody  id="solutions-table">
                   {% for solution in solutions %}
                     <tr>
                       <th>{{ solution.pos }}</th>
                       <td>{{ solution.user.first_name }}</td>
                       <td>{{ solution.user.last_name }}</td>
                       <td>{{ solution.user.platoon }}</td>
-                        <td>{{ solution.spent }}</td>
-                        <td>{{ solution.datetime }}</td>
-                     </tr>
+                      <td>{{ solution.spent }}</td>
+                      <td>{{ solution.datetime }}</td>
+                    </tr>
                   {% endfor  %}
                   </tbody>
                 </table>
@@ -75,7 +75,41 @@
         </div>
     </div>
 
-     <script>
+
+    <script>
+        function refreshSolutions() {
+            var competitionSlug = document.getElementById('competition-slug').getAttribute('data-slug');
+            $.ajax({
+                url: `/competitions/${competitionSlug}/solutions/`,
+                type: 'GET',
+                success: function(response) {
+                    var tableBody = document.querySelector('#solutions-table tbody');
+                    //tableBody.innerHTML = '';
+
+                    response.solutions.forEach(function(solution) {
+                        var row = document.createElement('tr');
+                        row.innerHTML = `
+                             <th>${solution.pos}</th>
+                             <td>${solution.user_first_name}</td>
+                             <td>${solution.user_last_name}</td>
+                             <td>${solution.user_platoon}</td>
+                             <td>${solution.spent}</td>
+                             <td>${solution.datetime}</td>
+                             `;
+                        tableBody.appendChild(row);
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error loading solutions:", error);
+                }
+            });
+        }
+
+        setInterval(refreshSolutions, 1000);
+    </script>
+
+
+    <script>
         // Function to update the countdown timer
         {% if solutions %}
             setTimeout('location.reload()', 30000);
@@ -140,4 +174,7 @@
         setInterval(updateTimer, 1000);
         setInterval(fetchTime, 30000);
     </script>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
 {% endblock %}

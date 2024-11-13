@@ -10,4 +10,5 @@ urlpatterns = [
     path("labs/", LabListView.as_view(), name="lab-list"),
     path("competitions/<slug:slug>/", CompetitionDetailView.as_view(), name="competition-detail"),
     path("competitions/", CompetitionListView.as_view(), name="competition-list"),
+    path("competitions/<slug:slug>/solutions/", CompetitionSolutionsView.as_view(), name="competition-solutions"),
 ]
