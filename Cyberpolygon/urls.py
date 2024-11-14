@@ -19,8 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from interface.views import registration, AnswerAPIView, start_lab, end_lab, change_password
-from interface.api import get_time
-
+from interface.api import get_time, get_solutions
 
 admin.site.site_url = '/cyberpolygon/labs'
 
@@ -31,6 +30,7 @@ urlpatterns = [
     path("api/start", start_lab),
     path("api/end", end_lab),
     path('api/get_competition_time/<int:competition_id>/', get_time, name='get_time'),
+    path('api/get_competition_solutions/<slug:slug>/', get_solutions, name='get_solutions'),
     path('jet/', include('jet.urls', 'jet')),
     path('cyberpolygon/', include(('interface.urls', 'interface'), namespace='interface')),
     path('admin/', admin.site.urls),

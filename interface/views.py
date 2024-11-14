@@ -113,14 +113,6 @@ class CompetitionDetailView(DetailView):
                 datetime__lte=competition.finish,
                 datetime__gte=competition.start
             ).order_by('datetime').values()
-            pos = 1
-            # for solution in solutions:
-            #     user = User.objects.get(pk=solution["user_id"])
-            #     solution["user"] = user
-            #     solution["pos"] = str(pos)
-            #     solution["spent"] = str(solution["datetime"] - competition.start).split(".")[0]
-            #
-            #     pos += 1
 
             context["solutions"] = solutions
 
@@ -132,33 +124,6 @@ class CompetitionDetailView(DetailView):
         context["object"] = competition
 
         return context
-
-
-class CompetitionSolutionsView(View):
-    def get(self, request, slug):
-        competition = get_object_or_404(Competition, slug=slug)
-        solutions = Answers.objects.filter(
-            lab=competition.lab,
-            user__platoon__in=competition.platoons.all(),
-            datetime__lte=competition.finish,
-            datetime__gte=competition.start
-        ).order_by('datetime').values()
-
-        solutions_data = []
-        pos = 1
-        for solution in solutions:
-            user = User.objects.get(pk=solution["user_id"])
-            solutions_data.append({
-                "pos": pos,
-                "user_first_name": user.first_name,
-                "user_last_name": user.last_name,
-                "user_platoon": str(user.platoon),
-                "spent": str(solution["datetime"] - competition.start).split(".")[0],
-                "datetime": solution["datetime"].strftime("%Y-%m-%d %H:%M:%S")
-            })
-            pos += 1
-
-        return JsonResponse({"solutions": solutions_data})
 
 
 class PlatoonDetailView(DetailView):
@@ -272,10 +237,10 @@ def change_password(request):
             url = "http://172.18.4.160"
             Login = 'pnet_scripts'
             Pass = 'eve'
-            # cookie, xsrf = pf_login(url, Login, Pass)
-            # create_directory(url, "/Practice work/Test_Labs/api_test_dir", user.username, cookie)
-            # create_user(url, user.username, request.POST.get('password1'), '1', cookie)
-            # logout(url)
+            cookie, xsrf = pf_login(url, Login, Pass)
+            create_directory(url, "/Practice work/Test_Labs/api_test_dir", user.username, cookie)
+            create_user(url, user.username, request.POST.get('password1'), '1', cookie)
+            logout(url)
             return redirect('/cyberpolygon/labs')
         else:
             form = ChangePasswordForm()
