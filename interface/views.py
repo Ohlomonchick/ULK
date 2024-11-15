@@ -1,3 +1,4 @@
+from django.views import View
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 import logging
@@ -6,7 +7,7 @@ from interface.forms import LabAnswerForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_directory, create_user, logout
 
@@ -112,14 +113,6 @@ class CompetitionDetailView(DetailView):
                 datetime__lte=competition.finish,
                 datetime__gte=competition.start
             ).order_by('datetime').values()
-            pos = 1
-            for solution in solutions:
-                user = User.objects.get(pk=solution["user_id"])
-                solution["user"] = user
-                solution["pos"] = str(pos)
-                solution["spent"] = str(solution["datetime"] - competition.start).split(".")[0]
-
-                pos += 1
 
             context["solutions"] = solutions
 

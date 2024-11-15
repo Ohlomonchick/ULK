@@ -23,30 +23,32 @@
                 <progress class="progress is-success" value="{{ progress }}" max="100">{{ progress }}%</progress>
             {% endif %}
             {% if solutions %}
-                <table class="table">
-                  <thead>
-                    <tr>
-                        <th><abbr title="Позиция">Поз.</abbr></th>
-                        <th>Фамилия</th>
-                        <th>Имя</th>
-                        <th>Взвод</th>
-                        <th>Затраченное время</th>
-                        <th>Время сдачи</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                  {% for solution in solutions %}
-                    <tr>
-                      <th>{{ solution.pos }}</th>
-                      <td>{{ solution.user.first_name }}</td>
-                      <td>{{ solution.user.last_name }}</td>
-                      <td>{{ solution.user.platoon }}</td>
-                        <td>{{ solution.spent }}</td>
-                        <td>{{ solution.datetime }}</td>
-                     </tr>
-                  {% endfor  %}
-                  </tbody>
-                </table>
+                <div id="competition-slug" data-slug="{{ object.slug }}">
+                    <table class="table">
+                      <thead>
+                        <tr>
+                            <th><abbr title="Позиция">Поз.</abbr></th>
+                            <th>Имя</th>
+                            <th>Фамилия</th>
+                            <th>Взвод</th>
+                            <th>Затраченное время</th>
+                            <th>Время сдачи</th>
+                        </tr>
+                      </thead>
+                      <tbody  id="solutions-table">
+                      {% for solution in solutions %}
+                        <tr>
+                          <th>{{ solution.pos }}</th>
+                          <td>{{ solution.user.first_name }}</td>
+                          <td>{{ solution.user.last_name }}</td>
+                          <td>{{ solution.user.platoon }}</td>
+                          <td>{{ solution.spent }}</td>
+                          <td>{{ solution.datetime }}</td>
+                        </tr>
+                      {% endfor  %}
+                      </tbody>
+                    </table>
+                </div>
             {% endif %}
             <p><div class="content">{{ object.lab.description | safe  }}</div></p>
             {% if not user.is_superuser and object.lab.answer_flag %}
@@ -75,12 +77,42 @@
         </div>
     </div>
 
-     <script>
-        // Function to update the countdown timer
-        {% if solutions %}
-            setTimeout('location.reload()', 30000);
-        {% endif %}
 
+    <script>
+        function refreshSolutions() {
+            var competitionSlug = document.getElementById('competition-slug').getAttribute('data-slug');
+            console.log();
+            $.ajax({
+                url: `/api/get_competition_solutions/${competitionSlug}/`,
+                type: 'GET',
+                success: function(response) {
+                    var tableBody = document.querySelector('#solutions-table');
+                    tableBody.innerHTML = '';
+
+                    response.solutions.forEach(function(solution) {
+                        var row = document.createElement('tr');
+                        row.innerHTML = `
+                             <th>${solution.pos}</th>
+                             <td>${solution.user_first_name}</td>
+                             <td>${solution.user_last_name}</td>
+                             <td>${solution.user_platoon}</td>
+                             <td>${solution.spent}</td>
+                             <td>${solution.datetime}</td>
+                             `;
+                        tableBody.appendChild(row);
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error loading solutions:", error);
+                }
+            });
+        }
+
+        setInterval(refreshSolutions, 1000);
+    </script>
+
+
+    <script>
         function updateTimer() {
             var hours = parseInt(document.getElementById('countdown').textContent.split(':')[0]);
             var minutes = parseInt(document.getElementById('countdown').textContent.split(':')[1]);
@@ -134,10 +166,12 @@
         }
         window.onload = function() {
             fetchTime();
+            refreshSolutions();
         }
 
         // Update the timer every second
         setInterval(updateTimer, 1000);
         setInterval(fetchTime, 30000);
     </script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 {% endblock %}
