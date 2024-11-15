@@ -287,10 +287,13 @@ def start_lab(request):
             logging.debug(user)
             if user and lab:
                 issue = IssuedLabs.objects.filter(lab_id=lab, user_id=user)
-                if issue and not lab.answer_flag:
+                # у нас на одного юзера не может назначаться несколько раз одна и та же лаба? пересдача с другим вариантом?
+                if issue and lab.answer_flag:
+                    issue = issue[0]
                     data = {
-                        "variant": 1,
-                        "task": create_var_text(hardcode, user.last_name)
+                        "variant": issue.level.level_number,
+                        "task": create_var_text(hardcode, user.last_name),
+                        "tasks": [task.task_id for task in issue.tasks.all()]
                     }
                     return JsonResponse(data)
                 else:
