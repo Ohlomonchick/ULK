@@ -1,5 +1,6 @@
 server {
     listen {%ip%};
+    client_max_body_size 300M;
 
     location /static/ {
         alias /static/;
