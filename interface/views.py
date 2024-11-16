@@ -35,11 +35,16 @@ class LabDetailView(DetailView):
             now = timezone.now()
             issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=request.user, end_date__gte=now,
                                                   date_of_appointment__lte=now).exclude(done=True).first()
-            comps = Competition.objects.filter(lab=context["object"], start__lte=now, finish__gte=now).first()
-            if comps:
-                answers = Answers.objects.filter(lab=context["object"], user=request.user, datetime__lte=comps.finish,
-                                                 datetime__gte=comps.start).first()
-            if issuedLab or comps and (answers is None):
+            context["issue"] = issuedLab
+
+            competition = False
+            answers = None
+            if "competition" in context.keys():
+                competition = context["competition"]
+                context["issue"] = competition
+                answers = Answers.objects.filter(lab=context["object"], user=request.user, datetime__lte=competition.finish,
+                                                 datetime__gte=competition.start).first()
+            if issuedLab or competition and (answers is None):
                 answer = request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
@@ -104,6 +109,7 @@ class CompetitionDetailView(DetailView):
 
         competition = context["object"]
         context["object"] = competition.lab
+        context["competition"] = competition
         context = LabDetailView.set_submitted(context, self.request)
 
         if self.request.user.is_staff:

@@ -205,8 +205,8 @@ class IssuedLabs(models.Model):
         verbose_name="Лабораторная работа"
     )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    date_of_appointment = models.DateTimeField('Начало')
-    end_date = models.DateTimeField('Конец')
+    date_of_appointment = models.DateTimeField('Начало', blank=False)
+    end_date = models.DateTimeField('Конец', blank=False)
     done = models.BooleanField('Завершено', default=False)
     level = models.ForeignKey(LabLevel, related_name="issued", on_delete=models.CASCADE,
                               verbose_name="Вариант", null=True)
