@@ -1,0 +1,14 @@
+[Unit]
+Description=Cyberpolygon-appscheduler
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/mnt/c/Users/Dmitry/PycharmProjects/Cyberpolygon
+ExecStart=/mnt/c/Users/Dmitry/PycharmProjects/Cyberpolygon/run_scheduler.sh
+Restart=always
+StandardOutput=append:/var/log/cyberpolygon_scheduler.log
+StandardError=append:/var/log/cyberpolygon_scheduler.log
+
+[Install]
+WantedBy=multi-user.target

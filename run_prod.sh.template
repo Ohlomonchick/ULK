@@ -9,6 +9,4 @@ sudo chmod 444 /etc/nginx/sites-available/django_project
 sudo ln -sf /etc/nginx/sites-available/django_project /etc/nginx/sites-enabled
 sudo systemctl restart nginx
 
-source /mnt/c/Users/Dmitry/PycharmProjects/Cyberpolygon/polygon_linux/bin/activate
-
 gunicorn Cyberpolygon.wsgi:application -c {%gunicorn.conf.py%}
