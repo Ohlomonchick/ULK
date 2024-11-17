@@ -169,6 +169,7 @@ class Competition(models.Model):
     level = models.ForeignKey(LabLevel, related_name="competitions", on_delete=models.CASCADE,
                               verbose_name="Вариант",  null=True)
     tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
+    deleted = models.BooleanField(default=False)
 
     def clean(self):
         if self.start >= self.finish:
@@ -176,7 +177,7 @@ class Competition(models.Model):
         if self.finish <= timezone.now():
             raise ValidationError("Экзамен уже закончился!")
 
-    def delete(self, *args, **kwargs):
+    def delete_from_platform(self):
         if self.lab.get_platform() == "PN":
             Login = 'pnet_scripts'
             Pass = 'eve'
@@ -186,6 +187,9 @@ class Competition(models.Model):
                 delete_lab_with_session_destroy(PNET_URL, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie,
                                                 xsrf, user.username)
             logout(PNET_URL)
+
+    def delete(self, *args, **kwargs):
+        self.delete_from_platform()
         super(Competition, self).delete(*args, **kwargs)
 
     class Meta:
@@ -211,6 +215,7 @@ class IssuedLabs(models.Model):
     level = models.ForeignKey(LabLevel, related_name="issued", on_delete=models.CASCADE,
                               verbose_name="Вариант", null=True)
     tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
+    deleted = models.BooleanField(default=False)
 
     def clean(self):
         if self.date_of_appointment >= self.end_date:
@@ -230,7 +235,9 @@ class IssuedLabs(models.Model):
             logout(PNET_URL)
         super(IssuedLabs, self).save(*args, **kwargs)
 
-    def delete(self, *args, **kwargs):
+    def delete_from_platform(self):
+        if self.deleted:
+            return False
         if self.lab.get_platform() == "PN":
             url = PNET_URL
             Login = 'pnet_scripts'
@@ -239,6 +246,9 @@ class IssuedLabs(models.Model):
             delete_lab_with_session_destroy(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
                                             self.user.username)
             logout(url)
+
+    def delete(self, *args, **kwargs):
+        self.delete_from_platform()
         super(IssuedLabs, self).delete(*args, **kwargs)
 
     # def __str__(self):
