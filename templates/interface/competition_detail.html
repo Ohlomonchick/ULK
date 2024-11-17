@@ -97,6 +97,16 @@
 
 
     <script>
+        window.onload = function() {
+        if (localStorage.getItem('final') === 'true') {
+            final = true;
+        } else {
+            final = false;
+        }
+            fetchTime();
+            refreshSolutions();
+        }
+
         function updateTimer() {
             var hours = parseInt(document.getElementById('countdown').textContent.split(':')[0]);
             var minutes = parseInt(document.getElementById('countdown').textContent.split(':')[1]);
@@ -114,9 +124,13 @@
                         minutes = 59;
                         seconds = 59;
                     } else {
-                        {% if available and not solutions %}
-                            location.reload();
-                        {% endif %}
+                        if (!final) {
+                            {% if available and not solutions %}
+                                location.reload();
+                            {% endif %}
+                            final = true;
+                            localStorage.setItem('final', 'true');
+                        }
                     }
                 }
             }
@@ -127,6 +141,7 @@
                 (minutes < 10 ? '0' : '') + minutes + ' : ' +
                 (seconds < 10 ? '0' : '') + seconds;
         }
+
 
         function fetchTime() {
             // Get the competition ID from the template (assuming you pass it in context)
