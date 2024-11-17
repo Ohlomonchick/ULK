@@ -98,10 +98,10 @@
 
     <script>
         window.onload = function() {
-        if (localStorage.getItem('final') === 'true') {
-            final = true;
+        if (localStorage.getItem('end') === 'true') {
+            end = true;
         } else {
-            final = false;
+            end = false;
         }
             fetchTime();
             refreshSolutions();
@@ -124,12 +124,12 @@
                         minutes = 59;
                         seconds = 59;
                     } else {
-                        if (!final) {
+                        if (!end) {
                             {% if available and not solutions %}
                                 location.reload();
                             {% endif %}
-                            final = true;
-                            localStorage.setItem('final', 'true');
+                            end = true;
+                            localStorage.setItem('end', 'true');
                         }
                     }
                 }
