@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models.signals import post_save
 from django.utils.text import slugify
 from django_summernote.models import AbstractAttachment
 from django.contrib.auth.models import AbstractUser
@@ -49,7 +50,6 @@ class Lab(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)
-        print(self.slug)
         address = os.environ.get('CREATE_ADDRESS', "")
         port = os.environ.get('CREATE_PORT', "")
 
@@ -169,6 +169,7 @@ class Competition(models.Model):
     level = models.ForeignKey(LabLevel, related_name="competitions", on_delete=models.CASCADE,
                               verbose_name="Вариант",  null=True)
     tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
+    deleted = models.BooleanField(default=False)
 
     def clean(self):
         if self.start >= self.finish:
@@ -176,7 +177,9 @@ class Competition(models.Model):
         if self.finish <= timezone.now():
             raise ValidationError("Экзамен уже закончился!")
 
-    def delete(self, *args, **kwargs):
+    def delete_from_platform(self):
+        if self.deleted:
+            return
         if self.lab.get_platform() == "PN":
             Login = 'pnet_scripts'
             Pass = 'eve'
@@ -186,6 +189,11 @@ class Competition(models.Model):
                 delete_lab_with_session_destroy(PNET_URL, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie,
                                                 xsrf, user.username)
             logout(PNET_URL)
+        self.deleted = True
+        self.save()
+
+    def delete(self, *args, **kwargs):
+        self.delete_from_platform()
         super(Competition, self).delete(*args, **kwargs)
 
     class Meta:
@@ -204,13 +212,14 @@ class IssuedLabs(models.Model):
         on_delete=models.CASCADE,
         verbose_name="Лабораторная работа"
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,  verbose_name='Кому назначаем')
     date_of_appointment = models.DateTimeField('Начало', blank=False)
     end_date = models.DateTimeField('Конец', blank=False)
     done = models.BooleanField('Завершено', default=False)
     level = models.ForeignKey(LabLevel, related_name="issued", on_delete=models.CASCADE,
                               verbose_name="Вариант", null=True)
     tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
+    deleted = models.BooleanField(default=False)
 
     def clean(self):
         if self.date_of_appointment >= self.end_date:
@@ -218,19 +227,27 @@ class IssuedLabs(models.Model):
         if self.end_date <= timezone.now():
             raise ValidationError("Экзамен уже закончился!")
 
-    def save(self, *args, **kwargs):
-        if self.lab.get_platform() == "PN":
+    @classmethod
+    def post_create(cls, sender, instance, created, *args, **kwargs):
+        if not created:
+            return
+        if instance.lab.get_platform() == "PN":
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            create_lab(PNET_URL, self.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
-                       self.user.username)
-            create_all_lab_nodes_and_connectiors(PNET_URL, self.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
-                                                 self.user.username)
+            create_lab(PNET_URL, instance.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
+                       instance.user.username)
+            create_all_lab_nodes_and_connectiors(PNET_URL, instance.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
+                                                 instance.user.username)
             logout(PNET_URL)
+        print(instance)
+
+    def save(self, *args, **kwargs):
         super(IssuedLabs, self).save(*args, **kwargs)
 
-    def delete(self, *args, **kwargs):
+    def delete_from_platform(self):
+        if self.deleted:
+            return
         if self.lab.get_platform() == "PN":
             url = PNET_URL
             Login = 'pnet_scripts'
@@ -239,6 +256,12 @@ class IssuedLabs(models.Model):
             delete_lab_with_session_destroy(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
                                             self.user.username)
             logout(url)
+
+        self.deleted = True
+        self.save()
+
+    def delete(self, *args, **kwargs):
+        self.delete_from_platform()
         super(IssuedLabs, self).delete(*args, **kwargs)
 
     # def __str__(self):
@@ -247,3 +270,6 @@ class IssuedLabs(models.Model):
     class Meta:
         verbose_name = 'Назначенная работа'
         verbose_name_plural = 'Назначенные работы'
+
+
+post_save.connect(IssuedLabs.post_create, sender=IssuedLabs)

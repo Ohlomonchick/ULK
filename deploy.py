@@ -21,6 +21,14 @@ with open('cyberpolygon.service.template') as f:
         write_f.write(string)
 
 
+with open('cyberpolygon-scheduler.service.template') as f:
+    string = f.read()
+    string = string.replace('{%workdir%}', os.getcwd())
+    string = string.replace('{%run_script%}', os.path.abspath('run_scheduler.sh'))
+    with open('cyberpolygon-scheduler.service', mode='w', encoding='utf-8') as write_f:
+        write_f.write(string)
+
+
 with open('run_prod.sh.template') as f:
     string = f.read()
     string = string.replace('{%gunicorn.conf.py%}', os.path.abspath('gunicorn.conf.py'))
