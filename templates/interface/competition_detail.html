@@ -22,12 +22,12 @@
             {% if progress %}
                 <progress class="progress is-success" value="{{ progress }}" max="100">{{ progress }}%</progress>
             {% endif %}
-            {% if solutions %}
+            {% if user.is_superuser %}
                 <div id="competition-slug" data-slug="{{ object.slug }}">
-                    <table class="table">
+                    <table class="table" style="border-spacing: 7px;">
                       <thead>
                         <tr>
-                            <th><abbr title="Позиция">Поз.</abbr></th>
+                            <th><abbr title="Позиция" style="text-decoration: none;">Поз.</abbr></th>
                             <th>Имя</th>
                             <th>Фамилия</th>
                             <th>Взвод</th>
@@ -36,16 +36,7 @@
                         </tr>
                       </thead>
                       <tbody  id="solutions-table">
-                      {% for solution in solutions %}
-                        <tr>
-                          <th>{{ solution.pos }}</th>
-                          <td>{{ solution.user.first_name }}</td>
-                          <td>{{ solution.user.last_name }}</td>
-                          <td>{{ solution.user.platoon }}</td>
-                          <td>{{ solution.spent }}</td>
-                          <td>{{ solution.datetime }}</td>
-                        </tr>
-                      {% endfor  %}
+
                       </tbody>
                     </table>
                 </div>
@@ -73,18 +64,26 @@
                     var tableBody = document.querySelector('#solutions-table');
                     tableBody.innerHTML = '';
 
-                    response.solutions.forEach(function(solution) {
-                        var row = document.createElement('tr');
-                        row.innerHTML = `
-                             <th>${solution.pos}</th>
-                             <td>${solution.user_first_name}</td>
-                             <td>${solution.user_last_name}</td>
-                             <td>${solution.user_platoon}</td>
-                             <td>${solution.spent}</td>
-                             <td>${solution.datetime}</td>
-                             `;
-                        tableBody.appendChild(row);
-                    });
+                    if (response.solutions.length === 0) {
+                        tableBody.innerHTML = `
+                            <tr>
+                                <td colspan = 6 style="text-align: center; color: gray;">Пока никто не выполнил работу</td>
+                            </tr>
+                        `;
+                    } else {
+                        response.solutions.forEach(function(solution) {
+                            var row = document.createElement('tr');
+                            row.innerHTML = `
+                                 <th>${solution.pos}</th>
+                                 <td>${solution.user_first_name}</td>
+                                 <td>${solution.user_last_name}</td>
+                                 <td>${solution.user_platoon}</td>
+                                 <td>${solution.spent}</td>
+                                 <td>${solution.datetime}</td>
+                                 `;
+                            tableBody.appendChild(row);
+                        });
+                    }
                 },
                 error: function(xhr, status, error) {
                     console.error("Error loading solutions:", error);
@@ -172,5 +171,6 @@
         setInterval(updateTimer, 1000);
         setInterval(fetchTime, 30000);
     </script>
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 {% endblock %}
