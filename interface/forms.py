@@ -96,8 +96,8 @@ class CompetitionForm(forms.ModelForm):
             Pass = 'eve'
             cookie, xsrf = pf_login(PNET_URL, Login, Pass)
             for user in AllUsers:
-                create_lab(PNET_URL, instance.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
-                create_all_lab_nodes_and_connectiors(PNET_URL, instance.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf, user.username)
+                create_lab(PNET_URL, instance.lab.name, "", PNET_BASE_DIR, cookie, xsrf, user.username)
+                create_all_lab_nodes_and_connectiors(PNET_URL, instance.lab, PNET_BASE_DIR, cookie, xsrf, user.username)
             logout(PNET_URL)
 
         return instance

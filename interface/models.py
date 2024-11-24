@@ -186,7 +186,7 @@ class Competition(models.Model):
             cookie, xsrf = pf_login(PNET_URL, Login, Pass)
             AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
             for user in AllUsers:
-                delete_lab_with_session_destroy(PNET_URL, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie,
+                delete_lab_with_session_destroy(PNET_URL, self.lab.name, PNET_BASE_DIR, cookie,
                                                 xsrf, user.username)
             logout(PNET_URL)
         self.deleted = True
@@ -235,9 +235,9 @@ class IssuedLabs(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            create_lab(PNET_URL, instance.lab.name, "", "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
+            create_lab(PNET_URL, instance.lab.name, "", PNET_BASE_DIR, cookie, xsrf,
                        instance.user.username)
-            create_all_lab_nodes_and_connectiors(PNET_URL, instance.lab, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
+            create_all_lab_nodes_and_connectiors(PNET_URL, instance.lab, PNET_BASE_DIR, cookie, xsrf,
                                                  instance.user.username)
             logout(PNET_URL)
         print(instance)
@@ -253,7 +253,7 @@ class IssuedLabs(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.lab.name, "/Practice work/Test_Labs/api_test_dir", cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.lab.name, PNET_BASE_DIR, cookie, xsrf,
                                             self.user.username)
             logout(url)
 

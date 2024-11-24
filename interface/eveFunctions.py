@@ -2,6 +2,8 @@ import requests
 from slugify import slugify
 import logging
 import json
+from .config import *
+from urllib.parse import urljoin
 
 
 def pf_login(url, name, password):
@@ -36,7 +38,7 @@ def create_user(url, username, password, user_role, cookie):
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
-                "user_workspace": f"/Practice work/Test_Labs/api_test_dir/{username}",
+                "user_workspace": urljoin(PNET_BASE_DIR, username),
                 "note": "",
                 "max_node": "",
                 "max_node_lab": ""
@@ -50,7 +52,7 @@ def create_user(url, username, password, user_role, cookie):
             cookies = cookie, 
             verify = False
         )
-        logging.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(username, password, f"/Practice work/Test_Labs/api_test_dir/{username}", r.text))
+        logging.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(username, password, urljoin(PNET_BASE_DIR, username), r.text))
     except Exception as e:
         logging.debug("Error with creating user\n{}\n".format(e))
 
