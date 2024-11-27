@@ -1,10 +1,15 @@
 from email.utils import format_datetime
+
+from django.core.cache import cache
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import timedelta
+
+from slugify import slugify
+
 from .models import Competition, LabLevel, Lab, LabTask, Answers, User
 from .serializers import LabLevelSerializer, LabTaskSerializer
 
@@ -26,7 +31,7 @@ def get_time(request, competition_id):
         return Response({
             'hours': hours,
             'minutes': minutes,
-            'seconds': seconds
+            'seconds': seconds,
         })
     except Competition.DoesNotExist:
         return Response({'error': 'Competition not found'}, status=404)
@@ -80,3 +85,44 @@ def load_tasks(request, lab_name):
     except Lab.DoesNotExist:
         return Response({"error": "Lab not found"}, status=404)
 
+
+@api_view(['POST'])
+def press_button(request, action):
+    try:
+        lab_name = request.data.get('lab')
+        competition = Competition.objects.filter(lab__name=lab_name).first()
+
+        if action == "start":
+            competition.start = timezone.now()
+            competition.save()
+
+            cache.set("competitions_update", True, timeout=60)
+
+            start_time_str = competition.start.strftime("%Y-%m-%d-%H-%M-%S-%f")
+            slug = slugify(f"{lab_name}{start_time_str}", allow_unicode=False)
+            competition_url = f"/cyberpolygon/competitions/{slug}/"
+
+            return JsonResponse({"redirect_url": competition_url}, status=200)
+        else:
+            return JsonResponse({"error": "Unknown action"}, status=400)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(['GET'])
+def check_updates(request):
+    last_update = cache.get("competitions_update", False)
+    if last_update:
+        cache.delete("competitions_update")
+    return JsonResponse({"update_required": last_update})
+
+
+@api_view(['GET'])
+def check_availability(request, slug):
+    try:
+        competition = Competition.objects.get(slug=slug)
+        available = competition.finish > timezone.now()
+        return JsonResponse({"available": available})
+    except Competition.DoesNotExist:
+        return JsonResponse({"error": "Competition not found"}, status=404)

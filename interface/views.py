@@ -1,3 +1,5 @@
+from lib2to3.fixes.fix_input import context
+
 from django.views import View
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
@@ -82,34 +84,30 @@ class CompetitionListView(ListView):
     model = Competition
 
     def get_queryset(self):
-        queryset = []
-        current_time = timezone.now()
-        if self.request.user.is_authenticated:
-            queryset = Competition.objects.order_by("-start").all()
-            if not self.request.user.is_staff:
-                queryset = queryset.filter(
-                    platoons__in=[self.request.user.platoon],
-                    start__lte=current_time,
-                    finish__gte=current_time
-                )
+        queryset = Competition.objects.order_by("-start").all()
+        if not self.request.user.is_staff:
+            current_time = timezone.now()
+            queryset = queryset.filter(
+                platoons__in=[self.request.user.platoon],
+                start__lte=current_time,
+                finish__gte=current_time
+            )
         return queryset
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["now"] = timezone.now()
+        return context
 
 class CompetitionDetailView(DetailView):
     model = Competition
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        context["available"] = True
-        if not self.request.user.is_staff:
-            if timezone.now() < context["object"].start or timezone.now() > context["object"].finish:
-                context["available"] = False
-                return context
-
         competition = context["object"]
         context["object"] = competition.lab
         context["competition"] = competition
+        context["available"] = True if competition.finish > timezone.now() else False
         context = LabDetailView.set_submitted(context, self.request)
 
         if self.request.user.is_staff:
@@ -128,6 +126,7 @@ class CompetitionDetailView(DetailView):
                 context["progress"] = round(len(solutions) / int(competition.participants) * 100)
 
         context["object"] = competition
+        context["button"] = True if (timezone.now() - competition.start).total_seconds() < 0 else False
 
         return context
 
@@ -181,7 +180,6 @@ class PlatoonListView(ListView):
             progress_dict["progress"] += int((progress_dict["submitted"] / progress_dict["total"]) * 100)
 
         return progress_dict
-
 
 
 class UserDetailView(DetailView):

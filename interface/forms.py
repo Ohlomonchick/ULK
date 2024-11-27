@@ -91,7 +91,7 @@ class CompetitionForm(forms.ModelForm):
         instance.save()
 
         if instance.lab.get_platform() == "PN":
-            AllUsers = User.objects.filter(platoon_id=instance.platoons.all())
+            AllUsers = User.objects.filter(platoon_id__in=instance.platoons.all())
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(PNET_URL, Login, Pass)

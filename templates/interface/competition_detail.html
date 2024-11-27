@@ -5,25 +5,38 @@
 {% block content %}
     <div class="columns is-centered">
         <div class="column is-two-thirds">
-        {% if available  %}
             <h1 class="title is-2">{{ object.lab.name }}</h1>
             <div class="column is-one-quarter p-0 mb-4">
                 <div id="timer" class="message is-dark">
                     <div class="message-body">
-                    <h2 class="has-text-weight-bold">Оставшееся время:</h2>
-                    <div id="countdown" class="has-text-weight-bold has-text-danger">
-                         {{ delta.hours }} <span>:</span>
-                         {{ delta.minutes }} <span>:</span>
-                         {{ delta.seconds }}
-                    </div>
-
+                        <h2 class="has-text-weight-bold">Оставшееся время:</h2>
+                        <div id="countdown" class="has-text-weight-bold has-text-danger">
+                             {{ delta.hours }} <span>:</span>
+                             {{ delta.minutes }} <span>:</span>
+                             {{ delta.seconds }}
+                        </div>
                     </div>
                 </div>
             </div>
             {% if progress %}
                 <progress class="progress is-success" value="{{ progress }}" max="100">{{ progress }}%</progress>
             {% endif %}
+
             {% if user.is_superuser %}
+                {% if button %}
+                    <div id="button-video-container" style="display: flex; align-items: center;">
+                        <button id="start-now" class="button is-danger is-large" data-slug="{{ object.slug }}" data-lab="{{ object.lab.name }}">
+                            Начать сейчас
+                        </button>
+                        <div id="video-container" class="hidden">
+                            {% load static %}
+                                <video id="exam-video" style="width: auto; height: 62px; border: 1px solid #ccc; border-radius: 4px;" class="is-hidden" autoplay muted>
+                                    <source src="{% static 'videos/rocket.mp4' %}" type="video/mp4"></source>
+                                </video>
+                        </div>
+                    </div>
+                {% endif %}
+
                 <div id="competition-slug" data-slug="{{ object.slug }}">
                     <table class="table" style="border-spacing: 7px;">
                       <thead>
@@ -45,19 +58,33 @@
             {% with object=object.lab %}
                 {% include 'interface/lab_data.html' %}
             {% endwith %}
-        {% else  %}
-            <div class="notification is-warning is-light">
-                <h1 class="subtitle is-4">Экзамен станет доступен: {{ object.start }}</h1>
-            </div>
-        {% endif %}
         </div>
     </div>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const startButton = document.getElementById("start-now");
+            const video = document.getElementById("exam-video");
+
+            // Обработчик нажатия на кнопку
+            if (startButton) {
+                startButton.addEventListener("click", function () {
+                    video.style.display = "block"; // Показываем видео
+                    video.play(); // Воспроизводим
+
+                    // Пример действия после завершения видео (если нужно)
+                    video.onended = function () {
+                        video.style.display = "none"; // Скрываем видео
+                    };
+                });
+            }
+        });
+    </script>
 
     <script>
         function refreshSolutions() {
+            if (!document.getElementById('competition-slug')) { return; }
             var competitionSlug = document.getElementById('competition-slug').getAttribute('data-slug');
-            console.log();
             $.ajax({
                 url: `/api/get_competition_solutions/${competitionSlug}/`,
                 type: 'GET',
@@ -97,6 +124,7 @@
 
 
     <script>
+        let end = false;
         window.onload = function() {
         if (localStorage.getItem('end') === 'true') {
             end = true;
@@ -173,5 +201,10 @@
         setInterval(fetchTime, 30000);
     </script>
 
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+{% load static %}
+    <meta name="csrf-token" content="{{ csrf_token }}">
+
+    <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
+    <script src="{% static 'admin/js/button.js' %}"></script>
+
 {% endblock %}

@@ -3,18 +3,41 @@
 
 {% block content %}
     <h1 class="title is-1">Доступные экзамены</h1>
-<div class="block">
-<ul>
-{% for comp in object_list %}
-    <div class="box" style="border: thin solid darkslategray;">
-        <h2 class="title is-3 is-link"><a href="{% url 'interface:competition-list' %}{{ comp.slug }}">{{ comp.lab.name }}</a></h2>
-        <h4 class="subtitle is-5">Начало: {{ comp.start }}</h4>
+    <div class="block">
+        <ul>
+        {% for comp in object_list %}
+            <div class="box" style="border: thin solid darkslategray;">
+                <h2 class="title is-3 is-link"><a href="{% url 'interface:competition-list' %}{{ comp.slug }}">{{ comp.lab.name }}</a></h2>
+                {% if comp.start > now %}
+                    <h4 class="subtitle is-5 has-text-warning">Экзамен станет доступен: {{ comp.start }}</h4>
+                {% elif comp.finish < now %}
+                    <h4 class="subtitle is-5 has-text-danger">Экзамен был завершён: {{ comp.finish }}</h4>
+                {% else %}
+                    <h4 class="subtitle is-5 has-text-success">Экзамен доступен для выполнения!</h4>
+                {% endif %}
+            </div>
+        {% empty %}
+                <li>Доступных экзаменов нет.</li>
+        {% endfor %}
+        </ul>
     </div>
-{% empty %}
-    <li>Доступных экзаменов нет.</li>
-{% endfor %}
-</ul>
 
+  <script>
+     document.addEventListener("DOMContentLoaded", function () {
+        function checkForUpdates() {
+            fetch('/api/check_updates/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.update_required) {
+                        location.reload();
+                    }
+                })
+                .catch(error => console.error("Ошибка проверки обновлений:", error));
+        }
 
-</div>
+        setInterval(checkForUpdates, 5000);
+    });
+
+  </script>
+
 {% endblock %}
