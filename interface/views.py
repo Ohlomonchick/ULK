@@ -86,9 +86,7 @@ class CompetitionListView(ListView):
         if not self.request.user.is_staff:
             current_time = timezone.now()
             queryset = queryset.filter(
-                platoons__in=[self.request.user.platoon],
-                start__lte=current_time,
-                finish__gte=current_time
+                platoons__in=[self.request.user.platoon]
             )
         return queryset
 

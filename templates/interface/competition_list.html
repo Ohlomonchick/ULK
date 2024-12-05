@@ -7,7 +7,12 @@
         <ul>
         {% for comp in object_list %}
             <div class="box" style="border: thin solid darkslategray;">
-                <h2 class="title is-3 is-link"><a href="{% url 'interface:competition-list' %}{{ comp.slug }}">{{ comp.lab.name }}</a></h2>
+                {% if comp.start < now and now < comp.finish or user.is_superuser %}
+                    <h2 class="title is-3 is-link"><a href="{% url 'interface:competition-list' %}{{ comp.slug }}">{{ comp.lab.name }}</a></h2>
+                {% else %}
+                    <h2 class="title is-3 is-link">{{ comp.lab.name }}</h2>
+                {% endif %}
+
                 {% if comp.start > now %}
                     <h4 class="subtitle is-5 has-text-warning">Экзамен станет доступен: {{ comp.start }}</h4>
                 {% elif comp.finish < now %}

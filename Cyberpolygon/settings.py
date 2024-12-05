@@ -167,7 +167,9 @@ SUMMERNOTE_THEME = 'bs4'
 
 SUMMERNOTE_CONFIG = {
     'summernote': {
-        'lang': 'ru-RU'
+        'lang': 'ru-RU',
+        'width': '80%',
+        'height': '680',
     },
 
     'attachment_model': 'interface.MyAttachment',
