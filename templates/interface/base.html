@@ -23,7 +23,7 @@
 
 
 
-<body>
+<body oncontextmenu="return false;" onselectstart="return false;">
     <div class="flex-wrapper">
         <nav class="navbar is-black" role="navigation" aria-label="main navigation">
           <div class="navbar-brand">
@@ -41,32 +41,30 @@
         {#    </a>#}
           </div>
 
-            <div class="navbar-start">
-              {% if  user.is_authenticated %}
-              <a class="navbar-item" href="{% url 'interface:lab-list' %}">
-              {% else %}
-              <a class="navbar-item" href="{% url 'reg' %}">
-              {% endif %}
-                Главная
-              </a>
+            {% if  user.is_authenticated %}
+            <a class="navbar-item" href="{% url 'interface:lab-list' %}">
+                {% else %}
+                <a class="navbar-item" href="{% url 'reg' %}">
+                    {% endif %}
+                    Главная
+                </a>
 
-              {% if user.is_authenticated %}
+                {% if user.is_authenticated %}
                 <a class="navbar-item" href="{% url 'interface:competition-list' %}">
-                  Экзамены
+                    Экзамены
                 </a>
-              {% endif %}
+                {% endif %}
 
-              {% if user.is_superuser %}
+                {% if user.is_superuser %}
                 <a class="navbar-item" href = "{% url 'interface:platoon-list' %}">
-                  Список взводов
+                    Список взводов
                 </a>
-              {% endif %}
-            </div>
+                {% endif %}
 
-            <div class="navbar-end">
+                <div class="navbar-end">
                 {% if pnet_username %}
                     <div class="navbar-item">
-                        <h4 class="title is-6 has-text-white">Ваше имя в PNET: {{ pnet_username }}</h4>
+                        <h4 id="allow-copy" class="title is-6 has-text-white">Ваше имя в PNET: {{ pnet_username }}</h4>
                     </div>
                 {% endif %}
               <div class="navbar-item">
@@ -123,6 +121,15 @@
         </footer>
 
     </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var allowCopyElement = document.getElementById('allow-copy');
+        allowCopyElement.oncontextmenu = function(event) {
+            event.stopPropagation();
+        };
+        allowCopyElement.onselectstart = function(event) {
+            event.stopPropagation();
+        };
+    });
+</script>
 </body>
-
-

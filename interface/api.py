@@ -1,12 +1,13 @@
 from email.utils import format_datetime
 
 from django.core.cache import cache
+from django.utils.timezone import make_naive
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from slugify import slugify
 
@@ -90,23 +91,31 @@ def load_tasks(request, lab_name):
 def press_button(request, action):
     try:
         lab_name = request.data.get('lab')
-        competition = Competition.objects.filter(lab__name=lab_name).first()
+        start_time = request.data.get('start')
+        finish_time = request.data.get('finish')
 
+        start_time = make_naive(datetime.fromisoformat(start_time))
+        finish_time = make_naive(datetime.fromisoformat(finish_time))
+
+        competition = Competition.objects.get(
+            lab__name=lab_name,
+            finish=finish_time,
+            start=start_time,
+        )
         if action == "start":
             competition.start = timezone.now()
             competition.save()
-
             cache.set("competitions_update", True, timeout=60)
 
             start_time_str = competition.start.strftime("%Y-%m-%d-%H-%M-%S-%f")
             slug = slugify(f"{lab_name}{start_time_str}", allow_unicode=False)
             competition_url = f"/cyberpolygon/competitions/{slug}/"
-
             return JsonResponse({"redirect_url": competition_url}, status=200)
         else:
             return JsonResponse({"error": "Unknown action"}, status=400)
 
     except Exception as e:
+        print(f"Server error: {e}")
         return JsonResponse({"error": str(e)}, status=500)
 
 

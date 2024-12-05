@@ -25,7 +25,9 @@
             {% if user.is_superuser %}
                 {% if button %}
                     <div id="button-video-container" style="display: flex; align-items: center;">
-                        <button id="start-now" class="button is-danger is-large" data-slug="{{ object.slug }}" data-lab="{{ object.lab.name }}">
+                        <button id="start-now" class="button is-danger is-large"
+                                data-slug="{{ object.slug }}" data-lab="{{ object.lab.name }}"
+                                data-start="{{ competition.start }}" data-finish="{{ competition.finish }}">
                             Начать сейчас
                         </button>
                         <div id="video-container" class="hidden">
@@ -66,15 +68,13 @@
             const startButton = document.getElementById("start-now");
             const video = document.getElementById("exam-video");
 
-            // Обработчик нажатия на кнопку
             if (startButton) {
                 startButton.addEventListener("click", function () {
-                    video.style.display = "block"; // Показываем видео
-                    video.play(); // Воспроизводим
+                    video.style.display = "block";
+                    video.play();
 
-                    // Пример действия после завершения видео (если нужно)
                     video.onended = function () {
-                        video.style.display = "none"; // Скрываем видео
+                        video.style.display = "none";
                     };
                 });
             }
@@ -203,7 +203,7 @@
 
 {% load static %}
     <meta name="csrf-token" content="{{ csrf_token }}">
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.0/luxon.min.js"></script>
     <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
     <script src="{% static 'admin/js/button.js' %}"></script>
 
