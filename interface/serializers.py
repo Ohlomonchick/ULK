@@ -28,7 +28,10 @@ class AnswerSerializer(serializers.ModelSerializer):
             if pnet_login:
                 user = User.objects.get(pnet_login=pnet_login)
             elif username:
-                user = User.objects.get(username=username)
+                try:
+                    user = User.objects.get(username=username)
+                except User.DoesNotExist:
+                    user = User.objects.get(pnet_login=username)
             else:
                 raise serializers.ValidationError(
                     {"non_field_errors": "User could not be identified."}
