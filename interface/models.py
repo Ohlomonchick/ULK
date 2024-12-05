@@ -167,7 +167,7 @@ class Competition(models.Model):
     platoons = models.ManyToManyField(Platoon, verbose_name="Взвода")
     participants = models.IntegerField("Количество участников", null=True, default=0)
     level = models.ForeignKey(LabLevel, related_name="competitions", on_delete=models.CASCADE,
-                              verbose_name="Вариант",  null=True)
+                              verbose_name="Вариант",  null=True, blank=True)
     tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
     deleted = models.BooleanField(default=False)
 
@@ -217,7 +217,7 @@ class IssuedLabs(models.Model):
     end_date = models.DateTimeField('Конец', blank=False)
     done = models.BooleanField('Завершено', default=False)
     level = models.ForeignKey(LabLevel, related_name="issued", on_delete=models.CASCADE,
-                              verbose_name="Вариант", null=True)
+                              verbose_name="Вариант", null=True, blank=True)
     tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
     deleted = models.BooleanField(default=False)
 

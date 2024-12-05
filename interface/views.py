@@ -290,7 +290,7 @@ def start_lab(request):
             if user and lab:
                 issue = IssuedLabs.objects.filter(lab_id=lab, user_id=user)
                 # у нас на одного юзера не может назначаться несколько раз одна и та же лаба? пересдача с другим вариантом?
-                if issue and lab.answer_flag:
+                if issue and not lab.answer_flag:
                     issue = issue[0]
                     data = {
                         "variant": issue.level.level_number,
