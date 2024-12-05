@@ -4,6 +4,10 @@ from slugify import slugify
 def pnet_username(request):
     username = None
     if request.user.is_authenticated:
-        username = request.user.username
-        return {'pnet_username': slugify(username)}
+        if hasattr(request.user, 'pnet_login') and request.user.pnet_login is None:
+            request.user.pnet_login = slugify(request.user.username)
+            request.user.save()
+
+        username = request.user.pnet_login
+        return {'pnet_username': username}
     return {}

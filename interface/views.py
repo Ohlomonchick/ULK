@@ -278,10 +278,14 @@ def start_lab(request):
     if request.method == 'GET':
         logging.debug(request.body)
         data = json.loads(request.body.decode('utf-8'))
-        username = data.get("username")
+        username = data.get("username", False)
+        pnet_login = data.get("pnet_login", False)
         lab_name = data.get("lab")
-        if username and lab_name:
-            user = User.objects.filter(username=username).first()
+        if (username or pnet_login) and lab_name:
+            if username:
+                user = User.objects.filter(username=username).first()
+            else:
+                user = User.objects.filter(pnet_login=pnet_login).first()
             lab = Lab.objects.filter(name=lab_name).first()
             logging.debug(lab)
             logging.debug(user)
@@ -309,10 +313,14 @@ def end_lab(request):
     if request.method == 'POST':
         logging.debug(request.body)
         data = json.loads(request.body.decode('utf-8'))
-        username = data.get("username")
+        username = data.get("username", False)
+        pnet_login = data.get("pnet_login", False)
         lab_name = data.get("lab")
-        if username and lab_name:
-            user = User.objects.filter(username=username).first()
+        if (username or pnet_login) and lab_name:
+            if username:
+                user = User.objects.filter(username=username).first()
+            else:
+                user = User.objects.filter(pnet_login=pnet_login).first()
             lab = Lab.objects.filter(name=lab_name).first()
             if user and lab:
                 issue = IssuedLabs.objects.filter(lab_id=lab, user_id=user).exclude(done=True).first()

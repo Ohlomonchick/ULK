@@ -67,6 +67,7 @@ class MyUserAdmin(UserAdmin):
     )
     list_filter = ("is_staff", "platoon")
     search_fields = ("first_name", "last_name")
+    exclude = ('pnet_login', )
 
 
 class CompetitionAdmin(admin.ModelAdmin):

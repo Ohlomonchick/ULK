@@ -3,11 +3,10 @@ from django.db.models.signals import post_save
 from django.utils.text import slugify
 from django_summernote.models import AbstractAttachment
 from django.contrib.auth.models import AbstractUser
-from django.conf import settings
+
 from slugify import slugify
 from rest_framework import serializers
 import requests
-import os
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors, \
@@ -109,6 +108,7 @@ class User(AbstractUser):
                                 on_delete=models.CASCADE,
                                 verbose_name="взвод",
                                 null=True)
+    pnet_login = models.CharField('Имя в Pnet', max_length=255, primary_key=False, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.pk:
@@ -119,6 +119,7 @@ class User(AbstractUser):
             if not self.platoon_id:
                 default_platoon, created = Platoon.objects.get_or_create(number=0)
                 self.platoon = default_platoon
+        self.pnet_login = slugify(self.username)
 
         super(User, self).save(*args, **kwargs)
 
