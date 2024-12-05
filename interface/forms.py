@@ -1,5 +1,5 @@
 from django import forms
-from .models import User, Competition, LabLevel, LabTask
+from .models import User, Competition, LabLevel, LabTask, IssuedLabs, Platoon
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 import logging
@@ -62,6 +62,22 @@ class CustomUserCreationForm(UserCreationForm):
         return password2
 
 
+class IssuedLabForm(forms.ModelForm):
+    class Meta:
+        fields = '__all__'
+        model = IssuedLabs
+
+    def __init__(self, *args, **kwargs):
+        super(IssuedLabForm, self).__init__(*args, **kwargs)
+        self.fields['date_of_appointment'].widget.attrs['autocomplete'] = 'off'
+        self.fields['end_date'].widget.attrs['autocomplete'] = 'off'
+
+        if self.instance and hasattr(self.instance, 'lab') and self.instance.lab is not None:
+            # Filter options to those belonging to the selected lab
+            self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
+            self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.lab)
+
+
 class CompetitionForm(forms.ModelForm):
     class Meta:
         fields = '__all__'
@@ -71,8 +87,9 @@ class CompetitionForm(forms.ModelForm):
         super(CompetitionForm, self).__init__(*args, **kwargs)
         self.fields['start'].widget.attrs['autocomplete'] = 'off'
         self.fields['finish'].widget.attrs['autocomplete'] = 'off'
+        self.fields['platoons'].queryset = Platoon.objects.filter(number__gt=0)
 
-        if self.instance and self.instance.lab:
+        if self.instance and hasattr(self.instance, 'lab') and self.instance.lab is not None:
             # Filter options to those belonging to the selected lab
             self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
             self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.lab)

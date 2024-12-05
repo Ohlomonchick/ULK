@@ -3,7 +3,7 @@ from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from .models import *
-from .forms import CustomUserCreationForm, CompetitionForm
+from .forms import CustomUserCreationForm, CompetitionForm, IssuedLabForm
 from django.db.models import JSONField
 from django import forms
 
@@ -37,6 +37,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
 
 
 class IssuedLabsModel(admin.ModelAdmin):
+    form = IssuedLabForm
     list_display = ("lab", "user", "date_of_appointment", "done")
     list_filter = ("user", "lab")
     exclude = ('done', 'deleted')
