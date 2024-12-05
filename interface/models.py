@@ -114,8 +114,6 @@ class User(AbstractUser):
         if not self.pk:
             if not self.username:
                 self.username = self.last_name + "_" + self.first_name
-                self.set_password("test.test")
-
             if not self.platoon_id:
                 default_platoon, created = Platoon.objects.get_or_create(number=0)
                 self.platoon = default_platoon

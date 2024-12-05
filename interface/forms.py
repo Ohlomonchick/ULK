@@ -29,7 +29,10 @@ class ChangePasswordForm(forms.Form):
 
 
 class CustomUserCreationForm(UserCreationForm):
-    password1 = forms.CharField(label='Пароль', required=False, widget=forms.PasswordInput)
+    password1 = forms.CharField(
+        label='Пароль', required=False, widget=forms.PasswordInput,
+        help_text='Пароль по умолчанию "test.test", но вы можете задать свой пароль'
+    )
     password2 = forms.CharField(label='Повторите пароль', required=False, widget=forms.PasswordInput)
 
     def __init__(self, *args, **kwargs):
@@ -46,7 +49,10 @@ class CustomUserCreationForm(UserCreationForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         password = self.cleaned_data.get("password1")
-        if password:
+        if not password:
+            default_password = "test.test"  # Set your default password here
+            user.set_password(default_password)
+        else:
             user.set_password(password)
         if commit:
             user.save()
