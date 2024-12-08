@@ -19,6 +19,7 @@ class SignUpForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['platoon'].queryset = Platoon.objects.filter(number__gt=0)
         for name in self.fields.keys():
             self.fields[name].widget.attrs['autocomplete'] = 'off'
 

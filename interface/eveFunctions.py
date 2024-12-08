@@ -289,11 +289,10 @@ def create_all_lab_nodes_and_connectiors(url, lab_object, lab_path, cookie, xsrf
     username = slugify(username)
     lab_path += "/" + username
 
-
     lab_slash_name = "/" + lab_name
     lab = lab_path + lab_slash_name
     logging.debug(lab)
-    response = create_session(url, lab, cookie)
+    create_session(url, lab, cookie)
 
     users = filter_user(url, cookie, xsrf).json()
 
@@ -301,10 +300,7 @@ def create_all_lab_nodes_and_connectiors(url, lab_object, lab_path, cookie, xsrf
     count_labs = r["data"]
     logging.debug(count_labs)
 
-    response_json = filter_session(url, cookie, xsrf, 1, count_labs)
-
-    response_json = response_json.json()
-
+    response_json = filter_session(url, cookie, xsrf, 1, count_labs).json()
     session_list = []
 
     for item in response_json["data"]["data_table"]:
@@ -326,22 +322,26 @@ def create_all_lab_nodes_and_connectiors(url, lab_object, lab_path, cookie, xsrf
         if session[1] == 'pnet_scripts':
             sess_id = session[0]
 
-    
     join_session(url, sess_id, cookie)
 
     for node in lab_object.NodesData:
-        create_node(url, node, cookie, xsrf)
+        if node:
+            create_node(url, node, cookie, xsrf)
 
     for network in lab_object.NetworksData:
-        create_network(url, network, cookie)
+        if network:
+            create_network(url, network, cookie)
 
     for connector in lab_object.ConnectorsData:
-        create_p2p(url, connector, cookie)
+        if connector:
+            create_p2p(url, connector, cookie)
 
     for cloudConnector in lab_object.Connectors2CloudData:
-        create_p2p_nat(url, cloudConnector, cookie)
+        if cloudConnector:
+            create_p2p_nat(url, cloudConnector, cookie)
 
     destroy_session(url, sess_id, cookie)
+
 
 def delete_lab_with_session_destroy(url, lab_name, lab_path, cookie, xsrf, username):
     username = slugify(username)

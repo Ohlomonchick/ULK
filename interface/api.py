@@ -87,6 +87,12 @@ def load_tasks(request, lab_name):
         return Response({"error": "Lab not found"}, status=404)
 
 
+def change_iso_timezone(utc_time):
+    if utc_time[-1] == 'Z':
+        utc_time = utc_time[-1]
+    return datetime.fromisoformat(utc_time) + timedelta(hours=3)
+
+
 @api_view(['POST'])
 def press_button(request, action):
     try:
@@ -94,8 +100,8 @@ def press_button(request, action):
         start_time = request.data.get('start')
         finish_time = request.data.get('finish')
 
-        start_time = make_naive(datetime.fromisoformat(start_time))
-        finish_time = make_naive(datetime.fromisoformat(finish_time))
+        start_time = change_iso_timezone(start_time)
+        finish_time = change_iso_timezone(finish_time)
 
         competition = Competition.objects.get(
             lab__name=lab_name,
