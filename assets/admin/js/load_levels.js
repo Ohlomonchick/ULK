@@ -46,6 +46,7 @@ function loadLevels(labSlug) {
                 levelsField.empty(); // Clear existing options
 
                 // Populate new options from response data
+                levelsField.append($("<option value=\"\" selected=\"\">---------</option>"))
                 $.each(response, function(index, level) {
                     levelsField.append(
                         $("<option></option>").val(level.id).text(`Вариант ${level.level_number} - ${level.description}`)
@@ -71,7 +72,6 @@ function loadTasks(labSlug) {
         },
         success: function(response) {
             const tasksField = $("#id_tasks"); // Update with the correct ID of your levels field
-            console.log(response);
             if (tasksField.length) {
                 tasksField.empty(); // Clear existing options
 
