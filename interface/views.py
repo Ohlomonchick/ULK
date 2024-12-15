@@ -45,6 +45,11 @@ class LabDetailView(DetailView):
                 answers = Answers.objects.filter(lab=context["object"], user=request.user, datetime__lte=competition.finish,
                                                  datetime__gte=competition.start).first()
             if issuedLab or competition and (answers is None):
+                if issuedLab:
+                    context["available"] = True if issuedLab.end_date > timezone.now() else False
+                else:
+                    context["available"] = True if competition.finish > timezone.now() else False
+
                 answer = request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
@@ -103,7 +108,6 @@ class CompetitionDetailView(DetailView):
         competition = context["object"]
         context["object"] = competition.lab
         context["competition"] = competition
-        context["available"] = True if competition.finish > timezone.now() else False
         context = LabDetailView.set_submitted(context, self.request)
 
         if self.request.user.is_staff:
