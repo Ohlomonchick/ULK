@@ -70,15 +70,52 @@ class MyUserAdmin(UserAdmin):
     exclude = ('pnet_login', )
 
 
+class Competition2UserInline(admin.TabularInline):
+    model = Competition2User
+    extra = 0
+    fields = ('user', 'level')
+    readonly_fields = ('user',)
+    can_delete = False
+
+
+def set_all_users_to_competition_level(modeladmin, request, queryset):
+    for competition in queryset:
+        comp_users = competition.competition_users.all()
+        comp_users.update(level=competition.level)
+
+
 class CompetitionAdmin(admin.ModelAdmin):
     form = CompetitionForm
     add_form = CompetitionForm
     list_display = ("start", "lab")
     search_fields = ['lab__name']
     exclude = ('participants', 'deleted', 'slug')
+    inlines = [Competition2UserInline]
+    actions = [set_all_users_to_competition_level]
 
     class Media:
         js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # After saving the competition, ensure Competition2User records exist for all platoon users
+        all_users = User.objects.filter(platoon__in=obj.platoons.all())
+        existing_user_ids = obj.competition_users.values_list('user_id', flat=True)
+
+        for user in all_users:
+            if user.id not in existing_user_ids:
+                Competition2User.objects.create(
+                    competition=obj,
+                    user=user,
+                    level=obj.level
+                )
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        if obj and obj.lab:
+            formset.form.base_fields['level'].queryset = LabLevel.objects.filter(lab=obj.lab)
+
+        return formset
 
     def delete_queryset(self, request, queryset):
         for obj in queryset:

@@ -141,3 +141,17 @@ def check_availability(request, slug):
         return JsonResponse({"available": available})
     except Competition.DoesNotExist:
         return JsonResponse({"error": "Competition not found"}, status=404)
+
+
+@api_view(['GET'])
+def get_users_in_platoons(request):
+    platoon_ids = request.GET.get('platoons', '')
+
+    if platoon_ids:
+        ids = [int(x) for x in platoon_ids.split(',') if x.isdigit()]
+        users = User.objects.filter(platoon__number__in=ids).order_by('username')
+        print(users)
+        data = [{"id": user.pk, "login": user.username} for user in users]
+    else:
+        data = []
+    return JsonResponse(data, safe=False)

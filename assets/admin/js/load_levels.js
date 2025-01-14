@@ -4,6 +4,9 @@ $(document).ready(function() {
     const levelsField = $("#id_level");
     const tasksField = $("#id_tasks");
 
+    const platoonsField = $("#id_platoons");
+    const platoonsSelect2selection = platoonsField.siblings(".select2").find(".select2-selection__rendered");
+
     if (labSelect2.length) {
         const select2Selection = labSelect2.find(".select2-selection__rendered");
         const labSlug = select2Selection[0].getAttribute("title");
@@ -27,6 +30,22 @@ $(document).ready(function() {
             attributes: true // Watch for attribute changes
         });
     }
+
+    const observer = new MutationObserver((mutationsList, observer) => {
+    // Get all selected platoon elements
+    const choices = platoonsSelect2selection.find(".select2-selection__choice");
+
+    // Extract their 'title' attributes which contain the platoon numbers
+    const platoonNumbers = choices.map(function () {
+    return $(this).attr("title");
+    }).get();
+
+    console.log("Platoon numbers:", platoonNumbers);
+});
+
+// Start observing the target node for DOM changes
+observer.observe(platoonsSelect2selection[0], { childList: true, subtree: true });
+
 
     levelsField.siblings(".select2").css('width', '25vw');
     tasksField.siblings(".select2").css('width', '25vw');
@@ -56,6 +75,23 @@ function loadLevels(labSlug) {
                 // Trigger change event for select2 to refresh
                 levelsField.trigger('change.select2');
             }
+
+            const userLevelFields = $("select[name^='competition_users-'][name$='-level']");
+
+            userLevelFields.each(function() {
+                const $select = $(this);
+                $select.empty(); // Clear existing options
+                $select.append($("<option value=\"\">---------</option>"));
+
+                // Populate new options from the same response
+                $.each(response, function(index, level) {
+                    $select.append($("<option></option>").val(level.id).text(`Вариант ${level.level_number} - ${level.description}`));
+                });
+
+                // If using select2 for these fields, refresh them
+                $select.trigger('change.select2');
+            });
+
         },
         error: function(xhr, status, error) {
             console.error("Error loading levels:", error);

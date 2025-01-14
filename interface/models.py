@@ -271,4 +271,23 @@ class IssuedLabs(models.Model):
         verbose_name_plural = 'Назначенные работы'
 
 
+class Competition2User(models.Model):
+    competition = models.ForeignKey(
+        Competition,
+        on_delete=models.CASCADE,
+        related_name='competition_users'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='user_competitions'
+    )
+    level = models.ForeignKey(
+        LabLevel,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Вариант"
+    )
+
+
 post_save.connect(IssuedLabs.post_create, sender=IssuedLabs)
