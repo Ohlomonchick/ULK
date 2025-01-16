@@ -1,3 +1,5 @@
+import datetime
+
 from django.db import models
 from django.db.models.signals import post_save
 from django.utils.text import slugify
@@ -68,10 +70,38 @@ class LabSerializer(serializers.ModelSerializer):
         fields = ("name", "description")
 
 
+class LabLevel(models.Model):
+    lab = models.ForeignKey(Lab, related_name="levels", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
+    level_number = models.PositiveIntegerField("Вариант")
+    description = models.TextField("Описание варианта")
+
+    class Meta:
+        verbose_name = "Вариант"
+        verbose_name_plural = "Варианты"
+        ordering = ["lab", "level_number"]
+
+    def __str__(self):
+        return f"Вариант {self.level_number} - {self.description}"
+
+
+class LabTask(models.Model):
+    lab = models.ForeignKey(Lab, related_name="options", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
+    task_id = models.CharField("Идентификатор задания", max_length=255, null=True)
+    description = models.TextField("Описание задания", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Задание"
+        verbose_name_plural = "Задания"
+
+    def __str__(self):
+        return self.description
+
+
 class Answers(models.Model):
     lab = models.ForeignKey(Lab, related_name="lab", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     datetime = models.DateTimeField(null=True)
+    lab_task = models.ForeignKey(LabTask, related_name="lab_task", on_delete=models.CASCADE, null=True)
 
     def __str__(self):
         return str(self.lab.name + " " + self.user.username)
@@ -124,84 +154,6 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
-
-
-class LabLevel(models.Model):
-    lab = models.ForeignKey(Lab, related_name="levels", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
-    level_number = models.PositiveIntegerField("Вариант")
-    description = models.TextField("Описание варианта")
-
-    class Meta:
-        verbose_name = "Вариант"
-        verbose_name_plural = "Варианты"
-        ordering = ["lab", "level_number"]
-
-    def __str__(self):
-        return f"Вариант {self.level_number} - {self.description}"
-
-
-class LabTask(models.Model):
-    lab = models.ForeignKey(Lab, related_name="options", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
-    task_id = models.CharField("Идентификатор задания", max_length=255, null=True)
-    description = models.TextField("Описание задания", blank=True, null=True)
-
-    class Meta:
-        verbose_name = "Задание"
-        verbose_name_plural = "Задания"
-
-    def __str__(self):
-        return self.description
-
-
-class Competition(models.Model):
-    slug = models.SlugField('Название в адресной строке', unique=True)
-    start = models.DateTimeField("Начало")
-    finish = models.DateTimeField("Конец")
-    lab = models.ForeignKey(Lab,
-                            related_name="competitions",
-                            on_delete=models.CASCADE,
-                            verbose_name="Лабораторная работа",
-                            null=True)
-
-    platoons = models.ManyToManyField(Platoon, verbose_name="Взвода")
-    participants = models.IntegerField("Количество участников", null=True, default=0)
-    level = models.ForeignKey(LabLevel, related_name="competitions", on_delete=models.CASCADE,
-                              verbose_name="Вариант",  null=True, blank=True)
-    tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
-    deleted = models.BooleanField(default=False)
-
-    def clean(self):
-        if self.start >= self.finish:
-            raise ValidationError("Начало должно быть позже конца!")
-        if self.finish <= timezone.now():
-            raise ValidationError("Экзамен уже закончился!")
-
-    def delete_from_platform(self):
-        if self.deleted:
-            return
-        if self.lab.get_platform() == "PN":
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
-            for user in AllUsers:
-                delete_lab_with_session_destroy(PNET_URL, self.lab.name, PNET_BASE_DIR, cookie,
-                                                xsrf, user.username)
-            logout(PNET_URL)
-        self.deleted = True
-        self.save()
-
-    def delete(self, *args, **kwargs):
-        self.delete_from_platform()
-        super(Competition, self).delete(*args, **kwargs)
-
-    class Meta:
-        verbose_name = 'Экзамен'
-        verbose_name_plural = 'Экзамены'
-
-    def save(self, *args, **kwargs):
-        self.slug = slugify(self.lab.name + str(self.start))
-        super(Competition, self).save(*args, **kwargs)
 
 
 class IssuedLabs(models.Model):
@@ -271,6 +223,60 @@ class IssuedLabs(models.Model):
         verbose_name_plural = 'Назначенные работы'
 
 
+class Competition(models.Model):
+    slug = models.SlugField('Название в адресной строке', unique=True)
+    start = models.DateTimeField("Начало")
+    finish = models.DateTimeField("Конец")
+    lab = models.ForeignKey(Lab,
+                            related_name="competitions",
+                            on_delete=models.CASCADE,
+                            verbose_name="Лабораторная работа",
+                            null=True)
+
+    platoons = models.ManyToManyField(Platoon, verbose_name="Взвода", blank=True)
+    participants = models.IntegerField("Количество участников", null=True, default=0)
+    level = models.ForeignKey(LabLevel, related_name="competitions", on_delete=models.CASCADE,
+                              verbose_name="Вариант", null=True, blank=True)
+    tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
+    deleted = models.BooleanField(default=False)
+
+    non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
+    issued_labs = models.ManyToManyField(IssuedLabs, blank=True)
+
+    def clean(self):
+        if self.start >= self.finish:
+            raise ValidationError("Начало должно быть позже конца!")
+        if self.finish <= timezone.now():
+            raise ValidationError("Экзамен уже закончился!")
+
+    def delete_from_platform(self):
+        if self.deleted:
+            return
+        if self.lab.get_platform() == "PN":
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+            AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
+            for user in AllUsers:
+                delete_lab_with_session_destroy(PNET_URL, self.lab.name, PNET_BASE_DIR, cookie,
+                                                xsrf, user.username)
+            logout(PNET_URL)
+        self.deleted = True
+        self.save()
+
+    def delete(self, *args, **kwargs):
+        self.delete_from_platform()
+        super(Competition, self).delete(*args, **kwargs)
+
+    class Meta:
+        verbose_name = 'Экзамен'
+        verbose_name_plural = 'Экзамены'
+
+    def save(self, *args, **kwargs):
+        self.slug = slugify(self.lab.name + str(self.start))
+        super(Competition, self).save(*args, **kwargs)
+
+
 class Competition2User(models.Model):
     competition = models.ForeignKey(
         Competition,
@@ -291,3 +297,4 @@ class Competition2User(models.Model):
 
 
 post_save.connect(IssuedLabs.post_create, sender=IssuedLabs)
+# post_save.connect(Competition.post_save, sender=Competition)

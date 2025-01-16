@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db.models import Q
 from datetime import timedelta, datetime
 
 from slugify import slugify
@@ -42,8 +43,8 @@ def get_time(request, competition_id):
 def get_solutions(request, slug):
     competition = get_object_or_404(Competition, slug=slug)
     solutions = Answers.objects.filter(
+        Q(user__platoon__in=competition.platoons.all()) | Q(user__in=competition.non_platoon_users.all()),
         lab=competition.lab,
-        user__platoon__in=competition.platoons.all(),
         datetime__lte=competition.finish,
         datetime__gte=competition.start
     ).order_by('datetime').values()

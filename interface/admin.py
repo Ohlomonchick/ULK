@@ -36,21 +36,6 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     inlines = [LabLevelInline, LabTaskInline]
 
 
-class IssuedLabsModel(admin.ModelAdmin):
-    form = IssuedLabForm
-    list_display = ("lab", "user", "date_of_appointment", "done")
-    list_filter = ("user", "lab")
-    exclude = ('done', 'deleted')
-
-    # search_fields = ("user",)
-    class Media:
-        js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
-
-    def delete_queryset(self, request, queryset):
-        for obj in queryset:
-            obj.delete()
-
-
 class MyUserAdmin(UserAdmin):
     add_form = CustomUserCreationForm
     list_display = ("username", "is_staff", "platoon")
@@ -87,9 +72,9 @@ def set_all_users_to_competition_level(modeladmin, request, queryset):
 class CompetitionAdmin(admin.ModelAdmin):
     form = CompetitionForm
     add_form = CompetitionForm
-    list_display = ("start", "lab")
+    list_display = ("start", "lab", 'all_platoons', 'all_non_platoon_users')
     search_fields = ['lab__name']
-    exclude = ('participants', 'deleted', 'slug')
+    exclude = ('participants', 'deleted', 'slug', 'issued_labs')
     inlines = [Competition2UserInline]
     actions = [set_all_users_to_competition_level]
 
@@ -98,7 +83,6 @@ class CompetitionAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
-        # After saving the competition, ensure Competition2User records exist for all platoon users
         all_users = User.objects.filter(platoon__in=obj.platoons.all())
         existing_user_ids = obj.competition_users.values_list('user_id', flat=True)
 
@@ -121,8 +105,16 @@ class CompetitionAdmin(admin.ModelAdmin):
         for obj in queryset:
             obj.delete()
 
+    def all_platoons(self, obj):
+        return ", ".join(str(tag.number) for tag in obj.platoons.all())
 
-admin.site.register(IssuedLabs, IssuedLabsModel)
+    def all_non_platoon_users(self, obj):
+        return ", ".join(user.last_name for user in obj.non_platoon_users.all())
+
+    all_platoons.short_description = 'Взвода'
+    all_non_platoon_users.short_description = 'Отдельные пользователи'
+
+
 admin.site.register(Lab, LabModelAdmin)
 admin.site.register(Platoon, admin.ModelAdmin)
 admin.site.register(Competition, CompetitionAdmin)

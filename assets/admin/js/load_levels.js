@@ -31,20 +31,20 @@ $(document).ready(function() {
         });
     }
 
-    const observer = new MutationObserver((mutationsList, observer) => {
-    // Get all selected platoon elements
-    const choices = platoonsSelect2selection.find(".select2-selection__choice");
-
-    // Extract their 'title' attributes which contain the platoon numbers
-    const platoonNumbers = choices.map(function () {
-    return $(this).attr("title");
-    }).get();
-
-    console.log("Platoon numbers:", platoonNumbers);
-});
-
-// Start observing the target node for DOM changes
-observer.observe(platoonsSelect2selection[0], { childList: true, subtree: true });
+    // const observer = new MutationObserver((mutationsList, observer) => {
+    // // Get all selected platoon elements
+    //     const choices = platoonsSelect2selection.find(".select2-selection__choice");
+    //
+    //     // Extract their 'title' attributes which contain the platoon numbers
+    //     const platoonNumbers = choices.map(function () {
+    //     return $(this).attr("title");
+    //     }).get();
+    //
+    //     console.log("Platoon numbers:", platoonNumbers);
+    // });
+    //
+    // Start observing the target node for DOM changes
+    // observer.observe(platoonsSelect2selection[0], { childList: true, subtree: true });
 
 
     levelsField.siblings(".select2").css('width', '25vw');
@@ -76,21 +76,21 @@ function loadLevels(labSlug) {
                 levelsField.trigger('change.select2');
             }
 
-            const userLevelFields = $("select[name^='competition_users-'][name$='-level']");
-
-            userLevelFields.each(function() {
-                const $select = $(this);
-                $select.empty(); // Clear existing options
-                $select.append($("<option value=\"\">---------</option>"));
-
-                // Populate new options from the same response
-                $.each(response, function(index, level) {
-                    $select.append($("<option></option>").val(level.id).text(`Вариант ${level.level_number} - ${level.description}`));
-                });
-
-                // If using select2 for these fields, refresh them
-                $select.trigger('change.select2');
-            });
+            // const userLevelFields = $("select[name^='competition_users-'][name$='-level']");
+            //
+            // userLevelFields.each(function() {
+            //     const $select = $(this);
+            //     $select.empty(); // Clear existing options
+            //     $select.append($("<option value=\"\">---------</option>"));
+            //
+            //     // Populate new options from the same response
+            //     $.each(response, function(index, level) {
+            //         $select.append($("<option></option>").val(level.id).text(`Вариант ${level.level_number} - ${level.description}`));
+            //     });
+            //
+            //     // If using select2 for these fields, refresh them
+            //     $select.trigger('change.select2');
+            // });
 
         },
         error: function(xhr, status, error) {

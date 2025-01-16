@@ -109,10 +109,26 @@ class CompetitionForm(forms.ModelForm):
             instance.platoons.set(self.cleaned_data['platoons'])
         if 'tasks' in self.cleaned_data:
             instance.tasks.set(self.cleaned_data['tasks'])
+        if 'non_platoon_users' in self.cleaned_data:
+            instance.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
 
-            # Re-save the instance if additional fields like participants need to be updated
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
         instance.save()
+
+        for user in instance.non_platoon_users.all():
+            if user not in instance.issued_labs.all():
+                issued_lab = IssuedLabs.objects.create(
+                    lab=instance.lab, user=user, date_of_appointment=instance.start,
+                    end_date=instance.finish, level=instance.level
+                )
+                instance.issued_labs.add(issued_lab)
+                issued_lab.tasks.set(instance.tasks.all())
+
+        to_remove = []
+        for issued_lab in instance.issued_labs.all():
+            if issued_lab.user not in instance.non_platoon_users.all():
+                to_remove.append(issued_lab)
+        instance.issued_labs.remove(*to_remove)
 
         if instance.lab.get_platform() == "PN":
             AllUsers = User.objects.filter(platoon_id__in=instance.platoons.all())
