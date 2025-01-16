@@ -1,11 +1,13 @@
 from django.contrib import admin
-from django_summernote.admin import SummernoteModelAdmin
+from django_summernote.admin import SummernoteModelAdmin, SummernoteModelAdminMixin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from .models import *
 from .forms import CustomUserCreationForm, CompetitionForm, IssuedLabForm
 from django.db.models import JSONField
 from django import forms
+from unfold.admin import ModelAdmin, TabularInline
+
 
 
 class CustomJSONEditorWidget(JSONEditorWidget):
@@ -15,18 +17,22 @@ class CustomJSONEditorWidget(JSONEditorWidget):
         }
 
 
-class LabLevelInline(admin.TabularInline):
+class LabLevelInline(TabularInline):
     model = LabLevel
     extra = 1  # Display one empty level form by default
     fields = ["level_number", "description"]
 
 
-class LabTaskInline(admin.TabularInline):
+class LabTaskInline(TabularInline):
     model = LabTask
     extra = 1  # Shows one empty form by default
 
 
-class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
+class MySummernoteModelAdmin(SummernoteModelAdminMixin, ModelAdmin):
+    pass
+
+
+class LabModelAdmin(MySummernoteModelAdmin):  # instead of ModelAdmin
     summernote_fields = 'description'
     formfield_overrides = {
         JSONField: {
@@ -36,7 +42,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     inlines = [LabLevelInline, LabTaskInline]
 
 
-class IssuedLabsModel(admin.ModelAdmin):
+class IssuedLabsModel(ModelAdmin):
     form = IssuedLabForm
     list_display = ("lab", "user", "date_of_appointment", "done")
     list_filter = ("user", "lab")
@@ -51,7 +57,7 @@ class IssuedLabsModel(admin.ModelAdmin):
             obj.delete()
 
 
-class MyUserAdmin(UserAdmin):
+class MyUserAdmin(ModelAdmin, UserAdmin):
     add_form = CustomUserCreationForm
     list_display = ("username", "is_staff", "platoon")
     model = User
@@ -70,7 +76,7 @@ class MyUserAdmin(UserAdmin):
     exclude = ('pnet_login', )
 
 
-class CompetitionAdmin(admin.ModelAdmin):
+class CompetitionAdmin(ModelAdmin):
     form = CompetitionForm
     add_form = CompetitionForm
     list_display = ("start", "lab")

@@ -34,7 +34,7 @@ urlpatterns = [
     path('api/press_button/<str:action>/', press_button, name='press_button'),
     path('api/check_availability/<slug:slug>/', check_availability, name='check_availability'),
     path('api/check_updates/', check_updates, name='check_updates'),
-    path('jet/', include('jet.urls', 'jet')),
+    # path('jet/', include('jet.urls', 'jet')),
     path('cyberpolygon/', include(('interface.urls', 'interface'), namespace='interface')),
     path('admin/', admin.site.urls),
     path('summernote/', include('django_summernote.urls')),
