@@ -100,6 +100,7 @@ class CompetitionListView(ListView):
         context["now"] = timezone.now()
         return context
 
+
 class CompetitionDetailView(DetailView):
     model = Competition
 

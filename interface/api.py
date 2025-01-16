@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db.models import Q
 from datetime import timedelta, datetime
 
 from slugify import slugify
@@ -42,8 +43,8 @@ def get_time(request, competition_id):
 def get_solutions(request, slug):
     competition = get_object_or_404(Competition, slug=slug)
     solutions = Answers.objects.filter(
+        Q(user__platoon__in=competition.platoons.all()) | Q(user__in=competition.non_platoon_users.all()),
         lab=competition.lab,
-        user__platoon__in=competition.platoons.all(),
         datetime__lte=competition.finish,
         datetime__gte=competition.start
     ).order_by('datetime').values()
@@ -141,3 +142,17 @@ def check_availability(request, slug):
         return JsonResponse({"available": available})
     except Competition.DoesNotExist:
         return JsonResponse({"error": "Competition not found"}, status=404)
+
+
+@api_view(['GET'])
+def get_users_in_platoons(request):
+    platoon_ids = request.GET.get('platoons', '')
+
+    if platoon_ids:
+        ids = [int(x) for x in platoon_ids.split(',') if x.isdigit()]
+        users = User.objects.filter(platoon__number__in=ids).order_by('username')
+        print(users)
+        data = [{"id": user.pk, "login": user.username} for user in users]
+    else:
+        data = []
+    return JsonResponse(data, safe=False)
