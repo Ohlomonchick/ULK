@@ -69,22 +69,6 @@ class CustomUserCreationForm(UserCreationForm):
         return password2
 
 
-class IssuedLabForm(forms.ModelForm):
-    class Meta:
-        fields = '__all__'
-        model = IssuedLabs
-
-    def __init__(self, *args, **kwargs):
-        super(IssuedLabForm, self).__init__(*args, **kwargs)
-        self.fields['date_of_appointment'].widget.attrs['autocomplete'] = 'off'
-        self.fields['end_date'].widget.attrs['autocomplete'] = 'off'
-
-        if self.instance and hasattr(self.instance, 'lab') and self.instance.lab is not None:
-            # Filter options to those belonging to the selected lab
-            self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
-            self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.lab)
-
-
 class CompetitionForm(forms.ModelForm):
     class Meta:
         exclude = ('participants',)
@@ -95,6 +79,8 @@ class CompetitionForm(forms.ModelForm):
         self.fields['start'].widget.attrs['autocomplete'] = 'off'
         self.fields['finish'].widget.attrs['autocomplete'] = 'off'
         self.fields['platoons'].queryset = Platoon.objects.filter(number__gt=0)
+        self.fields['non_platoon_users'].help_text =\
+            'Вы можете добавить студентов к взводам. Или создать экзамен только для отдельных студентов.'
 
         if self.instance and hasattr(self.instance, 'lab') and self.instance.lab is not None:
             # Filter options to those belonging to the selected lab
