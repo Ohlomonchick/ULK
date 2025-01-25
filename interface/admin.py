@@ -3,9 +3,9 @@ from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from .models import *
-from .forms import CustomUserCreationForm, CompetitionForm, IssuedLabForm
+from .forms import CustomUserCreationForm, CompetitionForm
 from django.db.models import JSONField
-from django import forms
+from django_apscheduler.admin import DjangoJob, DjangoJobExecution
 
 
 class CustomJSONEditorWidget(JSONEditorWidget):
@@ -120,3 +120,5 @@ admin.site.register(Platoon, admin.ModelAdmin)
 admin.site.register(Competition, CompetitionAdmin)
 admin.site.register(User, MyUserAdmin)
 admin.site.register(Answers, admin.ModelAdmin)
+admin.site.unregister(DjangoJob)
+admin.site.unregister(DjangoJobExecution)
