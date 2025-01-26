@@ -5,7 +5,7 @@
     <div class="columns is-centered">
         <div class="column is-two-thirds">
             <h1 class="title is-2">{{ object.name }}</h1>
-        {% include 'interface/lab_data.html' %}
+            <p><div class="content ml-2 mt-1">{{ object.description | safe  }}</div></p>
         </div>
     </div>
 {% endblock %}

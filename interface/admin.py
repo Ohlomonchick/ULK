@@ -81,19 +81,6 @@ class CompetitionAdmin(admin.ModelAdmin):
     class Media:
         js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
 
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
-        all_users = User.objects.filter(platoon__in=obj.platoons.all())
-        existing_user_ids = obj.competition_users.values_list('user_id', flat=True)
-
-        for user in all_users:
-            if user.id not in existing_user_ids:
-                Competition2User.objects.create(
-                    competition=obj,
-                    user=user,
-                    level=obj.level
-                )
-
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
         if obj and obj.lab:

@@ -180,21 +180,6 @@ class IssuedLabs(models.Model):
         if self.end_date <= timezone.now():
             raise ValidationError("Экзамен уже закончился!")
 
-    @classmethod
-    def post_create(cls, sender, instance, created, *args, **kwargs):
-        if not created:
-            return
-        if instance.lab.get_platform() == "PN":
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            create_lab(PNET_URL, instance.lab.name, "", PNET_BASE_DIR, cookie, xsrf,
-                       instance.user.username)
-            create_all_lab_nodes_and_connectors(PNET_URL, instance.lab, PNET_BASE_DIR, cookie, xsrf,
-                                                instance.user.username)
-            logout(PNET_URL)
-        logger.debug(instance)
-
     def save(self, *args, **kwargs):
         super(IssuedLabs, self).save(*args, **kwargs)
 
@@ -243,7 +228,7 @@ class Competition(models.Model):
     deleted = models.BooleanField(default=False)
 
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
-    issued_labs = models.ManyToManyField(IssuedLabs, blank=True)
+    # issued_labs = models.ManyToManyField(IssuedLabs, blank=True)
 
     def clean(self):
         if not self.start or not self.finish:
@@ -253,26 +238,26 @@ class Competition(models.Model):
         if self.finish <= timezone.now():
             raise ValidationError("Экзамен уже закончился!")
 
-    def delete_from_platform(self):
-        if self.deleted:
-            return
-        if self.lab.get_platform() == "PN":
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
-            for user in AllUsers:
-                delete_lab_with_session_destroy(PNET_URL, self.lab.name, PNET_BASE_DIR, cookie,
-                                                xsrf, user.username)
-            logout(PNET_URL)
-        self.deleted = True
-        self.save()
+    # def delete_from_platform(self):
+    #     if self.deleted:
+    #         return
+    #     if self.lab.get_platform() == "PN":
+    #         Login = 'pnet_scripts'
+    #         Pass = 'eve'
+    #         cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+    #         AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
+    #         for user in AllUsers:
+    #             delete_lab_with_session_destroy(PNET_URL, self.lab.name, PNET_BASE_DIR, cookie,
+    #                                             xsrf, user.username)
+    #         logout(PNET_URL)
+    #     self.deleted = True
+    #     self.save()
 
     def delete(self, *args, **kwargs):
-        for issue in self.issued_labs.all():
+        for issue in self.competition_users.all():
             issue.delete()
 
-        self.delete_from_platform()
+        # self.delete_from_platform()
         super(Competition, self).delete(*args, **kwargs)
 
     class Meta:
@@ -301,6 +286,42 @@ class Competition2User(models.Model):
         null=True, blank=True,
         verbose_name="Вариант"
     )
+    deleted = models.BooleanField(default=False)
+
+    def delete_from_platform(self):
+        if self.deleted:
+            return
+        if self.competition.lab.get_platform() == "PN":
+            url = PNET_URL
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(url, Login, Pass)
+            delete_lab_with_session_destroy(url, self.competition.lab.name, PNET_BASE_DIR, cookie, xsrf,
+                                            self.user.username)
+            logout(url)
+
+        self.deleted = True
+        self.save()
+
+    def delete(self, *args, **kwargs):
+        self.delete_from_platform()
+        super(Competition2User, self).delete(*args, **kwargs)
+
+    @classmethod
+    def post_create(cls, sender, instance, created, *args, **kwargs):
+        if not created:
+            return
+        lab = instance.competition.lab
+        if lab.get_platform() == "PN":
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+            create_lab(PNET_URL, lab.name, "", PNET_BASE_DIR, cookie, xsrf,
+                       instance.user.username)
+            create_all_lab_nodes_and_connectors(PNET_URL, lab, PNET_BASE_DIR, cookie, xsrf,
+                                                instance.user.username)
+            logout(PNET_URL)
+        logger.debug(instance)
 
 
-post_save.connect(IssuedLabs.post_create, sender=IssuedLabs)
+post_save.connect(Competition2User.post_create, sender=Competition2User)
