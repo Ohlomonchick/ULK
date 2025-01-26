@@ -22,11 +22,6 @@ class Migration(migrations.Migration):
             name='non_platoon_users',
             field=models.ManyToManyField(to=settings.AUTH_USER_MODEL, verbose_name='Взвода'),
         ),
-        migrations.AddField(
-            model_name='user',
-            name='pnet_login',
-            field=models.CharField(blank=True, max_length=255, null=True, verbose_name='Имя в Pnet'),
-        ),
         migrations.AlterField(
             model_name='competition',
             name='level',
