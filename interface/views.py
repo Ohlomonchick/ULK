@@ -138,6 +138,7 @@ class PlatoonDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["now"] = timezone.now()
         user_list = User.objects.filter(platoon=context["platoon"]).exclude(username="admin")
         context["user_list"] = user_list
         competitions = {}
