@@ -39,6 +39,19 @@ def get_time(request, competition_id):
         return Response({'error': 'Competition not found'}, status=404)
 
 
+def make_solution_data(solution, competition):
+    user = User.objects.get(pk=solution["user_id"])
+    return {
+        "pos": 0,
+        "user_first_name": user.first_name,
+        "user_last_name": user.last_name,
+        "user_platoon": str(user.platoon),
+        "spent": str(solution["datetime"] - competition.start).split(".")[0],
+        "datetime": solution["datetime"].strftime("%d.%m.%Y %H:%M:%S"),
+        "raw_datetime": solution["datetime"]
+    }
+
+
 @api_view(['GET'])
 def get_solutions(request, slug):
     competition = get_object_or_404(Competition, slug=slug)
@@ -47,20 +60,31 @@ def get_solutions(request, slug):
         lab=competition.lab,
         datetime__lte=competition.finish,
         datetime__gte=competition.start
-    ).order_by('datetime').values()
+    ).order_by('user').order_by('datetime').values()
+
+    tasks_to_complete = competition.tasks.count()
 
     solutions_data = []
-    pos = 1
+    current_user_score = 0
+    current_user_id = None
     for solution in solutions:
-        user = User.objects.get(pk=solution["user_id"])
-        solutions_data.append({
-            "pos": pos,
-            "user_first_name": user.first_name,
-            "user_last_name": user.last_name,
-            "user_platoon": str(user.platoon),
-            "spent": str(solution["datetime"] - competition.start).split(".")[0],
-            "datetime": solution["datetime"].strftime("%d.%m.%Y %H:%M:%S")
-        })
+        if tasks_to_complete:
+            if current_user_id is None:
+                current_user_id = solution["user_id"]
+            elif current_user_id != solution["user_id"]:
+                current_user_score = 0
+                current_user_id = solution["user_id"]
+
+            current_user_score += 1
+            if current_user_score == tasks_to_complete:
+                solutions_data.append(make_solution_data(solution, competition))
+        else:
+            solutions_data.append(make_solution_data(solution, competition))
+
+    solutions_data.sort(key=lambda x: x["raw_datetime"])
+    pos = 1
+    for sol in solutions_data:
+        sol["pos"] = pos
         pos += 1
 
     return JsonResponse({"solutions": solutions_data})

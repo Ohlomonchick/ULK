@@ -33,24 +33,23 @@
               <h1><strong>КИБЕРПОЛИГОН</strong></h1>
             </a>
 
-        {#    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">#}
-        {#      <span aria-hidden="true"></span>#}
-        {#      <span aria-hidden="true"></span>#}
-        {#      <span aria-hidden="true"></span>#}
-        {#    </a>#}
           </div>
-{#        </div class="navbar-start">#}
             <div class="navbar-start">
-              {% if  user.is_authenticated %}
-              <a class="navbar-item" href="{% url 'interface:lab-list' %}">
-              {% else %}
-              <a class="navbar-item" href="{% url 'reg' %}">
+              {% if  user.is_superuser %}
+                  <a class="navbar-item" href="{% url 'interface:lab-list' %}">
+                      Лабораторные работы
+                  </a>
               {% endif %}
-                Главная
-              </a>
 
               {% if user.is_authenticated %}
                 <a class="navbar-item" href="{% url 'interface:competition-list' %}">
+                  Экзамены
+                </a>
+                <a class="navbar-item" href="{% url 'interface:competition-history-list' %}">
+                  История
+                </a>
+              {% else %}
+                  <a class="navbar-item" href="{% url 'reg' %}">
                   Экзамены
                 </a>
               {% endif %}

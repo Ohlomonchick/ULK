@@ -1,13 +1,11 @@
-from django.views import View
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
-import logging
 from interface.models import *
 from interface.forms import LabAnswerForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_directory, create_user, logout
 
@@ -21,77 +19,19 @@ import json
 class LabDetailView(DetailView):
     model = Lab
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context = LabDetailView.set_submitted(context, self.request)
-        return context
-
-    @staticmethod
-    def set_submitted(context, request):
-        context["form"] = LabAnswerForm()
-        context["submitted"] = False
-        lab = context["object"]
-        if request.user.is_authenticated:
-            now = timezone.now()
-            issuedLab = IssuedLabs.objects.filter(lab=context["object"], user=request.user, end_date__gte=now,
-                                                  date_of_appointment__lte=now).exclude(done=True).first()
-            context["issue"] = issuedLab
-
-            competition = False
-            answers = None
-            if "competition" in context.keys():
-                competition = context["competition"]
-                context["issue"] = competition
-                answers = Answers.objects.filter(lab=context["object"], user=request.user, datetime__lte=competition.finish,
-                                                 datetime__gte=competition.start).first()
-            if issuedLab or competition and (answers is None):
-                if issuedLab:
-                    context["available"] = True if issuedLab.end_date > timezone.now() else False
-                else:
-                    context["available"] = True if competition.finish > timezone.now() else False
-
-                answer = request.GET.get("answer_flag")
-                if answer:
-                    if answer == lab.answer_flag:
-                        context["submitted"] = True
-                        answer_object = Answers(lab=lab, user=request.user, datetime=timezone.now())
-                        if issuedLab:
-                            issuedLab.done = True
-                            issuedLab.save()
-                        answer_object.save()
-                    else:
-                        context["form"].fields["answer_flag"].label = "Неверный флаг!"
-            else:
-                context["submitted"] = True
-        return context
-
 
 class LabListView(ListView):
     model = Lab
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        if not self.request.user.is_superuser:
-            labs = []
-            issues = IssuedLabs.objects.filter(user=self.request.user).exclude(done=True)
-            for issue in issues:
-                labs.append(issue.lab)
-            labs_set = set(labs)
-            object_list = labs_set
-            context["object_list"] = object_list
-        logging.debug(context)
-        return context
 
 
 class CompetitionListView(ListView):
     model = Competition
 
     def get_queryset(self):
-        queryset = Competition.objects.order_by("-start").all()
+        queryset = Competition.objects.order_by("-start").filter(finish__gt=timezone.now())
         if not self.request.user.is_staff:
-            current_time = timezone.now()
             queryset = queryset.filter(
-                platoons__in=[self.request.user.platoon]
+                competition_users__user=self.request.user
             )
         return queryset
 
@@ -101,15 +41,54 @@ class CompetitionListView(ListView):
         return context
 
 
+class CompetitionHistoryListView(CompetitionListView):
+    template_name = "interface/competition_history_list.html"
+
+    def get_queryset(self):
+        queryset = Competition.objects.order_by("-start").filter(finish__lte=timezone.now())
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(
+                competition_users__user=self.request.user
+            )
+        return queryset
+
+
 class CompetitionDetailView(DetailView):
     model = Competition
+
+    def set_submitted(self, context):
+        context["form"] = LabAnswerForm()
+        context["submitted"] = False
+        lab = self.object.lab
+        if self.request.user.is_authenticated:
+            competition = context["object"]
+            # set ability to answer form to True
+            context["available"] = competition.finish > timezone.now()
+            context["issue"] = competition
+            answers = Answers.objects.filter(lab=competition.lab, user=self.request.user, lab_task=None,
+                                             datetime__lte=competition.finish,
+                                             datetime__gte=competition.start).first()
+            if answers is None:
+                answer = self.request.GET.get("answer_flag")     # getting user's form answer
+                if answer:
+                    if answer == lab.answer_flag:
+                        context["submitted"] = True
+                        answer_object = Answers(lab=lab, user=self.request.user, datetime=timezone.now())
+                        answer_object.save()
+                    else:
+                        context["form"].fields["answer_flag"].label = "Неверный флаг!"
+            else:
+                context["submitted"] = True
+
+            if context['submitted']:
+                context['available'] = False
+
+        return context
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         competition = context["object"]
-        context["object"] = competition.lab
-        context["competition"] = competition
-        context = LabDetailView.set_submitted(context, self.request)
+        context = self.set_submitted(context)
 
         if self.request.user.is_staff:
             solutions = Answers.objects.filter(
@@ -174,8 +153,13 @@ class PlatoonListView(ListView):
         user_list = User.objects.filter(platoon=platoon).exclude(username="admin")
 
         for user in user_list:
-            progress_dict["total"] += len(IssuedLabs.objects.filter(user=user))
-            progress_dict["submitted"] += len(IssuedLabs.objects.filter(user=user).exclude(done=False))
+            progress_dict["total"] += Competition2User.objects.filter(user=user).count()
+            progress_dict["submitted"] += (
+                Answers.objects.filter(user=user)
+                .values("lab")
+                .distinct()
+                .count()
+            )
         if progress_dict["total"] == 0:
             progress_dict["progress"] = 0
         else:
@@ -191,17 +175,21 @@ class UserDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["user"] = User.objects.filter(username="admin").first()
-        issues = IssuedLabs.objects.filter(user=context["object"])
+        issues = Competition2User.objects.filter(user=context["object"])
         object_list = issues
         context["object_list"] = object_list
         total = len(issues)
         context["total"] = total
-        submitted = len(IssuedLabs.objects.filter(user=context["object"]).exclude(done=False))
-        context["submitted"] = submitted
+        context["submitted"] = (
+            Answers.objects.filter(user=context["object"])
+            .values("lab")
+            .distinct()
+            .count()
+        )
         if total == 0:
             progress = 100
         else:
-            progress = int((submitted / total) * 100)
+            progress = int((context["submitted"] / total) * 100)
         context["progress"] = progress
         logging.debug(context)
         return context
@@ -296,14 +284,13 @@ def start_lab(request):
             logging.debug(lab)
             logging.debug(user)
             if user and lab:
-                issue = IssuedLabs.objects.filter(lab_id=lab, user_id=user)
+                issue = Competition2User.objects.filter(lab=lab, user=user, competition__finish__gt=timezone.now()).first()
                 # у нас на одного юзера не может назначаться несколько раз одна и та же лаба? пересдача с другим вариантом?
                 if issue and not lab.answer_flag:
-                    issue = issue[0]
                     data = {
                         "variant": issue.level.level_number,
                         "task": create_var_text(hardcode, user.last_name),
-                        "tasks": [task.task_id for task in issue.tasks.all()]
+                        "tasks": [task.task_id for task in issue.competition.tasks.all()]
                     }
                     return JsonResponse(data)
                 else:
@@ -329,12 +316,10 @@ def end_lab(request):
                 user = User.objects.filter(pnet_login=pnet_login).first()
             lab = Lab.objects.filter(name=lab_name).first()
             if user and lab:
-                issue = IssuedLabs.objects.filter(lab_id=lab, user_id=user).exclude(done=True).first()
-                if issue and not lab.answer_flag and not issue.done:
+                issue = Competition2User.objects.filter(lab=lab, user=user).first()
+                if issue and not lab.answer_flag:
                     ans = Answers(lab=lab, user=user, datetime=timezone.now())
                     ans.save()
-                    issue.done = True
-                    issue.save()
                     return JsonResponse({'message': 'Task finished'})
                 else:
                     return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND)

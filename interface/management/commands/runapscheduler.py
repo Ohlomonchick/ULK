@@ -13,7 +13,7 @@ from django_apscheduler.jobstores import DjangoJobStore
 from django_apscheduler.models import DjangoJobExecution
 from django_apscheduler import util
 
-from interface.models import Competition, IssuedLabs
+from interface.models import Competition2User
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +24,10 @@ def delete_labs_job():
     Удаляем лабы и соревнования через час после их окончания
     """
     delete_time = timezone.now() + datetime.timedelta(hours=1)
+    competitions2users = Competition2User.objects.filter(competition__finish__gte=delete_time, deleted=False)
 
-    issues = IssuedLabs.objects.filter(end_date__gte=delete_time, deleted=False)
-    competitions = Competition.objects.filter(finish__gte=delete_time, deleted=False)
-
-    for issue in issues:
-        issue.delete_from_platform()
-        time.sleep(10)
-
-    for competition in competitions:
-        competition.delete_from_platform()
+    for competition2user in competitions2users:
+        competition2user.delete_from_platform()
         time.sleep(20)
 
 

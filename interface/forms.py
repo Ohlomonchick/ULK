@@ -1,8 +1,7 @@
 from django import forms
-from .models import User, Competition, LabLevel, LabTask, IssuedLabs, Platoon
+from .models import User, Competition, LabLevel, LabTask, Competition2User, Platoon
 from django.core.exceptions import ValidationError
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
-import logging
+from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors
 from .config import *
 
@@ -69,22 +68,6 @@ class CustomUserCreationForm(UserCreationForm):
         return password2
 
 
-class IssuedLabForm(forms.ModelForm):
-    class Meta:
-        fields = '__all__'
-        model = IssuedLabs
-
-    def __init__(self, *args, **kwargs):
-        super(IssuedLabForm, self).__init__(*args, **kwargs)
-        self.fields['date_of_appointment'].widget.attrs['autocomplete'] = 'off'
-        self.fields['end_date'].widget.attrs['autocomplete'] = 'off'
-
-        if self.instance and hasattr(self.instance, 'lab') and self.instance.lab is not None:
-            # Filter options to those belonging to the selected lab
-            self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
-            self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.lab)
-
-
 class CompetitionForm(forms.ModelForm):
     class Meta:
         exclude = ('participants',)
@@ -95,6 +78,8 @@ class CompetitionForm(forms.ModelForm):
         self.fields['start'].widget.attrs['autocomplete'] = 'off'
         self.fields['finish'].widget.attrs['autocomplete'] = 'off'
         self.fields['platoons'].queryset = Platoon.objects.filter(number__gt=0)
+        self.fields['non_platoon_users'].help_text =\
+            'Вы можете добавить студентов к взводам. Или создать экзамен только для отдельных студентов.'
 
         if self.instance and hasattr(self.instance, 'lab') and self.instance.lab is not None:
             # Filter options to those belonging to the selected lab
@@ -115,30 +100,20 @@ class CompetitionForm(forms.ModelForm):
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
         instance.save()
 
-        for user in instance.non_platoon_users.all():
-            if user not in instance.issued_labs.all():
-                issued_lab = IssuedLabs.objects.create(
-                    lab=instance.lab, user=user, date_of_appointment=instance.start,
-                    end_date=instance.finish, level=instance.level
+        all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
+        existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
+
+        for user in all_users:
+            if user.id not in existing_user_ids:
+                Competition2User.objects.create(
+                    competition=instance,
+                    user=user,
+                    level=instance.level
                 )
-                instance.issued_labs.add(issued_lab)
-                issued_lab.tasks.set(instance.tasks.all())
 
-        to_remove = []
-        for issued_lab in instance.issued_labs.all():
-            if issued_lab.user not in instance.non_platoon_users.all():
-                to_remove.append(issued_lab)
-        instance.issued_labs.remove(*to_remove)
-
-        if instance.lab.get_platform() == "PN":
-            AllUsers = User.objects.filter(platoon_id__in=instance.platoons.all())
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            if AllUsers:
-                cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-                for user in AllUsers:
-                    create_lab(PNET_URL, instance.lab.name, "", PNET_BASE_DIR, cookie, xsrf, user.username)
-                    create_all_lab_nodes_and_connectors(PNET_URL, instance.lab, PNET_BASE_DIR, cookie, xsrf, user.username)
-                logout(PNET_URL)
+        all_users_ids = set(all_users.values_list('pk', flat=True))
+        for user_id in existing_user_ids:
+            if user_id not in all_users_ids:
+                Competition2User.objects.get(competition=instance, user_id=user_id).delete()
 
         return instance

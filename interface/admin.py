@@ -3,9 +3,9 @@ from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from .models import *
-from .forms import CustomUserCreationForm, CompetitionForm, IssuedLabForm
+from .forms import CustomUserCreationForm, CompetitionForm
 from django.db.models import JSONField
-from django import forms
+from django_apscheduler.admin import DjangoJob, DjangoJobExecution
 
 
 class CustomJSONEditorWidget(JSONEditorWidget):
@@ -81,19 +81,6 @@ class CompetitionAdmin(admin.ModelAdmin):
     class Media:
         js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
 
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
-        all_users = User.objects.filter(platoon__in=obj.platoons.all())
-        existing_user_ids = obj.competition_users.values_list('user_id', flat=True)
-
-        for user in all_users:
-            if user.id not in existing_user_ids:
-                Competition2User.objects.create(
-                    competition=obj,
-                    user=user,
-                    level=obj.level
-                )
-
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
         if obj and obj.lab:
@@ -120,3 +107,5 @@ admin.site.register(Platoon, admin.ModelAdmin)
 admin.site.register(Competition, CompetitionAdmin)
 admin.site.register(User, MyUserAdmin)
 admin.site.register(Answers, admin.ModelAdmin)
+admin.site.unregister(DjangoJob)
+admin.site.unregister(DjangoJobExecution)
