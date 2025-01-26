@@ -331,7 +331,7 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf,
             ]
             session_list.append(session)
 
-    logger.debug(session_list[0])
+    logger.debug(session_list)
 
     sess_id = 0
     for session in session_list:
