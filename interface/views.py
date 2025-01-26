@@ -5,7 +5,7 @@ from interface.forms import LabAnswerForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_directory, create_user, logout
 
@@ -28,7 +28,7 @@ class CompetitionListView(ListView):
     model = Competition
 
     def get_queryset(self):
-        queryset = Competition.objects.order_by("-start").all()
+        queryset = Competition.objects.order_by("-start").filter(finish__gt=timezone.now())
         if not self.request.user.is_staff:
             queryset = queryset.filter(
                 competition_users__user=self.request.user
@@ -39,6 +39,18 @@ class CompetitionListView(ListView):
         context = super().get_context_data(**kwargs)
         context["now"] = timezone.now()
         return context
+
+
+class CompetitionHistoryListView(CompetitionListView):
+    template_name = "interface/competition_history_list.html"
+
+    def get_queryset(self):
+        queryset = Competition.objects.order_by("-start").filter(finish__lte=timezone.now())
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(
+                competition_users__user=self.request.user
+            )
+        return queryset
 
 
 class CompetitionDetailView(DetailView):
