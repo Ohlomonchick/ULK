@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 from django.db import models
 from django.db.models.signals import post_save
@@ -11,10 +12,11 @@ from rest_framework import serializers
 import requests
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors, \
+from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
     delete_lab_with_session_destroy
 from .validators import validate_top_level_array
 from .config import *
+logger = logging.getLogger(__name__)
 
 
 def default_json():
@@ -188,10 +190,10 @@ class IssuedLabs(models.Model):
             cookie, xsrf = pf_login(PNET_URL, Login, Pass)
             create_lab(PNET_URL, instance.lab.name, "", PNET_BASE_DIR, cookie, xsrf,
                        instance.user.username)
-            create_all_lab_nodes_and_connectiors(PNET_URL, instance.lab, PNET_BASE_DIR, cookie, xsrf,
-                                                 instance.user.username)
+            create_all_lab_nodes_and_connectors(PNET_URL, instance.lab, PNET_BASE_DIR, cookie, xsrf,
+                                                instance.user.username)
             logout(PNET_URL)
-        print(instance)
+        logger.debug(instance)
 
     def save(self, *args, **kwargs):
         super(IssuedLabs, self).save(*args, **kwargs)
@@ -244,6 +246,8 @@ class Competition(models.Model):
     issued_labs = models.ManyToManyField(IssuedLabs, blank=True)
 
     def clean(self):
+        if not self.start or not self.finish:
+            raise ValidationError("Нет даты!")
         if self.start >= self.finish:
             raise ValidationError("Начало должно быть позже конца!")
         if self.finish <= timezone.now():
@@ -265,6 +269,9 @@ class Competition(models.Model):
         self.save()
 
     def delete(self, *args, **kwargs):
+        for issue in self.issued_labs.all():
+            issue.delete()
+
         self.delete_from_platform()
         super(Competition, self).delete(*args, **kwargs)
 
@@ -297,4 +304,3 @@ class Competition2User(models.Model):
 
 
 post_save.connect(IssuedLabs.post_create, sender=IssuedLabs)
-# post_save.connect(Competition.post_save, sender=Competition)

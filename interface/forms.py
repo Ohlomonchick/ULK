@@ -3,7 +3,7 @@ from .models import User, Competition, LabLevel, LabTask, IssuedLabs, Platoon
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 import logging
-from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectiors
+from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors
 from .config import *
 
 
@@ -87,7 +87,7 @@ class IssuedLabForm(forms.ModelForm):
 
 class CompetitionForm(forms.ModelForm):
     class Meta:
-        fields = '__all__'
+        exclude = ('participants',)
         model = Competition
 
     def __init__(self, *args, **kwargs):
@@ -134,10 +134,11 @@ class CompetitionForm(forms.ModelForm):
             AllUsers = User.objects.filter(platoon_id__in=instance.platoons.all())
             Login = 'pnet_scripts'
             Pass = 'eve'
-            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            for user in AllUsers:
-                create_lab(PNET_URL, instance.lab.name, "", PNET_BASE_DIR, cookie, xsrf, user.username)
-                create_all_lab_nodes_and_connectiors(PNET_URL, instance.lab, PNET_BASE_DIR, cookie, xsrf, user.username)
-            logout(PNET_URL)
+            if AllUsers:
+                cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+                for user in AllUsers:
+                    create_lab(PNET_URL, instance.lab.name, "", PNET_BASE_DIR, cookie, xsrf, user.username)
+                    create_all_lab_nodes_and_connectors(PNET_URL, instance.lab, PNET_BASE_DIR, cookie, xsrf, user.username)
+                logout(PNET_URL)
 
         return instance

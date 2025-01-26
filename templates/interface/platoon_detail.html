@@ -18,10 +18,12 @@
                 {% for comp, info in competitions.items %}
                         <div class="box">
                             <h2 class="title is-3 is-link"><a href="{% url 'interface:competition-list' %}{{ comp.slug }}">{{ comp.lab.name }}</a></h2>
-                            {% if info %}
-                                <h2 class="tag is-success"> Идет </h2>
-                            {% else %}
+                            {% if comp.start > now %}
+                                <h2 class="tag is-warning"> Не начато </h2>
+                            {% elif comp.finish < now %}
                                 <h2 class="tag is-danger"> Окончено </h2>
+                            {% else %}
+                                <h2 class="tag is-success"> Идет </h2>
                             {% endif %}
                         </div>
                 {% empty %}
