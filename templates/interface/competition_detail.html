@@ -10,6 +10,7 @@
                 <div id="timer" class="message is-dark">
                     <div class="message-body">
                         <h2 class="has-text-weight-bold">Оставшееся время:</h2>
+
                         <div id="countdown" class="has-text-weight-bold has-text-danger">
                              {{ delta.hours }} <span>:</span>
                              {{ delta.minutes }} <span>:</span>
@@ -126,19 +127,35 @@
     <script>
         let end = false;
         window.onload = function() {
-        if (localStorage.getItem('end') === 'true') {
-            end = true;
-        } else {
-            end = false;
-        }
+            if (localStorage.getItem('end') === 'true') {
+                end = true;
+            } else {
+                end = false;
+            }
             fetchTime();
             refreshSolutions();
         }
 
         function updateTimer() {
-            var hours = parseInt(document.getElementById('countdown').textContent.split(':')[0]);
-            var minutes = parseInt(document.getElementById('countdown').textContent.split(':')[1]);
-            var seconds = parseInt(document.getElementById('countdown').textContent.split(':')[2]);
+            const countdownElem = document.getElementById('countdown');
+            const text = countdownElem.textContent.trim();
+            if (text === "Экзамен завершён") {
+                return;
+            }
+
+            var hours = parseInt(text.split(':')[0]);
+            var minutes = parseInt(text.split(':')[1]);
+            var seconds = parseInt(text.split(':')[2]);
+
+            if (hours === 0 && minutes === 0 && seconds === 0) {
+                // Time is fully exhausted
+                countdownElem.textContent = "Экзамен завершён";
+                if (!end) {
+                    end = true;
+                    localStorage.setItem('end', 'true');
+                }
+                return;
+            }
 
             if (seconds > 0) {
                 seconds--;
@@ -181,6 +198,7 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4 && xhr.status === 200) {
                     var response = JSON.parse(xhr.responseText);
+                    console.log(response.hours);
 
                     // Update the timer display with new time
                     document.getElementById('countdown').textContent =

@@ -35,7 +35,7 @@ class Lab(models.Model):
     description = models.TextField('Описание')
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)
     slug = models.SlugField('Название в адресной строке', unique=True)
-    platform = models.CharField(max_length=3, choices=get_platform_choices, default="NO")
+    platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
 
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
     ConnectorsData = models.JSONField('Коннекторы', default=default_json, validators=[validate_top_level_array])
@@ -144,11 +144,11 @@ class User(AbstractUser):
 
     def save(self, *args, **kwargs):
         if not self.pk:
-            if not self.username:
-                self.username = self.last_name + "_" + self.first_name
             if not self.platoon_id:
                 default_platoon, created = Platoon.objects.get_or_create(number=0)
                 self.platoon = default_platoon
+        if not self.username:
+            self.username = self.last_name + "_" + self.first_name
         self.pnet_login = slugify(self.username)
 
         super(User, self).save(*args, **kwargs)

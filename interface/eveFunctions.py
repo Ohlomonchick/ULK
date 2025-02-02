@@ -56,9 +56,9 @@ def create_user(url, username, password, user_role, cookie):
             verify=False
         )
         logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(username, password,
-                                                                                               urljoin(PNET_BASE_DIR,
-                                                                                                       username),
-                                                                                               r.text))
+                                                                                              urljoin(PNET_BASE_DIR,
+                                                                                                      username),
+                                                                                              r.text))
     except Exception as e:
         logger.debug("Error with creating user\n{}\n".format(e))
 
@@ -74,7 +74,7 @@ def create_directory(url, path, dir_name, cookie):
         json=directory,
         headers={'content-type': 'application/json'},
         cookies=cookie, verify=False
-        )
+    )
     logger.debug(r.text)
 
 
@@ -111,7 +111,7 @@ def create_lab(url, lab_name, lab_description, lab_path, cookie, xsrf, username)
             json=lab_parameters,
             cookies=cookie,
             verify=False
-            )
+        )
         logger.debug(
             "Lab created at path {}\nServer response\t{}".format(f"{lab_path}/{username}", r.json()["message"]))
         logger.debug(r.text)
@@ -129,7 +129,7 @@ def filter_user(url, cookie, xsrf):
         {
             "data": {
                 "page_number": 1,
-                "page_quantity": 25,
+                "page_quantity": 1000,
                 "page_total": 0,
                 "flag_filter_change": True,
                 "flag_filter_logic": "and",
@@ -146,8 +146,41 @@ def filter_user(url, cookie, xsrf):
         data=payload,
         cookies=cookie,
         verify=False
-        )
+    )
     return r
+
+
+def change_user_password(url, cookie, xsrf, pnet_login, new_password):
+    users = filter_user(url, cookie, xsrf)
+    user_params = None
+    for user in users["data"]["data_table"]:
+        if user["username"] == pnet_login:
+            user_params = user
+    if user_params:
+        header = {
+            "Content-Type": "application/json;charset=UTF-8",
+            "X-XSRF-TOKEN": xsrf
+        }
+        user_params["password"] = new_password
+
+        payload = json.dumps({
+            "data": {
+                "data_key":
+                    [{"pod": user_params["pod"]}],
+                    "data_editor": user_params
+                }
+            }
+        )
+        r = requests.post(
+            url + '/store/public/admin/users/offEdit',
+            headers=header,
+            data=payload,
+            cookies=cookie,
+            verify=False
+        )
+        return r
+
+    return None
 
 
 def get_sessions_count(url, cookie):
@@ -156,7 +189,7 @@ def get_sessions_count(url, cookie):
         headers={'content-type': 'application/json'},
         cookies=cookie,
         verify=False
-        )
+    )
     return r
 
 
@@ -176,17 +209,17 @@ def filter_session(url, cookie, xsrf, page_number=1, page_quantity=25):
                 "flag_filter_logic": "and",
                 "data_sort": {
                     "lab_session_id": "desc"
-                    },
+                },
                 "data_filter": {}
-                }
             }
-        )
+        }
+    )
     r = requests.post(
         url + '/store/public/admin/lab_sessions/filter',
         headers=header,
         data=payload,
         cookies=cookie, verify=False
-        )
+    )
     return r
 
 
@@ -197,7 +230,7 @@ def create_session(url, lab, cookie):
         data=lab,
         headers={'content-type': 'application/json'},
         cookies=cookie, verify=False
-        )
+    )
     logger.debug(r)
 
 
@@ -209,7 +242,7 @@ def join_session(url, lab_session_id, cookie):
         headers={'content-type': 'application/json'},
         cookies=cookie,
         verify=False
-        )
+    )
     logger.debug(r)
 
 
@@ -220,7 +253,7 @@ def create_node(url, node_params, cookie, xsrf):
             json=node_params,
             cookies=cookie,
             verify=False
-            )
+        )
         logger.debug(
             "Node {} has been created\nServer response\t{}".format(node_params["template"], r.json()["message"]))
     except Exception as e:
@@ -235,7 +268,7 @@ def create_p2p(url, p2p_params, cookie):
             json=p2p_params,
             cookies=cookie,
             verify=False
-            )
+        )
         logger.debug("P2P {} has been created \nServer response\t{}".format(p2p_params["name"], r.json()["message"]))
     except Exception as e:
         r = "False"
@@ -260,7 +293,7 @@ def create_network(url, net_params, cookie):
             json=net_params,
             cookies=cookie,
             verify=False
-            )
+        )
         logger.debug(
             "Network {} has been created \nServer response\t{}".format(net_params["name"], r.json()["message"]))
     except Exception as e:
@@ -275,7 +308,7 @@ def create_p2p_nat(url, p2p_params, cookie):
             json=p2p_params,
             cookies=cookie,
             verify=False
-            )
+        )
         logger.debug(
             "P2P_NAT {} has been created\nServer response\t{}".format(p2p_params["node_id"], r.json()["message"]))
     except Exception as e:
@@ -291,7 +324,7 @@ def delete_lab(url, cookie, lab_path):
             data=path,
             cookies=cookie,
             verify=False
-            )
+        )
     except Exception as e:
         r = "False"
         logger.debug("Error with deleting lab\n{}\n".format(e))
@@ -374,8 +407,8 @@ def delete_lab_with_session_destroy(url, lab_name, lab_path, cookie, xsrf, usern
     response_json = filter_session(url, cookie, xsrf, 1, max(1, count_labs))
 
     if (
-        response_json.status_code != 204 and
-        response_json.headers["content-type"].strip().startswith("application/json")
+            response_json.status_code != 204 and
+            response_json.headers["content-type"].strip().startswith("application/json")
     ):
         try:
             response_json = response_json.json()
