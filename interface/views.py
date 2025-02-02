@@ -7,13 +7,10 @@ from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
 from django.shortcuts import render, redirect
 from django.utils import timezone
-from interface.eveFunctions import pf_login, create_directory, create_user, logout
+from interface.eveFunctions import pf_login, create_directory, create_user, logout, change_user_password
 
 from interface.serializers import *
-from rest_framework import viewsets, status
-from rest_framework.decorators import api_view
-from django.http.response import JsonResponse
-import json
+from rest_framework import viewsets
 
 
 class LabDetailView(DetailView):
@@ -232,8 +229,7 @@ def change_password(request):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            create_directory(url, "/Practice work/Test_Labs/api_test_dir", user.username, cookie)
-            create_user(url, user.username, request.POST.get('password1'), '1', cookie)
+            change_user_password(url, cookie, xsrf, user.pnet_login, request.POST.get('password1'))
             logout(url)
             return redirect('/cyberpolygon/labs')
         else:
@@ -246,84 +242,3 @@ def change_password(request):
 class AnswerAPIView(viewsets.ModelViewSet):
     queryset = Answers.objects.all()
     serializer_class = AnswerSerializer
-
-
-# Хардкодный ответ (генерация потом)
-hardcode = r"""/testdir/ 1 1 1 1 1 1 1 1 1 1
-./ Горяиновd1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
-Горяиновd1/ Горяиновd2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
-Горяиновd1/ Горяиновf1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
-Горяиновd1/ Горяиновf3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
-
-
-#
-
-def create_var_text(text, second_name):
-    new_var = rf"""/testdir/ 1 1 1 1 1 1 1 1 1 1
-./ {second_name}d1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
-{second_name}d1/ {second_name}d2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
-{second_name}d1/ {second_name}f1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
-{second_name}d1/ {second_name}f3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
-    return new_var
-
-
-@api_view(['GET'])
-def start_lab(request):
-    if request.method == 'GET':
-        logging.debug(request.body)
-        data = json.loads(request.body.decode('utf-8'))
-        username = data.get("username", False)
-        pnet_login = data.get("pnet_login", False)
-        lab_name = data.get("lab")
-        if (username or pnet_login) and lab_name:
-            if username:
-                user = User.objects.filter(username=username).first()
-            else:
-                user = User.objects.filter(pnet_login=pnet_login).first()
-            lab = Lab.objects.filter(name=lab_name).first()
-            logging.debug(lab)
-            logging.debug(user)
-            if user and lab:
-                issue = Competition2User.objects.filter(lab=lab, user=user, competition__finish__gt=timezone.now()).first()
-                # у нас на одного юзера не может назначаться несколько раз одна и та же лаба? пересдача с другим вариантом?
-                if issue and not lab.answer_flag:
-                    data = {
-                        "variant": issue.level.level_number,
-                        "task": create_var_text(hardcode, user.last_name),
-                        "tasks": [task.task_id for task in issue.competition.tasks.all()]
-                    }
-                    return JsonResponse(data)
-                else:
-                    return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND)
-            else:
-                return JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            return JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['POST'])
-def end_lab(request):
-    if request.method == 'POST':
-        logging.debug(request.body)
-        data = json.loads(request.body.decode('utf-8'))
-        username = data.get("username", False)
-        pnet_login = data.get("pnet_login", False)
-        lab_name = data.get("lab")
-        if (username or pnet_login) and lab_name:
-            if username:
-                user = User.objects.filter(username=username).first()
-            else:
-                user = User.objects.filter(pnet_login=pnet_login).first()
-            lab = Lab.objects.filter(name=lab_name).first()
-            if user and lab:
-                issue = Competition2User.objects.filter(lab=lab, user=user).first()
-                if issue and not lab.answer_flag:
-                    ans = Answers(lab=lab, user=user, datetime=timezone.now())
-                    ans.save()
-                    return JsonResponse({'message': 'Task finished'})
-                else:
-                    return JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND)
-            else:
-                return JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            return JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)

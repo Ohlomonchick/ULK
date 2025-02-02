@@ -2,7 +2,7 @@ from django import forms
 from .models import User, Competition, LabLevel, LabTask, Competition2User, Platoon
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
-from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors
+from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, create_user, create_directory
 from .config import *
 
 
@@ -50,12 +50,19 @@ class CustomUserCreationForm(UserCreationForm):
         user = super().save(commit=False)
         password = self.cleaned_data.get("password1")
         if not password:
-            default_password = "test.test"  # Set your default password here
-            user.set_password(default_password)
-        else:
-            user.set_password(password)
+            password = "test.test"  # Set your default password here
+        user.set_password(password)
         if commit:
             user.save()
+
+        url = "http://172.18.4.160"
+        Login = 'pnet_scripts'
+        Pass = 'eve'
+        cookie, xsrf = pf_login(url, Login, Pass)
+        create_directory(url, PNET_BASE_DIR, user.username, cookie)
+        create_user(url, user.username, user.plaintext_password, '1', cookie)
+        logout(url)
+
         return user
 
     def clean_password2(self):

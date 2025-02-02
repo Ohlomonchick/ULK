@@ -1,9 +1,10 @@
-from email.utils import format_datetime
+import logging
+import json
 
 from django.core.cache import cache
-from django.utils.timezone import make_naive
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import status
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -12,7 +13,7 @@ from datetime import timedelta, datetime
 
 from slugify import slugify
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User
+from .models import Competition, LabLevel, Lab, LabTask, Answers, User, Competition2User
 from .serializers import LabLevelSerializer, LabTaskSerializer
 
 
@@ -180,3 +181,111 @@ def get_users_in_platoons(request):
     else:
         data = []
     return JsonResponse(data, safe=False)
+
+
+# Хардкодный ответ (генерация потом)
+hardcode = r"""/testdir/ 1 1 1 1 1 1 1 1 1 1
+./ Горяиновd1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
+Горяиновd1/ Горяиновd2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
+Горяиновd1/ Горяиновf1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
+Горяиновd1/ Горяиновf3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
+
+
+def create_var_text(text, second_name):
+    new_var = rf"""/testdir/ 1 1 1 1 1 1 1 1 1 1
+./ {second_name}d1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
+{second_name}d1/ {second_name}d2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
+{second_name}d1/ {second_name}f1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
+{second_name}d1/ {second_name}f3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
+    return new_var
+
+
+def parse_request_data(request):
+    try:
+        return json.loads(request.body.decode('utf-8'))
+    except (ValueError, TypeError):
+        raise
+
+
+def get_issue(data, competition_filters):
+    """
+    Extract username/pnet_login and Competition from data,
+    then fetch corresponding User and Competition2User objects from DB.
+    If missing or invalid, return (None, response_with_error).
+    Otherwise, return (issue, None).
+    """
+    username = data.get("username")
+    pnet_login = data.get("pnet_login")
+    lab_name = data.get("lab")
+    lab_slug = data.get("lab_slug")
+
+    # Check required fields
+    if not (username or pnet_login) or not (lab_name or lab_slug):
+        return (
+            None,
+            JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)
+        )
+
+    if username:
+        user = User.objects.filter(username=username).first()
+    else:
+        user = User.objects.filter(pnet_login=pnet_login).first()
+
+    if lab_name:
+        lab = Lab.objects.filter(name=lab_name).first()
+    else:
+        lab = Lab.objects.filter(name=lab_slug).first()
+
+    if not user or not lab:
+        return (
+            None,
+            JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND)
+        )
+
+    issue_filters = {
+        'competition__lab': lab,
+        'user': user
+    }
+    issue_filters.update(competition_filters)
+    issue = Competition2User.objects.filter(**issue_filters).first()
+    if issue and (not lab.answer_flag):
+        return issue, None
+    else:
+        return (
+            None,
+            JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND)
+        )
+
+
+@api_view(['GET'])
+def start_lab(request):
+    if request.method == 'GET':
+        issue, error_response = get_issue(
+            parse_request_data(request),
+            {'competition__finish__gt': timezone.now()}
+        )
+        if error_response:
+            return error_response
+
+        response_data = {
+            "task": create_var_text(hardcode, issue.user.last_name),
+            "tasks": [task.task_id for task in issue.competition.tasks.all()]
+        }
+        if issue.level:
+            response_data["variant"] = issue.level.level_number
+        return JsonResponse(response_data)
+
+
+@api_view(['POST'])
+def end_lab(request):
+    if request.method == 'POST':
+        issue, error_response = get_issue(
+            parse_request_data(request),
+            {'competition__start__lt': timezone.now()}
+        )
+        if error_response:
+            return error_response
+
+        ans = Answers(lab=issue.competition.lab, user=issue.user, datetime=timezone.now())
+        ans.save()
+        return JsonResponse({'message': 'Task finished'})

@@ -35,7 +35,7 @@ class Lab(models.Model):
     description = models.TextField('Описание')
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)
     slug = models.SlugField('Название в адресной строке', unique=True)
-    platform = models.CharField(max_length=3, choices=get_platform_choices, default="NO")
+    platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
 
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
     ConnectorsData = models.JSONField('Коннекторы', default=default_json, validators=[validate_top_level_array])
