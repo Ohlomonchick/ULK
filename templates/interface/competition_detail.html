@@ -132,6 +132,8 @@
             } else {
                 end = false;
             }
+            fetchTime();
+            refreshSolutions();
         }
 
         function updateTimer() {
@@ -140,7 +142,6 @@
             if (text === "Экзамен завершён") {
                 return;
             }
-
 
             var hours = parseInt(text.split(':')[0]);
             var minutes = parseInt(text.split(':')[1]);
