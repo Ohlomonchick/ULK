@@ -129,7 +129,7 @@ def filter_user(url, cookie, xsrf):
         {
             "data": {
                 "page_number": 1,
-                "page_quantity": 25,
+                "page_quantity": 1000,
                 "page_total": 0,
                 "flag_filter_change": True,
                 "flag_filter_logic": "and",

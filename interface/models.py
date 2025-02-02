@@ -144,11 +144,11 @@ class User(AbstractUser):
 
     def save(self, *args, **kwargs):
         if not self.pk:
-            if not self.username:
-                self.username = self.last_name + "_" + self.first_name
             if not self.platoon_id:
                 default_platoon, created = Platoon.objects.get_or_create(number=0)
                 self.platoon = default_platoon
+        if not self.username:
+            self.username = self.last_name + "_" + self.first_name
         self.pnet_login = slugify(self.username)
 
         super(User, self).save(*args, **kwargs)

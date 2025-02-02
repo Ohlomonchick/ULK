@@ -55,12 +55,16 @@ class CustomUserCreationForm(UserCreationForm):
         if commit:
             user.save()
 
+        if not user.username:
+            user.username = user.last_name + "_" + user.first_name
+        user.save()
+
         url = "http://172.18.4.160"
         Login = 'pnet_scripts'
         Pass = 'eve'
         cookie, xsrf = pf_login(url, Login, Pass)
         create_directory(url, PNET_BASE_DIR, user.username, cookie)
-        create_user(url, user.username, user.plaintext_password, '1', cookie)
+        create_user(url, user.username, password, '1', cookie)
         logout(url)
 
         return user
