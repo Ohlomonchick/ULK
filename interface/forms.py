@@ -1,5 +1,5 @@
 from django import forms
-from .models import User, Competition, LabLevel, LabTask, Competition2User, Platoon
+from .models import User, Competition, LabLevel, Lab, LabTask, Competition2User, Platoon, KkzLab, Kkz
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, create_user, create_directory
@@ -8,7 +8,6 @@ from .config import *
 
 class LabAnswerForm(forms.Form):
     answer_flag = forms.CharField(label="Флаг:", widget=forms.TextInput(attrs={'class': 'input', 'type': 'text'}))
-
 
 class SignUpForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(), label = "Пароль")
@@ -94,8 +93,10 @@ class CompetitionForm(forms.ModelForm):
 
         if self.instance and hasattr(self.instance, 'lab') and self.instance.lab is not None:
             # Filter options to those belonging to the selected lab
-            self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
-            self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.lab)
+            if 'tasks' in self.fields:
+                self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
+            if 'level' in self.fields:
+                self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.lab)
 
     def save(self, commit=True):
         instance = super(CompetitionForm, self).save(commit=False)
@@ -128,3 +129,29 @@ class CompetitionForm(forms.ModelForm):
                 Competition2User.objects.get(competition=instance, user_id=user_id).delete()
 
         return instance
+
+
+class KkzForm(forms.ModelForm):
+    labs = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(), label="Лабораторные работы")
+
+    class Meta:
+        model = Kkz
+        fields = ['name', 'start', 'finish', 'platoons', 'non_platoon_users']
+
+    def save(self, commit=True):
+        kkz = super().save(commit=False)
+        if commit:
+            kkz.save()
+            self.save_m2m()
+
+            for lab in self.cleaned_data['labs']:
+                competition = Competition.objects.create(
+                    start=self.cleaned_data['start'],
+                    finish=self.cleaned_data['finish'],
+                    lab=lab,
+                )
+                competition.platoons.set(self.cleaned_data['platoons'])
+                competition.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
+                kkz.competitions.add(competition)
+
+        return kkz

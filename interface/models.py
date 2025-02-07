@@ -210,6 +210,51 @@ class IssuedLabs(models.Model):
         verbose_name_plural = 'Назначенные работы'
 
 
+
+class Kkz(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название ККЗ", null=True, blank=False)
+    start = models.DateTimeField(verbose_name="Начало")
+    finish = models.DateTimeField(verbose_name="Окончание")
+    platoons = models.ManyToManyField(Platoon, verbose_name="Взвода", blank=True)
+    non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
+    unified_tasks = models.BooleanField("Единые задания для всех", default=False)
+
+    def get_users(self):
+        users = User.objects.filter(platoon__in=self.platoons.all())
+        users = users.union(User.objects.filter(id__in=self.non_platoon_users.values('id')))
+        return users
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "ККЗ"
+        verbose_name_plural = "ККЗ"
+
+
+class KkzLab(models.Model):
+    kkz = models.ForeignKey('Kkz', on_delete=models.CASCADE, related_name='kkz_labs')
+    lab = models.ForeignKey('Lab', on_delete=models.CASCADE, verbose_name="Лабораторная работа")
+    tasks = models.ManyToManyField('LabTask', verbose_name="Задания", blank=True)
+    num_tasks = models.PositiveIntegerField("Количество заданий для распределения", default=1)
+
+    def __str__(self):
+        return f"{self.kkz.name} - {self.lab.name}"
+
+    class Meta:
+        verbose_name = 'Лабораторная работа в ККЗ'
+        verbose_name_plural = 'Лабораторные работы в ККЗ'
+
+
+class AssignedTask(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assigned_tasks", verbose_name="Студент", default=None, null=True, blank=True)
+    task = models.ForeignKey("LabTask", on_delete=models.CASCADE, related_name="assigned_task", verbose_name="Задание")
+    kkz = models.ForeignKey(Kkz, on_delete=models.CASCADE, related_name="assigned_tasks", verbose_name="ККЗ", null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user} - {self.task}"
+
+
 class Competition(models.Model):
     slug = models.SlugField('Название в адресной строке', unique=True)
     start = models.DateTimeField("Начало")
@@ -229,6 +274,7 @@ class Competition(models.Model):
 
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
     # issued_labs = models.ManyToManyField(IssuedLabs, blank=True)
+    kkz = models.ForeignKey(Kkz, related_name="competitions", on_delete=models.CASCADE, verbose_name="ККЗ", null=True, blank=True)  # Добавляем связь с ККЗ
 
     def clean(self):
         if not self.start or not self.finish:
@@ -286,6 +332,13 @@ class Competition2User(models.Model):
         null=True, blank=True,
         verbose_name="Вариант"
     )
+    tasks = models.ManyToManyField(
+        LabTask,
+        related_name='assigned_tasks',
+        blank=True,
+        verbose_name="Задания"
+    )
+
     deleted = models.BooleanField(default=False)
 
     def delete_from_platform(self):

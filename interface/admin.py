@@ -1,9 +1,10 @@
+import random
 from django.contrib import admin
 from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from .models import *
-from .forms import CustomUserCreationForm, CompetitionForm
+from .forms import CustomUserCreationForm, CompetitionForm, KkzForm
 from django.db.models import JSONField
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
 
@@ -58,8 +59,8 @@ class MyUserAdmin(UserAdmin):
 class Competition2UserInline(admin.TabularInline):
     model = Competition2User
     extra = 0
-    fields = ('user', 'level')
-    readonly_fields = ('user',)
+    fields = ('user', 'level', 'tasks')
+    readonly_fields = ('user', )
     can_delete = False
 
 
@@ -74,12 +75,10 @@ class CompetitionAdmin(admin.ModelAdmin):
     add_form = CompetitionForm
     list_display = ("start", "lab", 'all_platoons', 'all_non_platoon_users')
     search_fields = ['lab__name']
-    exclude = ('participants', 'deleted', 'slug', 'issued_labs')
+    exclude = ('participants', 'deleted', 'slug', 'issued_labs', 'kkz')
     inlines = [Competition2UserInline]
     actions = [set_all_users_to_competition_level]
 
-    class Media:
-        js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
@@ -102,6 +101,71 @@ class CompetitionAdmin(admin.ModelAdmin):
     all_non_platoon_users.short_description = 'Отдельные пользователи'
 
 
+class KkzLabInline(admin.TabularInline):
+    model = KkzLab
+    extra = 1
+    fields = ['lab', 'tasks', 'num_tasks']
+    filter_horizontal = ['tasks']
+
+    class Media:
+        js = (
+            'admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js',
+        )
+
+    # def formfield_for_manytomany(self, db_field, request, **kwargs):
+    #     if db_field.name == "tasks":
+    #         if request.method == "POST" and "lab" in request.POST:
+    #             try:
+    #                 lab_id = int(request.POST.get("lab"))
+    #                 kwargs["queryset"] = LabTask.objects.filter(lab_id=lab_id)
+    #             except (ValueError, TypeError):
+    #                 kwargs["queryset"] = LabTask.objects.none()
+    #         elif 'object_id' in request.resolver_match.kwargs:
+    #             try:
+    #                 kkz_lab_id = request.resolver_match.kwargs['object_id']
+    #                 kkz_lab = KkzLab.objects.get(id=kkz_lab_id)
+    #                 kwargs["queryset"] = LabTask.objects.filter(lab=kkz_lab.lab)
+    #             except KkzLab.DoesNotExist:
+    #                 kwargs["queryset"] = LabTask.objects.none()
+    #         else:
+    #             kwargs["queryset"] = LabTask.objects.none()
+    #     return super().formfield_for_manytomany(db_field, request, **kwargs)
+
+
+class KkzAdmin(admin.ModelAdmin):
+    inlines = [KkzLabInline]
+    list_display = ('name', 'start', 'finish')
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+
+        for kkz_lab in obj.kkz_labs.all():
+            competition = Competition.objects.create(
+                start=obj.start,
+                finish=obj.finish,
+                lab=kkz_lab.lab,
+                kkz=obj,
+            )
+
+            competition.platoons.set(obj.platoons.all())
+            competition.non_platoon_users.set(obj.non_platoon_users.all())
+
+            users = obj.get_users()
+            tasks = list(kkz_lab.tasks.all())
+            num_tasks = kkz_lab.num_tasks
+
+            if tasks and users:
+                for user in users:
+                    assigned_tasks = random.sample(tasks, min(num_tasks, len(tasks)))
+                    competition2user, created = Competition2User.objects.get_or_create(
+                        competition=competition,
+                        user=user)
+                    if competition.kkz.unified_tasks:
+                        competition.tasks.set(assigned_tasks)
+                    else:
+                        competition2user.tasks.set(assigned_tasks)
+
+
 admin.site.register(Lab, LabModelAdmin)
 admin.site.register(Platoon, admin.ModelAdmin)
 admin.site.register(Competition, CompetitionAdmin)
@@ -109,3 +173,4 @@ admin.site.register(User, MyUserAdmin)
 admin.site.register(Answers, admin.ModelAdmin)
 admin.site.unregister(DjangoJob)
 admin.site.unregister(DjangoJobExecution)
+admin.site.register(Kkz, KkzAdmin)

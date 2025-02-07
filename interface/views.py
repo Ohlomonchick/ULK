@@ -23,6 +23,8 @@ class LabListView(ListView):
 
 class CompetitionListView(ListView):
     model = Competition
+    template_name = 'interface/competition_list.html'
+    context_object_name = 'competitions'
 
     def get_queryset(self):
         queryset = Competition.objects.order_by("-start").filter(finish__gt=timezone.now())
@@ -52,6 +54,7 @@ class CompetitionHistoryListView(CompetitionListView):
 
 class CompetitionDetailView(DetailView):
     model = Competition
+    template_name = 'interface/competition_detail.html'
 
     def set_submitted(self, context):
         context["form"] = LabAnswerForm()
@@ -59,14 +62,17 @@ class CompetitionDetailView(DetailView):
         lab = self.object.lab
         if self.request.user.is_authenticated:
             competition = context["object"]
-            # set ability to answer form to True
             context["available"] = competition.finish > timezone.now()
             context["issue"] = competition
-            answers = Answers.objects.filter(lab=competition.lab, user=self.request.user, lab_task=None,
-                                             datetime__lte=competition.finish,
-                                             datetime__gte=competition.start).first()
+            answers = Answers.objects.filter(
+                lab=competition.lab,
+                user=self.request.user,
+                lab_task=None,
+                datetime__lte=competition.finish,
+                datetime__gte=competition.start
+            ).first()
             if answers is None:
-                answer = self.request.GET.get("answer_flag")     # getting user's form answer
+                answer = self.request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
                         context["submitted"] = True
@@ -94,7 +100,6 @@ class CompetitionDetailView(DetailView):
                 datetime__lte=competition.finish,
                 datetime__gte=competition.start
             ).order_by('datetime').values()
-
             context["solutions"] = solutions
 
             if not str(competition.participants).isnumeric() or int(competition.participants) == 0:
@@ -102,8 +107,18 @@ class CompetitionDetailView(DetailView):
             else:
                 context["progress"] = round(len(solutions) / int(competition.participants) * 100)
 
+        if self.request.user.is_authenticated:
+            try:
+                competition2user = Competition2User.objects.get(competition=competition, user=self.request.user)
+                assigned_tasks = competition2user.tasks.all()
+            except Competition2User.DoesNotExist:
+                assigned_tasks = []
+
+            context["assigned_tasks"] = assigned_tasks
+            print(f"Assigned tasks for {self.request.user}: {assigned_tasks}")  # Отладка
+
         context["object"] = competition
-        context["button"] = True if (timezone.now() - competition.start).total_seconds() < 0 else False
+        context["button"] = (timezone.now() - competition.start).total_seconds() < 0
 
         return context
 
