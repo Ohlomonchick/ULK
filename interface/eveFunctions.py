@@ -333,7 +333,7 @@ def delete_lab(url, cookie, lab_path):
 
 
 def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf, username):
-    lab_name = lab_object.name
+    lab_name = lab_object.slug
     username = slugify(username)
     lab_path += "/" + username
 
@@ -392,7 +392,7 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf,
     destroy_session(url, sess_id, cookie)
 
 
-def delete_lab_with_session_destroy(url, lab_name, lab_path, cookie, xsrf, username):
+def delete_lab_with_session_destroy(url: object, lab_name: object, lab_path: object, cookie: object, xsrf: object, username: object) -> object:
     username = slugify(username)
     lab_path += "/" + username
 

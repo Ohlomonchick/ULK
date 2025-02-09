@@ -140,7 +140,7 @@ class CompetitionFormTest(TestCase):
 
         self.assertEqual(
             mock_delete_lab.call_count,
-            len(self.non_platoon_users) + len(self.users_in_platoon),
+            2 * len(self.non_platoon_users) + 2 * len(self.users_in_platoon),
             "Expected `delete_lab_with_session_destroy` to be called once for each user."
         )
 

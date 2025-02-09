@@ -191,6 +191,8 @@ class IssuedLabs(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
+            delete_lab_with_session_destroy(url, self.lab.slug, PNET_BASE_DIR, cookie, xsrf,
+                                            self.user.username)
             delete_lab_with_session_destroy(url, self.lab.name, PNET_BASE_DIR, cookie, xsrf,
                                             self.user.username)
             logout(url)
@@ -296,6 +298,8 @@ class Competition2User(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
+            delete_lab_with_session_destroy(url, self.competition.lab.slug, PNET_BASE_DIR, cookie, xsrf,
+                                            self.user.username)
             delete_lab_with_session_destroy(url, self.competition.lab.name, PNET_BASE_DIR, cookie, xsrf,
                                             self.user.username)
             logout(url)
@@ -316,7 +320,7 @@ class Competition2User(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            create_lab(PNET_URL, lab.name, "", PNET_BASE_DIR, cookie, xsrf,
+            create_lab(PNET_URL, lab.slug, "", PNET_BASE_DIR, cookie, xsrf,
                        instance.user.username)
             create_all_lab_nodes_and_connectors(PNET_URL, lab, PNET_BASE_DIR, cookie, xsrf,
                                                 instance.user.username)
