@@ -34,7 +34,7 @@ class Lab(models.Model):
     name = models.CharField('Имя', max_length=255, primary_key=True)
     description = models.TextField('Описание')
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)
-    slug = models.SlugField('Название в адресной строке', unique=True)
+    slug = models.SlugField('Название в адресной строке', unique=True, max_length=255)
     platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
 
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
@@ -211,7 +211,7 @@ class IssuedLabs(models.Model):
 
 
 class Competition(models.Model):
-    slug = models.SlugField('Название в адресной строке', unique=True)
+    slug = models.SlugField('Название в адресной строке', unique=True, max_length=255)
     start = models.DateTimeField("Начало")
     finish = models.DateTimeField("Конец")
     lab = models.ForeignKey(Lab,
