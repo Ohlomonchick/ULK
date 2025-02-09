@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from interface.models import *
@@ -20,7 +22,6 @@ class LabDetailView(DetailView):
 class LabListView(ListView):
     model = Lab
 
-
 class CompetitionListView(ListView):
     model = Competition
     template_name = 'interface/competition_list.html'
@@ -37,6 +38,15 @@ class CompetitionListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["now"] = timezone.now()
+        competitions = context["competitions"]
+        kkz_groups = defaultdict(list)
+
+        for comp in competitions:
+            if comp.kkz:
+                kkz_groups[comp.kkz].append(comp)
+
+        context["kkz_groups"] = dict(kkz_groups)
+
         return context
 
 
@@ -115,7 +125,6 @@ class CompetitionDetailView(DetailView):
                 assigned_tasks = []
 
             context["assigned_tasks"] = assigned_tasks
-            print(f"Assigned tasks for {self.request.user}: {assigned_tasks}")  # Отладка
 
         context["object"] = competition
         context["button"] = (timezone.now() - competition.start).total_seconds() < 0

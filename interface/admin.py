@@ -112,25 +112,6 @@ class KkzLabInline(admin.TabularInline):
             'admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js',
         )
 
-    # def formfield_for_manytomany(self, db_field, request, **kwargs):
-    #     if db_field.name == "tasks":
-    #         if request.method == "POST" and "lab" in request.POST:
-    #             try:
-    #                 lab_id = int(request.POST.get("lab"))
-    #                 kwargs["queryset"] = LabTask.objects.filter(lab_id=lab_id)
-    #             except (ValueError, TypeError):
-    #                 kwargs["queryset"] = LabTask.objects.none()
-    #         elif 'object_id' in request.resolver_match.kwargs:
-    #             try:
-    #                 kkz_lab_id = request.resolver_match.kwargs['object_id']
-    #                 kkz_lab = KkzLab.objects.get(id=kkz_lab_id)
-    #                 kwargs["queryset"] = LabTask.objects.filter(lab=kkz_lab.lab)
-    #             except KkzLab.DoesNotExist:
-    #                 kwargs["queryset"] = LabTask.objects.none()
-    #         else:
-    #             kwargs["queryset"] = LabTask.objects.none()
-    #     return super().formfield_for_manytomany(db_field, request, **kwargs)
-
 
 class KkzAdmin(admin.ModelAdmin):
     inlines = [KkzLabInline]
@@ -164,6 +145,8 @@ class KkzAdmin(admin.ModelAdmin):
                         competition.tasks.set(assigned_tasks)
                     else:
                         competition2user.tasks.set(assigned_tasks)
+
+        super().save_model(request, obj, form, change)
 
 
 admin.site.register(Lab, LabModelAdmin)
