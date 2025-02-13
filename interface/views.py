@@ -12,16 +12,18 @@ from interface.eveFunctions import pf_login, create_directory, create_user, logo
 from interface.serializers import *
 from rest_framework import viewsets
 
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
-class LabDetailView(DetailView):
+
+class LabDetailView(LoginRequiredMixin, DetailView):
     model = Lab
 
 
-class LabListView(ListView):
+class LabListView(LoginRequiredMixin, ListView):
     model = Lab
 
 
-class CompetitionListView(ListView):
+class CompetitionListView(LoginRequiredMixin, ListView):
     model = Competition
 
     def get_queryset(self):
@@ -50,35 +52,45 @@ class CompetitionHistoryListView(CompetitionListView):
         return queryset
 
 
-class CompetitionDetailView(DetailView):
+class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Competition
+
+    def test_func(self):
+        competition = self.get_object()
+        if self.request.user.is_staff:
+            return True
+        return competition.start <= timezone.now() <= (competition.finish + datetime.timedelta(minutes=10))
 
     def set_submitted(self, context):
         context["form"] = LabAnswerForm()
         context["submitted"] = False
         lab = self.object.lab
-        if self.request.user.is_authenticated:
-            competition = context["object"]
-            # set ability to answer form to True
-            context["available"] = competition.finish > timezone.now()
-            context["issue"] = competition
-            answers = Answers.objects.filter(lab=competition.lab, user=self.request.user, lab_task=None,
-                                             datetime__lte=competition.finish,
-                                             datetime__gte=competition.start).first()
-            if answers is None:
-                answer = self.request.GET.get("answer_flag")     # getting user's form answer
-                if answer:
-                    if answer == lab.answer_flag:
-                        context["submitted"] = True
-                        answer_object = Answers(lab=lab, user=self.request.user, datetime=timezone.now())
-                        answer_object.save()
-                    else:
-                        context["form"].fields["answer_flag"].label = "Неверный флаг!"
-            else:
-                context["submitted"] = True
+        competition = context["object"]
+        # set ability to answer form to True
+        context["available"] = competition.finish > timezone.now()
+        context["issue"] = competition
 
-            if context['submitted']:
-                context['available'] = False
+        # show no description if competition finished
+        if not self.request.user.is_staff and competition.finish <= timezone.now():
+            competition.lab.description = ''
+
+        answers = Answers.objects.filter(lab=competition.lab, user=self.request.user, lab_task=None,
+                                         datetime__lte=competition.finish,
+                                         datetime__gte=competition.start).first()
+        if answers is None:
+            answer = self.request.GET.get("answer_flag")     # getting user's form answer
+            if answer:
+                if answer == lab.answer_flag:
+                    context["submitted"] = True
+                    answer_object = Answers(lab=lab, user=self.request.user, datetime=timezone.now())
+                    answer_object.save()
+                else:
+                    context["form"].fields["answer_flag"].label = "Неверный флаг!"
+        else:
+            context["submitted"] = True
+
+        if context['submitted']:
+            context['available'] = False
 
         return context
 
@@ -108,9 +120,13 @@ class CompetitionDetailView(DetailView):
         return context
 
 
-class PlatoonDetailView(DetailView):
+class PlatoonDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):
     model = Platoon
     pk_url_kwarg = 'id'
+
+    def test_func(self):
+        # Allow only admin users
+        return self.request.user.is_staff
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -130,8 +146,12 @@ class PlatoonDetailView(DetailView):
         return context
 
 
-class PlatoonListView(ListView):
+class PlatoonListView(LoginRequiredMixin, ListView, UserPassesTestMixin):
     model = Platoon
+
+    def test_func(self):
+        # Allow only admin users
+        return self.request.user.is_staff
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -165,9 +185,13 @@ class PlatoonListView(ListView):
         return progress_dict
 
 
-class UserDetailView(DetailView):
+class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):
     model = User
     pk_url_kwarg = 'id'
+
+    def test_func(self):
+        # Allow only admin users
+        return self.request.user.is_staff
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -239,6 +263,6 @@ def change_password(request):
     return render(request, 'registration/change_password.html', {'form': form})
 
 
-class AnswerAPIView(viewsets.ModelViewSet):
+class AnswerAPIView(LoginRequiredMixin, viewsets.ModelViewSet):
     queryset = Answers.objects.all()
     serializer_class = AnswerSerializer
