@@ -187,13 +187,13 @@ class IssuedLabs(models.Model):
         if self.deleted:
             return
         if self.lab.get_platform() == "PN":
-            url = PNET_URL
+            url = get_pnet_url()
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.lab.slug, PNET_BASE_DIR, cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.lab.slug, get_pnet_base_dir(), cookie, xsrf,
                                             self.user.username)
-            delete_lab_with_session_destroy(url, self.lab.name, PNET_BASE_DIR, cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.lab.name, get_pnet_base_dir(), cookie, xsrf,
                                             self.user.username)
             logout(url)
 
@@ -246,12 +246,12 @@ class Competition(models.Model):
     #     if self.lab.get_platform() == "PN":
     #         Login = 'pnet_scripts'
     #         Pass = 'eve'
-    #         cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+    #         cookie, xsrf = pf_login(get_pnet_url(), Login, Pass)
     #         AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
     #         for user in AllUsers:
-    #             delete_lab_with_session_destroy(PNET_URL, self.lab.name, PNET_BASE_DIR, cookie,
+    #             delete_lab_with_session_destroy(get_pnet_url(), self.lab.name, get_pnet_base_dir(), cookie,
     #                                             xsrf, user.username)
-    #         logout(PNET_URL)
+    #         logout(get_pnet_url())
     #     self.deleted = True
     #     self.save()
 
@@ -294,13 +294,13 @@ class Competition2User(models.Model):
         if self.deleted:
             return
         if self.competition.lab.get_platform() == "PN":
-            url = PNET_URL
+            url = get_pnet_url()
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.competition.lab.slug, PNET_BASE_DIR, cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_pnet_base_dir(), cookie, xsrf,
                                             self.user.username)
-            delete_lab_with_session_destroy(url, self.competition.lab.name, PNET_BASE_DIR, cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.competition.lab.name, get_pnet_base_dir(), cookie, xsrf,
                                             self.user.username)
             logout(url)
 
@@ -319,12 +319,12 @@ class Competition2User(models.Model):
         if lab.get_platform() == "PN":
             Login = 'pnet_scripts'
             Pass = 'eve'
-            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            create_lab(PNET_URL, lab.slug, "", PNET_BASE_DIR, cookie, xsrf,
+            cookie, xsrf = pf_login(get_pnet_url(), Login, Pass)
+            create_lab(get_pnet_url(), lab.slug, "", get_pnet_base_dir(), cookie, xsrf,
                        instance.user.username)
-            create_all_lab_nodes_and_connectors(PNET_URL, lab, PNET_BASE_DIR, cookie, xsrf,
+            create_all_lab_nodes_and_connectors(get_pnet_url(), lab, get_pnet_base_dir(), cookie, xsrf,
                                                 instance.user.username)
-            logout(PNET_URL)
+            logout(get_pnet_url())
         logger.debug(instance)
 
 

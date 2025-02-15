@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django_json_widget',
     'interface',
     'django_apscheduler',
+    'dynamic_config',
 ]
 
 MIDDLEWARE = [

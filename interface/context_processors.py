@@ -1,5 +1,5 @@
 from slugify import slugify
-from interface.config import PNET_URL
+from interface.config import get_pnet_url
 
 
 def pnet_username(request):
@@ -10,5 +10,5 @@ def pnet_username(request):
             request.user.save()
 
         username = request.user.pnet_login
-        return {'pnet_username': username, 'pnet_url': PNET_URL}
+        return {'pnet_username': username, 'pnet_url': get_pnet_url}
     return {}
