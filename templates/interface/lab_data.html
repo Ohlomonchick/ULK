@@ -1,5 +1,12 @@
 
 {% block lab_data %}
+    {% if not user.is_superuser and object.platform == "PN" %}
+        <div class="box">
+            <p>Для выполнения задания перейдите в
+                <a href="{{ pnet_url }}" target="_blank" rel="noopener noreferrer"><strong>PNETLab</strong></a>.
+                Используйте ваш пароль от Киберполигона и ваше имя в PNET.</p>
+        </div>
+    {% endif %}
     {% if not user.is_superuser %}
         <span class="tag is-medium "><h5 class="title is-5">Ваш вариант: {{ issue.level.level_number }}</h5></span>
     {% endif %}
