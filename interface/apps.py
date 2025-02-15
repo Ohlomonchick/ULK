@@ -5,3 +5,4 @@ class InterfaceConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'interface'
     verbose_name = 'Основной функционал'
+

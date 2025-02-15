@@ -2,7 +2,7 @@ from django import forms
 from .models import User, Competition, LabLevel, LabTask, Competition2User, Platoon
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
-from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, create_user, create_directory
+from interface.eveFunctions import pf_login, logout, create_user, create_directory
 from .config import *
 
 
@@ -59,11 +59,11 @@ class CustomUserCreationForm(UserCreationForm):
             user.username = user.last_name + "_" + user.first_name
         user.save()
 
-        url = "http://172.18.4.160"
+        url = get_pnet_url()
         Login = 'pnet_scripts'
         Pass = 'eve'
         cookie, xsrf = pf_login(url, Login, Pass)
-        create_directory(url, PNET_BASE_DIR, user.username, cookie)
+        create_directory(url, get_pnet_base_dir(), user.username, cookie)
         create_user(url, user.username, password, '1', cookie)
         logout(url)
 

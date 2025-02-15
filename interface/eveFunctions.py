@@ -41,7 +41,7 @@ def create_user(url, username, password, user_role, cookie):
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
-                "user_workspace": urljoin(PNET_BASE_DIR, username),
+                "user_workspace": urljoin(get_pnet_base_dir(), username),
                 "note": "",
                 "max_node": "",
                 "max_node_lab": ""
