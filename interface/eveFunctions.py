@@ -151,7 +151,7 @@ def filter_user(url, cookie, xsrf):
 
 
 def change_user_password(url, cookie, xsrf, pnet_login, new_password):
-    users = filter_user(url, cookie, xsrf)
+    users = filter_user(url, cookie, xsrf).json()
     user_params = None
     for user in users["data"]["data_table"]:
         if user["username"] == pnet_login:

@@ -248,7 +248,7 @@ def get_issue(data, competition_filters):
     }
     issue_filters.update(competition_filters)
     issue = Competition2User.objects.filter(**issue_filters).first()
-    if issue and (not lab.answer_flag):
+    if issue:
         return issue, None
     else:
         return (
@@ -273,6 +273,8 @@ def start_lab(request):
         }
         if issue.level:
             response_data["variant"] = issue.level.level_number
+        if issue.competition.lab.answer_flag:
+            response_data["flag"] = issue.competition.lab.answer_flag
         return JsonResponse(response_data)
 
 

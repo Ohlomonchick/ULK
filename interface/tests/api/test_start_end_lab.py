@@ -98,22 +98,6 @@ class GetIssueTests(TestCase):
             {"message": "No such issue"}
         )
 
-    def test_get_issue_lab_answer_flag_is_true(self):
-        """
-        If lab.answer_flag is true, function returns (None, 404) with 'No such issue'.
-        """
-        self.lab.answer_flag = "flag"
-        self.lab.save()
-
-        data = {'username': 'testuser', 'lab': 'Chemistry Lab'}
-        issue, error_response = get_issue(data, self.competition_filters)
-        self.assertIsNone(issue)
-        self.assertEqual(error_response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertJSONEqual(
-            error_response.content,
-            {"message": "No such issue"}
-        )
-
     def test_get_issue_success(self):
         """
         Should return (issue, None) if everything is valid and lab.answer_flag=False.
@@ -130,7 +114,7 @@ class StartLabViewTests(APITestCase):
         self.client = APIClient()
 
         self.user = User.objects.create(username='testuser', pnet_login='pnetlogin', last_name='Doe')
-        self.lab = Lab.objects.create(name='Chemistry Lab', answer_flag=None)
+        self.lab = Lab.objects.create(name='Chemistry Lab', answer_flag='flag')
         self.competition = Competition.objects.create(
             lab=self.lab,
             start=timezone.now(),
@@ -165,9 +149,11 @@ class StartLabViewTests(APITestCase):
         self.assertIn("variant", data)
         self.assertIn("task", data)
         self.assertIn("tasks", data)
+        self.assertIn("flag", data)
 
         # Ensure these are what we expect
         self.assertEqual(data["variant"], self.issue.level.level_number)
+        self.assertEqual(data["flag"], self.lab.answer_flag)
         self.assertIsInstance(data["tasks"], list)
 
     def test_start_lab_with_invalid_data(self):
