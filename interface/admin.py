@@ -1,10 +1,11 @@
 import random
+
 from django.contrib import admin
 from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from .models import *
-from .forms import CustomUserCreationForm, CompetitionForm, KkzForm
+from .forms import CustomUserCreationForm, CompetitionForm, KkzForm, KkzLabInlineForm
 from django.db.models import JSONField
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
 
@@ -60,7 +61,7 @@ class Competition2UserInline(admin.TabularInline):
     model = Competition2User
     extra = 0
     fields = ('user', 'level', 'tasks')
-    readonly_fields = ('user', )
+    readonly_fields = ('user',)
     can_delete = False
 
 
@@ -79,6 +80,8 @@ class CompetitionAdmin(admin.ModelAdmin):
     inlines = [Competition2UserInline]
     actions = [set_all_users_to_competition_level]
 
+    class Media:
+        js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
@@ -103,14 +106,13 @@ class CompetitionAdmin(admin.ModelAdmin):
 
 class KkzLabInline(admin.TabularInline):
     model = KkzLab
+    form = KkzLabInlineForm
     extra = 1
     fields = ['lab', 'tasks', 'num_tasks']
     filter_horizontal = ['tasks']
 
     class Media:
-        js = (
-            'admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js',
-        )
+        js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
 
 
 class KkzAdmin(admin.ModelAdmin):
@@ -147,6 +149,7 @@ class KkzAdmin(admin.ModelAdmin):
                         competition2user.tasks.set(assigned_tasks)
 
         super().save_model(request, obj, form, change)
+
 
 
 admin.site.register(Lab, LabModelAdmin)

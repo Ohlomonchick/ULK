@@ -187,11 +187,13 @@ class IssuedLabs(models.Model):
         if self.deleted:
             return
         if self.lab.get_platform() == "PN":
-            url = PNET_URL
+            url = get_pnet_url()
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.lab.name, PNET_BASE_DIR, cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.lab.slug, get_pnet_base_dir(), cookie, xsrf,
+                                            self.user.username)
+            delete_lab_with_session_destroy(url, self.lab.name, get_pnet_base_dir(), cookie, xsrf,
                                             self.user.username)
             logout(url)
 
@@ -210,7 +212,6 @@ class IssuedLabs(models.Model):
         verbose_name_plural = 'Назначенные работы'
 
 
-
 class Kkz(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название ККЗ", null=True, blank=False)
     start = models.DateTimeField(verbose_name="Начало")
@@ -218,15 +219,12 @@ class Kkz(models.Model):
     platoons = models.ManyToManyField(Platoon, verbose_name="Взвода", blank=True)
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
     unified_tasks = models.BooleanField("Единые задания для всех", default=False)
-
     def get_users(self):
         users = User.objects.filter(platoon__in=self.platoons.all())
         users = users.union(User.objects.filter(id__in=self.non_platoon_users.values('id')))
         return users
-
     def __str__(self):
         return self.name
-
     class Meta:
         verbose_name = "ККЗ"
         verbose_name_plural = "ККЗ"
@@ -237,10 +235,8 @@ class KkzLab(models.Model):
     lab = models.ForeignKey('Lab', on_delete=models.CASCADE, verbose_name="Лабораторная работа")
     tasks = models.ManyToManyField('LabTask', verbose_name="Задания", blank=True)
     num_tasks = models.PositiveIntegerField("Количество заданий для распределения", default=1)
-
     def __str__(self):
         return f"{self.kkz.name} - {self.lab.name}"
-
     class Meta:
         verbose_name = 'Лабораторная работа в ККЗ'
         verbose_name_plural = 'Лабораторные работы в ККЗ'
@@ -250,13 +246,12 @@ class AssignedTask(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assigned_tasks", verbose_name="Студент", default=None, null=True, blank=True)
     task = models.ForeignKey("LabTask", on_delete=models.CASCADE, related_name="assigned_task", verbose_name="Задание")
     kkz = models.ForeignKey(Kkz, on_delete=models.CASCADE, related_name="assigned_tasks", verbose_name="ККЗ", null=True, blank=True)
-
     def __str__(self):
         return f"{self.user} - {self.task}"
 
 
 class Competition(models.Model):
-    slug = models.SlugField('Название в адресной строке', unique=True)
+    slug = models.SlugField('Название в адресной строке', unique=True, max_length=255)
     start = models.DateTimeField("Начало")
     finish = models.DateTimeField("Конец")
     lab = models.ForeignKey(Lab,
@@ -272,9 +267,10 @@ class Competition(models.Model):
     tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
     deleted = models.BooleanField(default=False)
 
+    kkz = models.ForeignKey(Kkz, related_name="competitions", on_delete=models.CASCADE, verbose_name="ККЗ",
+                            null=True, blank=True)
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
     # issued_labs = models.ManyToManyField(IssuedLabs, blank=True)
-    kkz = models.ForeignKey(Kkz, related_name="competitions", on_delete=models.CASCADE, verbose_name="ККЗ", null=True, blank=True)  # Добавляем связь с ККЗ
 
     def clean(self):
         if not self.start or not self.finish:
@@ -290,12 +286,12 @@ class Competition(models.Model):
     #     if self.lab.get_platform() == "PN":
     #         Login = 'pnet_scripts'
     #         Pass = 'eve'
-    #         cookie, xsrf = pf_login(PNET_URL, Login, Pass)
+    #         cookie, xsrf = pf_login(get_pnet_url(), Login, Pass)
     #         AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
     #         for user in AllUsers:
-    #             delete_lab_with_session_destroy(PNET_URL, self.lab.name, PNET_BASE_DIR, cookie,
+    #             delete_lab_with_session_destroy(get_pnet_url(), self.lab.name, get_pnet_base_dir(), cookie,
     #                                             xsrf, user.username)
-    #         logout(PNET_URL)
+    #         logout(get_pnet_url())
     #     self.deleted = True
     #     self.save()
 
@@ -345,11 +341,13 @@ class Competition2User(models.Model):
         if self.deleted:
             return
         if self.competition.lab.get_platform() == "PN":
-            url = PNET_URL
+            url = get_pnet_url()
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.competition.lab.name, PNET_BASE_DIR, cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_pnet_base_dir(), cookie, xsrf,
+                                            self.user.username)
+            delete_lab_with_session_destroy(url, self.competition.lab.name, get_pnet_base_dir(), cookie, xsrf,
                                             self.user.username)
             logout(url)
 
@@ -368,12 +366,12 @@ class Competition2User(models.Model):
         if lab.get_platform() == "PN":
             Login = 'pnet_scripts'
             Pass = 'eve'
-            cookie, xsrf = pf_login(PNET_URL, Login, Pass)
-            create_lab(PNET_URL, lab.name, "", PNET_BASE_DIR, cookie, xsrf,
+            cookie, xsrf = pf_login(get_pnet_url(), Login, Pass)
+            create_lab(get_pnet_url(), lab.slug, "", get_pnet_base_dir(), cookie, xsrf,
                        instance.user.username)
-            create_all_lab_nodes_and_connectors(PNET_URL, lab, PNET_BASE_DIR, cookie, xsrf,
+            create_all_lab_nodes_and_connectors(get_pnet_url(), lab, get_pnet_base_dir(), cookie, xsrf,
                                                 instance.user.username)
-            logout(PNET_URL)
+            logout(get_pnet_url())
         logger.debug(instance)
 
 

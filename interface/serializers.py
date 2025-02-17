@@ -72,5 +72,3 @@ class LabTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTask
         fields = ['id', 'task_id', 'description']
-
-
