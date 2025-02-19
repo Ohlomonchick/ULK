@@ -1,5 +1,5 @@
 from django import forms
-from .models import User, Competition, LabLevel, LabTask, Competition2User, Platoon, KkzLab, Kkz, Lab
+from .models import User, Competition, LabLevel, LabTask, Platoon, KkzLab, Kkz, Lab
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
@@ -59,13 +59,13 @@ class CustomUserCreationForm(UserCreationForm):
             user.username = user.last_name + "_" + user.first_name
         user.save()
 
-        url = get_pnet_url()
-        Login = 'pnet_scripts'
-        Pass = 'eve'
-        cookie, xsrf = pf_login(url, Login, Pass)
-        create_directory(url, get_pnet_base_dir(), user.username, cookie)
-        create_user(url, user.username, password, '1', cookie)
-        logout(url)
+        # url = get_pnet_url()
+        # Login = 'pnet_scripts'
+        # Pass = 'eve'
+        # cookie, xsrf = pf_login(url, Login, Pass)
+        # create_directory(url, get_pnet_base_dir(), user.username, cookie)
+        # create_user(url, user.username, password, '1', cookie)
+        # logout(url)
 
         return user
 
@@ -156,14 +156,9 @@ class KkzLabInlineForm(forms.ModelForm):
     class Meta:
         model = KkzLab
         fields = ['lab', 'tasks', 'num_tasks']
-        widgets = {
-            'lab': forms.Select(attrs={'class': 'lab-select'}),
-            'tasks': forms.SelectMultiple(attrs={'class': 'tasks-select'}),
-        }
+
 
     def __init__(self, *args, **kwargs):
         super(KkzLabInlineForm, self).__init__(*args, **kwargs)
-        if self.instance and self.instance.lab_id:
+        if self.instance and self.instance.pk:
             self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
-        else:
-            self.fields['tasks'].queryset = LabTask.objects.none()

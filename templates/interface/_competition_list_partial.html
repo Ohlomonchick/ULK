@@ -19,7 +19,7 @@
                         {% elif comp.finish < now %}
                             <h4 class="subtitle is-5 has-text-danger">Экзамен был завершён: {{ comp.finish|date:"H:i" }}</h4>
                         {% else %}
-                            <h4 class="subtitle is-5 has-text-success">Экзамен доступен для выполнения до {{ comp.finish|date:"H:i" }}!!</h4>
+                            <h4 class="subtitle is-5 has-text-success">Экзамен доступен для выполнения до {{ comp.finish|date:"H:i" }}!</h4>
                         {% endif %}
                     </div>
                 {%  endif %}

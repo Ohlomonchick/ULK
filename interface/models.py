@@ -315,7 +315,8 @@ class Competition2User(models.Model):
     competition = models.ForeignKey(
         Competition,
         on_delete=models.CASCADE,
-        related_name='competition_users'
+        related_name='competition_users',
+        null=True
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

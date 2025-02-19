@@ -59,6 +59,7 @@ class MyUserAdmin(UserAdmin):
 
 class Competition2UserInline(admin.TabularInline):
     model = Competition2User
+    #form = Competition2UserInlineForm
     extra = 0
     fields = ('user', 'level', 'tasks')
     readonly_fields = ('user',)
@@ -112,7 +113,12 @@ class KkzLabInline(admin.TabularInline):
     filter_horizontal = ['tasks']
 
     class Media:
-        js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
+        js = ('admin/js/jquery-3.7.1.min.js', 'admin/js/load_levels.js')
+
+    # def get_formset(self, request, obj=None, **kwargs):
+    #     formset = super().get_formset(request, obj, **kwargs)
+    #     formset.form.base_fields['tasks'].queryset = LabTask.objects.none()
+    #     return formset
 
 
 class KkzAdmin(admin.ModelAdmin):
@@ -122,13 +128,19 @@ class KkzAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
 
+        if not change:
+            obj.refresh_from_db()
+
         for kkz_lab in obj.kkz_labs.all():
-            competition = Competition.objects.create(
-                start=obj.start,
-                finish=obj.finish,
+            competition, created = Competition.objects.get_or_create(
+                defaults={'start': obj.start, 'finish': obj.finish},
                 lab=kkz_lab.lab,
                 kkz=obj,
             )
+            if not created:
+                competition.start = obj.start
+                competition.finish = obj.finish
+                competition.save()
 
             competition.platoons.set(obj.platoons.all())
             competition.non_platoon_users.set(obj.non_platoon_users.all())
@@ -148,8 +160,7 @@ class KkzAdmin(admin.ModelAdmin):
                     else:
                         competition2user.tasks.set(assigned_tasks)
 
-        super().save_model(request, obj, form, change)
-
+            super().save_model(request, obj, form, change)
 
 
 admin.site.register(Lab, LabModelAdmin)
