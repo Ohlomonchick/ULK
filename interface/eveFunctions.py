@@ -8,6 +8,14 @@ from urllib.parse import urljoin
 logger = logging.getLogger(__name__)
 
 
+def get_user_workspace_relative_path():
+    STUDENT_WORKSPACE = 'Practice work/Test_Labs'
+    base_dir = get_pnet_base_dir()
+    if STUDENT_WORKSPACE in base_dir:
+        base_dir = base_dir.replace(STUDENT_WORKSPACE, '')
+        base_dir = base_dir.replace('//', '/')
+    return base_dir
+
 def pf_login(url, name, password):
     url2 = url + '/store/public/auth/login/login'
     header1 = {
@@ -41,7 +49,7 @@ def create_user(url, username, password, user_role, cookie):
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
-                "user_workspace": urljoin(get_pnet_base_dir(), username),
+                "user_workspace": urljoin(get_user_workspace_relative_path(), username),
                 "note": "",
                 "max_node": "",
                 "max_node_lab": ""
@@ -55,10 +63,9 @@ def create_user(url, username, password, user_role, cookie):
             cookies=cookie,
             verify=False
         )
-        logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(username, password,
-                                                                                              urljoin(PNET_BASE_DIR,
-                                                                                                      username),
-                                                                                              r.text))
+        logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(
+            username, password, urljoin(get_pnet_base_dir(), username), r.text)
+        )
     except Exception as e:
         logger.debug("Error with creating user\n{}\n".format(e))
 

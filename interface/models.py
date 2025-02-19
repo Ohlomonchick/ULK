@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
-    delete_lab_with_session_destroy, change_user_workspace, create_directory
+    delete_lab_with_session_destroy, change_user_workspace, create_directory, get_user_workspace_relative_path
 from .validators import validate_top_level_array
 from .config import *
 logger = logging.getLogger(__name__)
@@ -396,9 +396,9 @@ class TeamCompetition2Team(models.Model):
                                                 instance.team.slug)
             logging.debug(f'competition created for team {instance.team.slug}')
             for user in instance.team.users.all():
-                logging.debug(f'call change_workspace for user {user.pnet_login}')
+                logging.debug(f'change workspace for {user.pnet_login} to {urljoin(get_user_workspace_relative_path(), instance.team.slug)}')
                 change_user_workspace(
-                    get_pnet_url(), cookie, xsrf, user.pnet_login, urljoin(get_pnet_base_dir(), instance.team.slug)
+                    get_pnet_url(), cookie, xsrf, user.pnet_login, urljoin(get_user_workspace_relative_path(), instance.team.slug)
                 )
 
             logout(get_pnet_url())
@@ -411,11 +411,11 @@ class TeamCompetition2Team(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_pnet_base_dir(), cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_user_workspace_relative_path(), cookie, xsrf,
                                             self.team.slug)
             for user in self.team.users.all():
                 change_user_workspace(
-                    get_pnet_url(), cookie, xsrf, user.pnet_login, urljoin(get_pnet_base_dir(), user.pnet_login)
+                    get_pnet_url(), cookie, xsrf, user.pnet_login, urljoin(get_user_workspace_relative_path(), user.pnet_login)
                 )
 
             logout(url)
