@@ -1,11 +1,15 @@
+import logging
+
 from django.contrib import admin
 from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from .models import *
-from .forms import CustomUserCreationForm, CompetitionForm
+from .forms import CustomUserCreationForm, CompetitionForm, TeamCompetitionForm
 from django.db.models import JSONField
+from django.db import transaction
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
+
 
 
 class CustomJSONEditorWidget(JSONEditorWidget):
@@ -81,6 +85,11 @@ class CompetitionAdmin(admin.ModelAdmin):
     class Media:
         js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # Exclude rows that actually belong to the TeamCompetition subclass
+        return qs.exclude(teamcompetition__isnull=False)
+
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
         if obj and obj.lab:
@@ -102,10 +111,43 @@ class CompetitionAdmin(admin.ModelAdmin):
     all_non_platoon_users.short_description = 'Отдельные пользователи'
 
 
+class TeamAdmin(admin.ModelAdmin):
+    exclude = ('slug', )
+
+    def save_related(self, request, form, formsets, change):
+        # First, let Django save all related m2m data
+        super().save_related(request, form, formsets, change)
+
+        # Now update the slug based on name and users
+        obj = form.instance
+        slug_str = obj.name
+        for user in obj.users.all():
+            slug_str += '-' + slugify(user.last_name)
+
+        obj.slug = slugify(slug_str)
+        obj.save()
+
+        transaction.on_commit(lambda: Team.post_create(sender=Team, instance=obj, created=True))
+
+
+class TeamCompetitionAdmin(CompetitionAdmin):
+    form = TeamCompetitionForm
+    add_form = TeamCompetitionForm
+
+    def get_queryset(self, request):
+        qs = admin.ModelAdmin.get_queryset(self, request)
+        qs = qs.filter(pk__in=TeamCompetition.objects.values_list('pk', flat=True))
+        return qs
+
 admin.site.register(Lab, LabModelAdmin)
 admin.site.register(Platoon, admin.ModelAdmin)
 admin.site.register(Competition, CompetitionAdmin)
 admin.site.register(User, MyUserAdmin)
 admin.site.register(Answers, admin.ModelAdmin)
+admin.site.register(Team, TeamAdmin)
+admin.site.register(TeamCompetition, TeamCompetitionAdmin)
+
+admin.site.register(TeamCompetition2Team, admin.ModelAdmin)
+
 admin.site.unregister(DjangoJob)
 admin.site.unregister(DjangoJobExecution)

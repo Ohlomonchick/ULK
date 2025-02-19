@@ -13,7 +13,7 @@ from django_apscheduler.jobstores import DjangoJobStore
 from django_apscheduler.models import DjangoJobExecution
 from django_apscheduler import util
 
-from interface.models import Competition2User
+from interface.models import Competition2User, TeamCompetition2Team
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,19 @@ def delete_labs_job():
     competitions2users = Competition2User.objects.filter(competition__finish__gte=delete_time, deleted=False)
 
     for competition2user in competitions2users:
+        competition2user.delete_from_platform()
+        time.sleep(20)
+
+
+@util.close_old_connections
+def delete_competition2team_job():
+    """
+    Удаляем лабы и соревнования через час после их окончания
+    """
+    delete_time = timezone.now() + datetime.timedelta(minutes=10)
+    competitions2teams = TeamCompetition2Team.objects.filter(competition__finish__gte=delete_time, deleted=False)
+
+    for competition2user in competitions2teams:
         competition2user.delete_from_platform()
         time.sleep(20)
 
@@ -62,6 +75,15 @@ class Command(BaseCommand):
             replace_existing=True,
         )
         logger.info("Added job 'delete_labs_job'.")
+
+        scheduler.add_job(
+            delete_competition2team_job,
+            trigger=CronTrigger(minute="*/15"),  # Every 15 minutes
+            id="delete_competition2team_job",
+            max_instances=1,
+            replace_existing=True,
+        )
+        logger.info("Added job 'delete_competition2team_job'.")
 
         scheduler.add_job(
             delete_old_job_executions,

@@ -150,36 +150,51 @@ def filter_user(url, cookie, xsrf):
     return r
 
 
-def change_user_password(url, cookie, xsrf, pnet_login, new_password):
+def get_user_params(url, cookie, xsrf, pnet_login):
     users = filter_user(url, cookie, xsrf).json()
     user_params = None
     for user in users["data"]["data_table"]:
         if user["username"] == pnet_login:
             user_params = user
-    if user_params:
-        header = {
-            "Content-Type": "application/json;charset=UTF-8",
-            "X-XSRF-TOKEN": xsrf
+    return user_params
+
+
+def change_user_params(url, cookie, xsrf, new_params):
+    header = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "X-XSRF-TOKEN": xsrf
+    }
+    payload = json.dumps({
+        "data": {
+            "data_key":
+                [{"pod": new_params["pod"]}],
+            "data_editor": new_params
         }
+    }
+    )
+    r = requests.post(
+        url + '/store/public/admin/users/offEdit',
+        headers=header,
+        data=payload,
+        cookies=cookie,
+        verify=False
+    )
+    return r
+
+
+def change_user_password(url, cookie, xsrf, pnet_login, new_password):
+    user_params = get_user_params(url, cookie, xsrf, pnet_login)
+    if user_params:
         user_params["password"] = new_password
+        return change_user_params(url, cookie, xsrf, user_params)
+    return None
 
-        payload = json.dumps({
-            "data": {
-                "data_key":
-                    [{"pod": user_params["pod"]}],
-                    "data_editor": user_params
-                }
-            }
-        )
-        r = requests.post(
-            url + '/store/public/admin/users/offEdit',
-            headers=header,
-            data=payload,
-            cookies=cookie,
-            verify=False
-        )
-        return r
 
+def change_user_workspace(url, cookie, xsrf, pnet_login, new_workspace):
+    user_params = get_user_params(url, cookie, xsrf, pnet_login)
+    if user_params:
+        user_params["user_workspace"] = new_workspace
+        return change_user_params(url, cookie, xsrf, user_params)
     return None
 
 
