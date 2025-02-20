@@ -135,6 +135,7 @@ class KkzForm(forms.ModelForm):
     class Meta:
         model = Kkz
         fields = ['name', 'start', 'finish', 'platoons', 'non_platoon_users']
+
     def save(self, commit=True):
         kkz = super().save(commit=False)
         if commit:
@@ -145,12 +146,11 @@ class KkzForm(forms.ModelForm):
                     start=self.cleaned_data['start'],
                     finish=self.cleaned_data['finish'],
                     lab=lab,
+                    kkz=kkz
                 )
                 competition.platoons.set(self.cleaned_data['platoons'])
                 competition.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
-                kkz.competitions.add(competition)
         return kkz
-
 
 class KkzLabInlineForm(forms.ModelForm):
     class Meta:

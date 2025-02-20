@@ -242,14 +242,6 @@ class KkzLab(models.Model):
         verbose_name_plural = 'Лабораторные работы в ККЗ'
 
 
-class AssignedTask(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assigned_tasks", verbose_name="Студент", default=None, null=True, blank=True)
-    task = models.ForeignKey("LabTask", on_delete=models.CASCADE, related_name="assigned_task", verbose_name="Задание")
-    kkz = models.ForeignKey(Kkz, on_delete=models.CASCADE, related_name="assigned_tasks", verbose_name="ККЗ", null=True, blank=True)
-    def __str__(self):
-        return f"{self.user} - {self.task}"
-
-
 class Competition(models.Model):
     slug = models.SlugField('Название в адресной строке', unique=True, max_length=255)
     start = models.DateTimeField("Начало")

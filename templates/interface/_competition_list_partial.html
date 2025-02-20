@@ -17,7 +17,7 @@
                         {% if comp.start > now %}
                             <h4 class="subtitle is-5 has-text-warning">Экзамен станет доступен: {{ comp.start|date:"H:i" }}</h4>
                         {% elif comp.finish < now %}
-                            <h4 class="subtitle is-5 has-text-danger">Экзамен был завершён: {{ comp.finish|date:"H:i" }}</h4>
+                            <h4 class="subtitle is-5 has-text-danger">Экзамен был завершён: {{ comp.finish }}</h4>
                         {% else %}
                             <h4 class="subtitle is-5 has-text-success">Экзамен доступен для выполнения до {{ comp.finish|date:"H:i" }}!</h4>
                         {% endif %}
@@ -49,10 +49,10 @@
                         </div>
                     {% endfor %}
                 </ul>
-            {% if comp.start > now %}
+            {% if kkz.start > now %}
                 <h4 class="subtitle is-5 has-text-warning">Экзамен станет доступен: {{ kkz.start|date:"H:i" }}</h4>
-            {% elif comp.finish < now %}
-                <h4 class="subtitle is-5 has-text-danger">Экзамен был завершён: {{ kkz.finish|date:"H:i" }}</h4>
+            {% elif kkz.finish < now %}
+                <h4 class="subtitle is-5 has-text-danger">Экзамен был завершён: {{ kkz.finish}}</h4>
             {% else %}
                 <h4 class="subtitle is-5 has-text-success">Экзамен доступен для выполнения до {{ kkz.finish|date:"H:i" }}!</h4>
             {% endif %}
