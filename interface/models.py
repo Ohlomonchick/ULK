@@ -10,10 +10,11 @@ from django.contrib.auth.models import AbstractUser
 from slugify import slugify
 from rest_framework import serializers
 import requests
+from urllib.parse import urljoin
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
-    delete_lab_with_session_destroy
+    delete_lab_with_session_destroy, change_user_workspace, create_directory, get_user_workspace_relative_path
 from .validators import validate_top_level_array
 from .config import *
 logger = logging.getLogger(__name__)
@@ -114,7 +115,7 @@ class Answers(models.Model):
 
 
 class Platoon(models.Model):
-    number = models.fields.IntegerField('Номер взвода')
+    number = models.fields.IntegerField('Номер взвода', unique=True)
 
     def __str__(self):
         return str(self.number)
@@ -240,21 +241,6 @@ class Competition(models.Model):
         if self.finish <= timezone.now():
             raise ValidationError("Экзамен уже закончился!")
 
-    # def delete_from_platform(self):
-    #     if self.deleted:
-    #         return
-    #     if self.lab.get_platform() == "PN":
-    #         Login = 'pnet_scripts'
-    #         Pass = 'eve'
-    #         cookie, xsrf = pf_login(get_pnet_url(), Login, Pass)
-    #         AllUsers = User.objects.filter(platoon_id__in=self.platoons.all())
-    #         for user in AllUsers:
-    #             delete_lab_with_session_destroy(get_pnet_url(), self.lab.name, get_pnet_base_dir(), cookie,
-    #                                             xsrf, user.username)
-    #         logout(get_pnet_url())
-    #     self.deleted = True
-    #     self.save()
-
     def delete(self, *args, **kwargs):
         for issue in self.competition_users.all():
             issue.delete()
@@ -307,12 +293,17 @@ class Competition2User(models.Model):
         self.deleted = True
         self.save()
 
+    class Meta:
+        verbose_name = 'Задание участника'
+        verbose_name_plural = 'Задания участников'
+
     def delete(self, *args, **kwargs):
         self.delete_from_platform()
         super(Competition2User, self).delete(*args, **kwargs)
 
     @classmethod
     def post_create(cls, sender, instance, created, *args, **kwargs):
+        logging.debug(f'post create Competition2User is called for')
         if not created:
             return
         lab = instance.competition.lab
@@ -328,4 +319,114 @@ class Competition2User(models.Model):
         logger.debug(instance)
 
 
+class Team(models.Model):
+    name = models.CharField('Имя', max_length=255)
+    slug = models.SlugField('Название в адресной строке', unique=True, max_length=255)
+    users = models.ManyToManyField(User, verbose_name="Участники", blank=True)
+
+    class Meta:
+        verbose_name = 'Команда'
+        verbose_name_plural = 'Команды'
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def post_create(cls, sender, instance, created, *args, **kwargs):
+        if not created:
+            return
+
+        url = get_pnet_url()
+        Login = 'pnet_scripts'
+        Pass = 'eve'
+        cookie, xsrf = pf_login(url, Login, Pass)
+        logging.debug(f'create dir with name {instance.slug}')
+        create_directory(url, get_pnet_base_dir(), instance.slug, cookie)
+        logout(url)
+
+
+class TeamCompetition(Competition):
+    teams = models.ManyToManyField(
+        Team,
+        through='TeamCompetition2Team',
+        verbose_name='Команды',
+        blank=True
+    )
+
+    class Meta:
+        verbose_name = 'Соревнование'
+        verbose_name_plural = 'Соревнования'
+
+
+class TeamCompetition2Team(models.Model):
+    competition = models.ForeignKey(
+        TeamCompetition,
+        on_delete=models.CASCADE,
+        related_name='competition_teams'
+    )
+    team = models.ForeignKey(
+        Team,
+        on_delete=models.CASCADE,
+        related_name='team_competitions'
+    )
+    tasks = models.ManyToManyField(
+        LabTask,
+        blank=True,
+        verbose_name="Задания"
+    )
+    deleted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.competition} — {self.team}"
+
+
+    @classmethod
+    def post_create(cls, sender, instance, created, *args, **kwargs):
+        # if not created:
+        #     return
+        logging.debug(f'post create TeamCompetition2Team is called for {instance.team.slug}')
+        lab = instance.competition.lab
+        if lab.get_platform() == "PN":
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(get_pnet_url(), Login, Pass)
+            create_lab(get_pnet_url(), lab.slug, "", get_pnet_base_dir(), cookie, xsrf,
+                       instance.team.slug)
+            create_all_lab_nodes_and_connectors(get_pnet_url(), lab, get_pnet_base_dir(), cookie, xsrf,
+                                                instance.team.slug)
+            logging.debug(f'competition created for team {instance.team.slug}')
+            for user in instance.team.users.all():
+                logging.debug(f'change workspace for {user.pnet_login} to {get_user_workspace_relative_path()}/{instance.team.slug}')
+                change_user_workspace(
+                    get_pnet_url(), cookie, xsrf, user.pnet_login, f'{get_user_workspace_relative_path()}/{instance.team.slug}'
+                )
+
+            logout(get_pnet_url())
+
+    def delete_from_platform(self):
+        if self.deleted:
+            return
+        if self.competition.lab.get_platform() == "PN":
+            url = get_pnet_url()
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(url, Login, Pass)
+            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_user_workspace_relative_path(), cookie, xsrf,
+                                            self.team.slug)
+            for user in self.team.users.all():
+                change_user_workspace(
+                    get_pnet_url(), cookie, xsrf, user.pnet_login, f'{get_user_workspace_relative_path()}/{user.pnet_login}'
+                )
+
+            logout(url)
+
+        self.deleted = True
+        self.save()
+
+    def delete(self, *args, **kwargs):
+        self.delete_from_platform()
+        super(TeamCompetition2Team, self).delete(*args, **kwargs)
+
+
 post_save.connect(Competition2User.post_create, sender=Competition2User)
+post_save.connect(TeamCompetition2Team.post_create, sender=TeamCompetition2Team)

@@ -1,5 +1,6 @@
 from django import forms
-from .models import User, Competition, LabLevel, LabTask, Competition2User, Platoon
+from .models import (User, Competition, LabLevel, LabTask, Competition2User,
+                     Platoon, TeamCompetition, Team, TeamCompetition2Team)
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
@@ -126,5 +127,45 @@ class CompetitionForm(forms.ModelForm):
         for user_id in existing_user_ids:
             if user_id not in all_users_ids:
                 Competition2User.objects.get(competition=instance, user_id=user_id).delete()
+
+        return instance
+
+
+class TeamCompetitionForm(CompetitionForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple,
+        label="Команды"
+    )
+
+    class Meta(CompetitionForm.Meta):
+        model = TeamCompetition
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['teams'].help_text = \
+            'Если пользователь добавлен отдельно от команды, он всё равно будет принимать участие в составе команды.'
+
+    def save(self, commit=True):
+        """
+        This calls CompetitionForm's save() logic first,
+        so you reuse all that field assignment and M2M logic.
+        """
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
+
+        teams = self.cleaned_data.get('teams', [])
+        # Clear any existing through-relations.
+        instance.teams.clear()
+
+        for team in teams:
+            through_instance = TeamCompetition2Team(
+                competition=instance,
+                team=team
+            )
+            through_instance.save()
 
         return instance
