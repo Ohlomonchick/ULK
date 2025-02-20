@@ -3,7 +3,6 @@ from slugify import slugify
 import logging
 import json
 from .config import *
-from urllib.parse import urljoin
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ def create_user(url, username, password, user_role, cookie):
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
-                "user_workspace": urljoin(get_user_workspace_relative_path(), username),
+                "user_workspace": f'{get_user_workspace_relative_path()}/{username}',
                 "note": "",
                 "max_node": "",
                 "max_node_lab": ""
@@ -64,7 +63,7 @@ def create_user(url, username, password, user_role, cookie):
             verify=False
         )
         logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(
-            username, password, urljoin(get_pnet_base_dir(), username), r.text)
+            username, password, f'{get_user_workspace_relative_path()}/{username}', r.text)
         )
     except Exception as e:
         logger.debug("Error with creating user\n{}\n".format(e))

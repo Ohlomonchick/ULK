@@ -396,9 +396,9 @@ class TeamCompetition2Team(models.Model):
                                                 instance.team.slug)
             logging.debug(f'competition created for team {instance.team.slug}')
             for user in instance.team.users.all():
-                logging.debug(f'change workspace for {user.pnet_login} to {urljoin(get_user_workspace_relative_path(), instance.team.slug)}')
+                logging.debug(f'change workspace for {user.pnet_login} to {get_user_workspace_relative_path()}/{instance.team.slug}')
                 change_user_workspace(
-                    get_pnet_url(), cookie, xsrf, user.pnet_login, urljoin(get_user_workspace_relative_path(), instance.team.slug)
+                    get_pnet_url(), cookie, xsrf, user.pnet_login, f'{get_user_workspace_relative_path()}/{instance.team.slug}'
                 )
 
             logout(get_pnet_url())
@@ -415,7 +415,7 @@ class TeamCompetition2Team(models.Model):
                                             self.team.slug)
             for user in self.team.users.all():
                 change_user_workspace(
-                    get_pnet_url(), cookie, xsrf, user.pnet_login, urljoin(get_user_workspace_relative_path(), user.pnet_login)
+                    get_pnet_url(), cookie, xsrf, user.pnet_login, f'{get_user_workspace_relative_path()}/{user.pnet_login}'
                 )
 
             logout(url)
