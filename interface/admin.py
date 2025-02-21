@@ -5,7 +5,7 @@ from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from .models import *
-from .forms import CustomUserCreationForm, CompetitionForm, KkzForm, KkzLabInlineForm
+from .forms import CustomUserCreationForm, CompetitionForm, KkzForm, KkzLabInlineForm, Competition2UserInlineForm
 from django.db.models import JSONField
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
 
@@ -59,6 +59,7 @@ class MyUserAdmin(UserAdmin):
 
 class Competition2UserInline(admin.TabularInline):
     model = Competition2User
+    form = Competition2UserInlineForm
     extra = 0
     fields = ('user', 'level', 'tasks')
     readonly_fields = ('user',)

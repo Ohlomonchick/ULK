@@ -1,5 +1,5 @@
 from django import forms
-from .models import User, Competition, LabLevel, LabTask, Platoon, KkzLab, Kkz, Lab
+from .models import User, Competition, LabLevel, LabTask, Platoon, KkzLab, Kkz, Lab, Competition2User
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
@@ -162,3 +162,18 @@ class KkzLabInlineForm(forms.ModelForm):
         super(KkzLabInlineForm, self).__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
+
+
+class Competition2UserInlineForm(forms.ModelForm):
+    class Meta:
+        model = Competition2User
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.competition and self.instance.competition.lab:
+            self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.competition.lab)
+            self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.competition.lab)
+        else:
+            self.fields['tasks'].queryset = LabTask.objects.none()
+            self.fields['level'].queryset = LabLevel.objects.none()
