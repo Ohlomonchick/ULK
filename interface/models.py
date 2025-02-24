@@ -327,6 +327,7 @@ class Competition2User(models.Model):
         blank=True,
         verbose_name="Задания"
     )
+    done = models.BooleanField('Завершено', default=False)
 
     deleted = models.BooleanField(default=False)
 

@@ -9,7 +9,7 @@
             <h2 class="title is-3">Список студентов данного взвода или группы.</h2>
                 {% for student in user_list %}
                         <div class="box">
-                            <h2 class="title is-5"><a href = " {% url 'interface:user-detail' student.id %}">{{student.username}}</a></h2>
+                            <h2 class="title is-5"><a href = " {% url 'interface:user-detail' student.id %}">{{ student.last_name }} {{ student.first_name }}</a></h2>
                         </div>
                 {% empty %}
                 <p class = "content is-medium">Студентов нет.</p>

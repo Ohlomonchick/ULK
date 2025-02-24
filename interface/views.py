@@ -22,6 +22,7 @@ class LabDetailView(DetailView):
 class LabListView(ListView):
     model = Lab
 
+
 class CompetitionListView(ListView):
     model = Competition
     template_name = 'interface/competition_list.html'
@@ -85,6 +86,13 @@ class CompetitionDetailView(DetailView):
                 answer = self.request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
+                        competition2user = Competition2User.objects.get(
+                            competition=competition,
+                            user=self.request.user
+                        )
+                        competition2user.done = True
+                        context["done"] = True
+                        competition2user.save()
                         context["submitted"] = True
                         answer_object = Answers(lab=lab, user=self.request.user, datetime=timezone.now())
                         answer_object.save()
@@ -172,7 +180,6 @@ class PlatoonListView(ListView):
     def get_platoon_progress(platoon):
         progress_dict = {"total": 0, "submitted": 0, "progress": 0}
         user_list = User.objects.filter(platoon=platoon).exclude(username="admin")
-
         for user in user_list:
             progress_dict["total"] += Competition2User.objects.filter(user=user).count()
             progress_dict["submitted"] += (
@@ -214,7 +221,6 @@ class UserDetailView(DetailView):
         context["progress"] = progress
         logging.debug(context)
         return context
-
 
 def registration(request):
     if request.method == 'POST':

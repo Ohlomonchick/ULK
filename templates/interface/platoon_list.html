@@ -24,7 +24,7 @@
 {% for plat, info in object_list.items %}
     <div class="box" style="border: thin solid darkslategray;">
         <h2 class="title is-3 is-link"><a href=" {% url 'interface:platoon-detail' plat.id %}">{{ plat.number }}</a></h2>
-        <h1 class = "title is-4"> Назначено: {{ info.total }} / Выполнено: {{ info.submitted}}</h1>
+        <h1 class = "title is-4"> Назначено: {{ info.total }} / Выполнено: {{ info.submitted }}</h1>
         {% if info.progress >= 80%}
         <h1 class = "title is-4 has-text-success"> Процент выполнения: {{info.progress}}%</h1>
         {%elif info.progress >= 60%}
