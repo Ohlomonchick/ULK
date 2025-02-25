@@ -3,10 +3,17 @@ from slugify import slugify
 import logging
 import json
 from .config import *
-from urllib.parse import urljoin
 
 logger = logging.getLogger(__name__)
 
+
+def get_user_workspace_relative_path():
+    STUDENT_WORKSPACE = 'Practice work/Test_Labs'
+    base_dir = get_pnet_base_dir()
+    if STUDENT_WORKSPACE in base_dir:
+        base_dir = base_dir.replace(STUDENT_WORKSPACE, '')
+        base_dir = base_dir.replace('//', '/')
+    return base_dir
 
 def pf_login(url, name, password):
     url2 = url + '/store/public/auth/login/login'
@@ -41,7 +48,7 @@ def create_user(url, username, password, user_role, cookie):
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
-                "user_workspace": urljoin(PNET_BASE_DIR, username),
+                "user_workspace": f'{get_user_workspace_relative_path()}/{username}',
                 "note": "",
                 "max_node": "",
                 "max_node_lab": ""
@@ -55,10 +62,9 @@ def create_user(url, username, password, user_role, cookie):
             cookies=cookie,
             verify=False
         )
-        logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(username, password,
-                                                                                              urljoin(PNET_BASE_DIR,
-                                                                                                      username),
-                                                                                              r.text))
+        logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(
+            username, password, f'{get_user_workspace_relative_path()}/{username}', r.text)
+        )
     except Exception as e:
         logger.debug("Error with creating user\n{}\n".format(e))
 
@@ -150,36 +156,51 @@ def filter_user(url, cookie, xsrf):
     return r
 
 
-def change_user_password(url, cookie, xsrf, pnet_login, new_password):
-    users = filter_user(url, cookie, xsrf)
+def get_user_params(url, cookie, xsrf, pnet_login):
+    users = filter_user(url, cookie, xsrf).json()
     user_params = None
     for user in users["data"]["data_table"]:
         if user["username"] == pnet_login:
             user_params = user
-    if user_params:
-        header = {
-            "Content-Type": "application/json;charset=UTF-8",
-            "X-XSRF-TOKEN": xsrf
+    return user_params
+
+
+def change_user_params(url, cookie, xsrf, new_params):
+    header = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "X-XSRF-TOKEN": xsrf
+    }
+    payload = json.dumps({
+        "data": {
+            "data_key":
+                [{"pod": new_params["pod"]}],
+            "data_editor": new_params
         }
+    }
+    )
+    r = requests.post(
+        url + '/store/public/admin/users/offEdit',
+        headers=header,
+        data=payload,
+        cookies=cookie,
+        verify=False
+    )
+    return r
+
+
+def change_user_password(url, cookie, xsrf, pnet_login, new_password):
+    user_params = get_user_params(url, cookie, xsrf, pnet_login)
+    if user_params:
         user_params["password"] = new_password
+        return change_user_params(url, cookie, xsrf, user_params)
+    return None
 
-        payload = json.dumps({
-            "data": {
-                "data_key":
-                    [{"pod": user_params["pod"]}],
-                    "data_editor": user_params
-                }
-            }
-        )
-        r = requests.post(
-            url + '/store/public/admin/users/offEdit',
-            headers=header,
-            data=payload,
-            cookies=cookie,
-            verify=False
-        )
-        return r
 
+def change_user_workspace(url, cookie, xsrf, pnet_login, new_workspace):
+    user_params = get_user_params(url, cookie, xsrf, pnet_login)
+    if user_params:
+        user_params["user_workspace"] = new_workspace
+        return change_user_params(url, cookie, xsrf, user_params)
     return None
 
 
@@ -333,7 +354,7 @@ def delete_lab(url, cookie, lab_path):
 
 
 def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf, username):
-    lab_name = lab_object.name
+    lab_name = lab_object.slug
     username = slugify(username)
     lab_path += "/" + username
 
@@ -392,7 +413,7 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf,
     destroy_session(url, sess_id, cookie)
 
 
-def delete_lab_with_session_destroy(url, lab_name, lab_path, cookie, xsrf, username):
+def delete_lab_with_session_destroy(url: object, lab_name: object, lab_path: object, cookie: object, xsrf: object, username: object) -> object:
     username = slugify(username)
     lab_path += "/" + username
 

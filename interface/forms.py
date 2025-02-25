@@ -1,5 +1,6 @@
 from django import forms
-from .models import User, Competition, LabLevel, LabTask, Platoon, KkzLab, Kkz, Lab, Competition2User
+from .models import (User, Competition, LabLevel, LabTask, Competition2User, KkzLab, Kkz, Lab,
+                                         Platoon, TeamCompetition, Team, TeamCompetition2Team)
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
@@ -58,14 +59,13 @@ class CustomUserCreationForm(UserCreationForm):
         if not user.username:
             user.username = user.last_name + "_" + user.first_name
         user.save()
-
-        # url = get_pnet_url()
-        # Login = 'pnet_scripts'
-        # Pass = 'eve'
-        # cookie, xsrf = pf_login(url, Login, Pass)
-        # create_directory(url, get_pnet_base_dir(), user.username, cookie)
-        # create_user(url, user.username, password, '1', cookie)
-        # logout(url)
+        url = get_pnet_url()
+        Login = 'pnet_scripts'
+        Pass = 'eve'
+        cookie, xsrf = pf_login(url, Login, Pass)
+        create_directory(url, get_pnet_base_dir(), user.username, cookie)
+        create_user(url, user.username, password, '1', cookie)
+        logout(url)
 
         return user
 
@@ -177,3 +177,43 @@ class Competition2UserInlineForm(forms.ModelForm):
         else:
             self.fields['tasks'].queryset = LabTask.objects.none()
             self.fields['level'].queryset = LabLevel.objects.none()
+
+            
+class TeamCompetitionForm(CompetitionForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple,
+        label="Команды"
+    )
+
+    class Meta(CompetitionForm.Meta):
+        model = TeamCompetition
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['teams'].help_text = \
+            'Если пользователь добавлен отдельно от команды, он всё равно будет принимать участие в составе команды.'
+
+    def save(self, commit=True):
+        """
+        This calls CompetitionForm's save() logic first,
+        so you reuse all that field assignment and M2M logic.
+        """
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
+
+        teams = self.cleaned_data.get('teams', [])
+        # Clear any existing through-relations.
+        instance.teams.clear()
+
+        for team in teams:
+            through_instance = TeamCompetition2Team(
+                competition=instance,
+                team=team
+            )
+            through_instance.save()
+
+        return instance
