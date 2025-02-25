@@ -33,9 +33,26 @@
         {% endif %}
     </div>
     <p><div class="content ml-2 mt-1">{{ object.description | safe  }}</div></p>
-    {% if not user.is_superuser and issue.tasks.all %}
+    {% if not user.is_superuser %}
         <div class="box">
         <h3 class="title is-3">Задания</h3>
+        {% if assigned_tasks %}
+            {% for task in assigned_tasks %}
+                <article class="media">
+                <div class="media-content">
+                    <div class="content">
+                        <p>
+                            <strong>Задание {{ forloop.counter }} </strong>
+                            <br />
+                            {{ task.description }}
+                            <br />
+                        </p>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        {% endif %}
+
         {% for task in issue.tasks.all %}
             <article class="media">
                 <div class="media-content">

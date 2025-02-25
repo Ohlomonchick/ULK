@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from interface.models import *
@@ -25,6 +27,8 @@ class LabListView(LoginRequiredMixin, ListView):
 
 class CompetitionListView(LoginRequiredMixin, ListView):
     model = Competition
+    template_name = 'interface/competition_list.html'
+    context_object_name = 'competitions'
 
     def get_queryset(self):
         queryset = Competition.objects.order_by("-start").filter(finish__gt=timezone.now())
@@ -37,6 +41,15 @@ class CompetitionListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["now"] = timezone.now()
+        competitions = context["competitions"]
+        kkz_groups = defaultdict(list)
+
+        for comp in competitions:
+            if comp.kkz:
+                kkz_groups[comp.kkz].append(comp)
+
+        context["kkz_groups"] = dict(kkz_groups)
+
         return context
 
 
@@ -54,6 +67,7 @@ class CompetitionHistoryListView(CompetitionListView):
 
 class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Competition
+    template_name = 'interface/competition_detail.html'
 
     def test_func(self):
         competition = self.get_object()
@@ -65,29 +79,41 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
         context["form"] = LabAnswerForm()
         context["submitted"] = False
         lab = self.object.lab
-        competition = context["object"]
-        # set ability to answer form to True
-        context["available"] = competition.finish > timezone.now()
-        context["issue"] = competition
 
-        # show no description if competition finished
-        if not self.request.user.is_staff and competition.finish <= timezone.now():
-            competition.lab.description = ''
-
-        answers = Answers.objects.filter(lab=competition.lab, user=self.request.user, lab_task=None,
-                                         datetime__lte=competition.finish,
-                                         datetime__gte=competition.start).first()
-        if answers is None:
-            answer = self.request.GET.get("answer_flag")     # getting user's form answer
-            if answer:
-                if answer == lab.answer_flag:
-                    context["submitted"] = True
-                    answer_object = Answers(lab=lab, user=self.request.user, datetime=timezone.now())
-                    answer_object.save()
-                else:
-                    context["form"].fields["answer_flag"].label = "Неверный флаг!"
-        else:
-            context["submitted"] = True
+        if self.request.user.is_authenticated:
+            competition = context["object"]
+            context["available"] = competition.finish > timezone.now()
+            context["issue"] = competition
+            
+            if not self.request.user.is_staff and competition.finish <= timezone.now():
+                competition.lab.description = ''
+            
+            answers = Answers.objects.filter(
+                lab=competition.lab,
+                user=self.request.user,
+                lab_task=None,
+                datetime__lte=competition.finish,
+                datetime__gte=competition.start
+            ).first()
+            
+            if answers is None:
+                answer = self.request.GET.get("answer_flag")
+                if answer:
+                    if answer == lab.answer_flag:
+                        competition2user = Competition2User.objects.get(
+                            competition=competition,
+                            user=self.request.user
+                        )
+                        competition2user.done = True
+                        context["done"] = True
+                        competition2user.save()
+                        context["submitted"] = True
+                        answer_object = Answers(lab=lab, user=self.request.user, datetime=timezone.now())
+                        answer_object.save()
+                    else:
+                        context["form"].fields["answer_flag"].label = "Неверный флаг!"
+            else:
+                context["submitted"] = True
 
         if context['submitted']:
             context['available'] = False
@@ -106,7 +132,6 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
                 datetime__lte=competition.finish,
                 datetime__gte=competition.start
             ).order_by('datetime').values()
-
             context["solutions"] = solutions
 
             if not str(competition.participants).isnumeric() or int(competition.participants) == 0:
@@ -114,8 +139,17 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             else:
                 context["progress"] = round(len(solutions) / int(competition.participants) * 100)
 
+        if self.request.user.is_authenticated:
+            try:
+                competition2user = Competition2User.objects.get(competition=competition, user=self.request.user)
+                assigned_tasks = competition2user.tasks.all()
+            except Competition2User.DoesNotExist:
+                assigned_tasks = []
+
+            context["assigned_tasks"] = assigned_tasks
+
         context["object"] = competition
-        context["button"] = True if (timezone.now() - competition.start).total_seconds() < 0 else False
+        context["button"] = (timezone.now() - competition.start).total_seconds() < 0
 
         return context
 
@@ -168,7 +202,6 @@ class PlatoonListView(LoginRequiredMixin, ListView, UserPassesTestMixin):
     def get_platoon_progress(platoon):
         progress_dict = {"total": 0, "submitted": 0, "progress": 0}
         user_list = User.objects.filter(platoon=platoon).exclude(username="admin")
-
         for user in user_list:
             progress_dict["total"] += Competition2User.objects.filter(user=user).count()
             progress_dict["submitted"] += (
@@ -214,7 +247,6 @@ class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):
         context["progress"] = progress
         logging.debug(context)
         return context
-
 
 def registration(request):
     if request.method == 'POST':

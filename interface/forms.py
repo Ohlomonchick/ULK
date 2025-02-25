@@ -1,6 +1,6 @@
 from django import forms
-from .models import (User, Competition, LabLevel, LabTask, Competition2User,
-                     Platoon, TeamCompetition, Team, TeamCompetition2Team)
+from .models import (User, Competition, LabLevel, LabTask, Competition2User, KkzLab, Kkz, Lab,
+                                         Platoon, TeamCompetition, Team, TeamCompetition2Team)
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
@@ -59,7 +59,6 @@ class CustomUserCreationForm(UserCreationForm):
         if not user.username:
             user.username = user.last_name + "_" + user.first_name
         user.save()
-
         url = get_pnet_url()
         Login = 'pnet_scripts'
         Pass = 'eve'
@@ -131,6 +130,55 @@ class CompetitionForm(forms.ModelForm):
         return instance
 
 
+class KkzForm(forms.ModelForm):
+    labs = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(), label="Лабораторные работы")
+    class Meta:
+        model = Kkz
+        fields = ['name', 'start', 'finish', 'platoons', 'non_platoon_users']
+
+    def save(self, commit=True):
+        kkz = super().save(commit=False)
+        if commit:
+            kkz.save()
+            self.save_m2m()
+            for lab in self.cleaned_data['labs']:
+                competition = Competition.objects.create(
+                    start=self.cleaned_data['start'],
+                    finish=self.cleaned_data['finish'],
+                    lab=lab,
+                    kkz=kkz
+                )
+                competition.platoons.set(self.cleaned_data['platoons'])
+                competition.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
+        return kkz
+
+class KkzLabInlineForm(forms.ModelForm):
+    class Meta:
+        model = KkzLab
+        fields = ['lab', 'tasks', 'num_tasks']
+
+
+    def __init__(self, *args, **kwargs):
+        super(KkzLabInlineForm, self).__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
+
+
+class Competition2UserInlineForm(forms.ModelForm):
+    class Meta:
+        model = Competition2User
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.competition and self.instance.competition.lab:
+            self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.competition.lab)
+            self.fields['level'].queryset = LabLevel.objects.filter(lab=self.instance.competition.lab)
+        else:
+            self.fields['tasks'].queryset = LabTask.objects.none()
+            self.fields['level'].queryset = LabLevel.objects.none()
+
+            
 class TeamCompetitionForm(CompetitionForm):
     teams = forms.ModelMultipleChoiceField(
         queryset=Team.objects.all(),
