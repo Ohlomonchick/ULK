@@ -420,7 +420,6 @@ class TeamCompetition2Team(models.Model):
     def __str__(self):
         return f"{self.competition} — {self.team}"
 
-
     @classmethod
     def post_create(cls, sender, instance, created, *args, **kwargs):
         # if not created:
@@ -452,7 +451,7 @@ class TeamCompetition2Team(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_user_workspace_relative_path(), cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_pnet_base_dir(), cookie, xsrf,
                                             self.team.slug)
             for user in self.team.users.all():
                 change_user_workspace(
