@@ -105,9 +105,9 @@ def create_lab(url, lab_name, lab_description, lab_path, cookie, xsrf, username)
         "path": f"{lab_path}/{username}",
         "openable": 1,
         "openable_emails": ["1"],
-        "joinable": 0,
+        "joinable": 1,
         "joinable_emails": ["1"],
-        "editable": 1,
+        "editable": 0,
         "editable_emails": ["1"]
     }
 

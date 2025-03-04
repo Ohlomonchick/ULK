@@ -112,7 +112,15 @@ class CompetitionForm(forms.ModelForm):
         instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
         instance.save()
 
+        self.handle_competition_users(instance)
+        return instance
+
+    def get_all_users(self, instance):
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
+        return all_users
+
+    def handle_competition_users(self, instance):
+        all_users = self.get_all_users(instance)
         existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
 
         for user in all_users:
@@ -132,6 +140,7 @@ class CompetitionForm(forms.ModelForm):
 
 
 class KkzForm(forms.ModelForm):
+    labs = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(), label="Лабораторные работы")
     class Meta:
         model = Kkz
         fields = '__all__'
@@ -150,6 +159,7 @@ class KkzForm(forms.ModelForm):
     def save(self, commit=True):
         kkz = super().save(commit=False)
         if commit:
+            kkz.save()
             self.save_m2m()
             for lab in self.cleaned_data['labs']:
                 competition = Competition.objects.create(
@@ -162,15 +172,6 @@ class KkzForm(forms.ModelForm):
                 competition.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
         return kkz
 
-# class CustomFilteredSelectMultiple(FilteredSelectMultiple):
-#     def render(self, name, value, attrs=None, renderer=None):
-#         html = super().render(name, value, attrs, renderer)
-#         # Добавляем стили напрямую к тегам <select>
-#         html = html.replace(
-#             '<select multiple',
-#             '<select multiple style="width: 50%; height: 30vh;"'
-#         )
-#         return html
 
 class CustomFilteredSelectMultiple(FilteredSelectMultiple):
     def __init__(self, verbose_name, is_stacked, attrs=None, choices=()):
@@ -224,8 +225,16 @@ class TeamCompetitionForm(CompetitionForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['non_platoon_users'].help_text = \
+            'Вы можете добавить студентов к взводам. Или создать соревнование только для отдельных студентов.'
         self.fields['teams'].help_text = \
             'Если пользователь добавлен отдельно от команды, он всё равно будет принимать участие в составе команды.'
+
+    def get_all_users(self, instance):
+        all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
+        team_user_ids = User.objects.filter(team__in=self.cleaned_data["teams"]).values_list("id", flat=True)
+        all_users = all_users.exclude(id__in=team_user_ids)
+        return all_users
 
     def save(self, commit=True):
         """

@@ -2,7 +2,7 @@ import datetime
 import logging
 
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.utils.text import slugify
 from django_summernote.models import AbstractAttachment
 from django.contrib.auth.models import AbstractUser
@@ -422,7 +422,6 @@ class TeamCompetition2Team(models.Model):
     def __str__(self):
         return f"{self.competition} — {self.team}"
 
-
     @classmethod
     def post_create(cls, sender, instance, created, *args, **kwargs):
         # if not created:
@@ -446,15 +445,15 @@ class TeamCompetition2Team(models.Model):
 
             logout(get_pnet_url())
 
-    def delete_from_platform(self):
-        if self.deleted:
+    def delete_from_platform(self, final=False):
+        if self.deleted and not final:
             return
         if self.competition.lab.get_platform() == "PN":
             url = get_pnet_url()
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_user_workspace_relative_path(), cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_pnet_base_dir(), cookie, xsrf,
                                             self.team.slug)
             for user in self.team.users.all():
                 change_user_workspace(
@@ -464,12 +463,15 @@ class TeamCompetition2Team(models.Model):
             logout(url)
 
         self.deleted = True
-        self.save()
+        if not final:
+            self.save()
 
-    def delete(self, *args, **kwargs):
-        self.delete_from_platform()
-        super(TeamCompetition2Team, self).delete(*args, **kwargs)
+    @classmethod
+    def on_through_delete(cls, sender, instance, **kwargs):
+        logging.debug('on_through_delete call')
+        instance.delete_from_platform(final=True)
 
 
 post_save.connect(Competition2User.post_create, sender=Competition2User)
 post_save.connect(TeamCompetition2Team.post_create, sender=TeamCompetition2Team)
+post_delete.connect(TeamCompetition2Team.on_through_delete, sender=TeamCompetition2Team)
