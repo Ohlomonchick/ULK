@@ -1,0 +1,8 @@
+.inline-group .tabular tr td {
+    width: 100%;
+    max-width: 900px;
+}
+.inline-group .tabular tr td [id$="-tasks"] + .select2-container--jet {
+    max-width: 100% !important;
+    width: 50%; !important;
+}

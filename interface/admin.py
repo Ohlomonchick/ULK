@@ -10,6 +10,8 @@ from .forms import CustomUserCreationForm, CompetitionForm, TeamCompetitionForm,
 from django.db.models import JSONField
 from django.db import transaction
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
+from django.contrib.admin.widgets import FilteredSelectMultiple
+
 
 
 class CustomJSONEditorWidget(JSONEditorWidget):
@@ -120,16 +122,18 @@ class KkzLabInline(admin.TabularInline):
     filter_horizontal = ['tasks']
 
     class Media:
+        css = {'all': ('admin/css/kkz_custom.css',)}
         js = ('admin/js/jquery-3.7.1.min.js', 'admin/js/load_levels.js')
 
 
 class KkzAdmin(admin.ModelAdmin):
+    form = KkzForm
     inlines = [KkzLabInline]
     list_display = ('name', 'start', 'finish')
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
-        obj = form.instance  # Текущий объект Kkz
+        obj = form.instance
 
         for kkz_lab in obj.kkz_labs.all():
             competition, created = Competition.objects.get_or_create(

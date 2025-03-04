@@ -236,8 +236,10 @@ class KkzLab(models.Model):
     lab = models.ForeignKey('Lab', on_delete=models.CASCADE, verbose_name="Лабораторная работа")
     tasks = models.ManyToManyField('LabTask', verbose_name="Задания", blank=True)
     num_tasks = models.PositiveIntegerField("Количество заданий для распределения", default=1)
+
     def __str__(self):
         return f"{self.kkz.name} - {self.lab.name}"
+
     class Meta:
         verbose_name = 'Лабораторная работа в ККЗ'
         verbose_name_plural = 'Лабораторные работы в ККЗ'

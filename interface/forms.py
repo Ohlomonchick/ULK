@@ -4,6 +4,7 @@ from .models import (User, Competition, LabLevel, LabTask, Competition2User, Kkz
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
+from django.contrib.admin.widgets import FilteredSelectMultiple
 from .config import *
 
 
@@ -131,15 +132,24 @@ class CompetitionForm(forms.ModelForm):
 
 
 class KkzForm(forms.ModelForm):
-    labs = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(), label="Лабораторные работы")
     class Meta:
         model = Kkz
-        fields = ['name', 'start', 'finish', 'platoons', 'non_platoon_users']
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super(KkzForm, self).__init__(*args, **kwargs)
+        self.fields['name'].widget.attrs['autocomplete'] = 'off'
+        self.fields['start'].widget.attrs['autocomplete'] = 'off'
+        self.fields['finish'].widget.attrs['autocomplete'] = 'off'
+        self.fields['platoons'].queryset = Platoon.objects.filter(number__gt=0)
+        self.fields['non_platoon_users'].help_text =\
+            'Вы можете добавить студентов к взводам. Или создать ККЗ только для отдельных студентов.'
+        self.fields['unified_tasks'].help_text =\
+            'Вы можете сделать задания одинаковыми для всех.'
 
     def save(self, commit=True):
         kkz = super().save(commit=False)
         if commit:
-            kkz.save()
             self.save_m2m()
             for lab in self.cleaned_data['labs']:
                 competition = Competition.objects.create(
@@ -152,11 +162,32 @@ class KkzForm(forms.ModelForm):
                 competition.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
         return kkz
 
+# class CustomFilteredSelectMultiple(FilteredSelectMultiple):
+#     def render(self, name, value, attrs=None, renderer=None):
+#         html = super().render(name, value, attrs, renderer)
+#         # Добавляем стили напрямую к тегам <select>
+#         html = html.replace(
+#             '<select multiple',
+#             '<select multiple style="width: 50%; height: 30vh;"'
+#         )
+#         return html
+
+class CustomFilteredSelectMultiple(FilteredSelectMultiple):
+    def __init__(self, verbose_name, is_stacked, attrs=None, choices=()):
+        super().__init__(verbose_name, is_stacked, attrs, choices)
+
+    class Media:
+        css = {
+            'all': ('admin/css/kkz_custom.css',)
+        }
+
 class KkzLabInlineForm(forms.ModelForm):
     class Meta:
         model = KkzLab
         fields = ['lab', 'tasks', 'num_tasks']
-
+        widgets = {
+            'tasks': CustomFilteredSelectMultiple("Задания", is_stacked=False),
+        }
 
     def __init__(self, *args, **kwargs):
         super(KkzLabInlineForm, self).__init__(*args, **kwargs)
