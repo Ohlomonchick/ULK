@@ -317,7 +317,6 @@ class Competition(models.Model):
         for issue in self.competition_users.all():
             issue.delete()
 
-        # self.delete_from_platform()
         super(Competition, self).delete(*args, **kwargs)
 
     class Meta:
@@ -357,7 +356,7 @@ class Competition2User(models.Model):
 
     deleted = models.BooleanField(default=False)
 
-    def delete_from_platform(self):
+    def delete_from_platform(self, final=False):
         if self.deleted:
             return
         if self.competition.lab.get_platform() == "PN":
@@ -372,14 +371,15 @@ class Competition2User(models.Model):
             logout(url)
 
         self.deleted = True
-        self.save()
+        if not final:
+            self.save()
 
     class Meta:
         verbose_name = 'Задание участника'
         verbose_name_plural = 'Задания участников'
 
     def delete(self, *args, **kwargs):
-        self.delete_from_platform()
+        self.delete_from_platform(final=True)
         super(Competition2User, self).delete(*args, **kwargs)
 
     @classmethod
