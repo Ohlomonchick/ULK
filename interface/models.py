@@ -174,13 +174,16 @@ class Team(models.Model):
 
 class Answers(models.Model):
     lab = models.ForeignKey(Lab, related_name="lab", on_delete=models.CASCADE)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, null=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
     datetime = models.DateTimeField(null=True)
     lab_task = models.ForeignKey(LabTask, related_name="lab_task", on_delete=models.CASCADE, null=True)
 
     def __str__(self):
-        return str(self.lab.name + " " + self.user.username)
+        if self.user:
+            return str(self.lab.name + " " + self.user.username)
+        else:
+            return str(self.lab.name + " " + self.team.slug)
 
     class Meta:
         verbose_name = 'Ответ'

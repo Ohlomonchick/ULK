@@ -154,11 +154,6 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             ).order_by('datetime').values()
             context["solutions"] = solutions
 
-            if not str(competition.participants).isnumeric() or int(competition.participants) == 0:
-                context["progress"] = 100
-            else:
-                context["progress"] = round(len(solutions) / int(competition.participants) * 100)
-
         if self.request.user.is_authenticated:
             try:
                 competition2user = Competition2User.objects.get(competition=competition, user=self.request.user)
@@ -230,6 +225,7 @@ class TeamCompetitionDetailView(CompetitionDetailView):
         context = self.set_submitted(context)
         if context.get("assigned_tasks", []) == [] and self.team_relation:
             context["assigned_tasks"] = self.team_relation.tasks.all()
+        context["is_team_competition"] = True
 
         return context
 

@@ -13,7 +13,8 @@ from datetime import timedelta, datetime
 
 from slugify import slugify
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User, Competition2User, TeamCompetition2Team
+from .models import Competition, LabLevel, Lab, LabTask, Answers, User, Competition2User, TeamCompetition2Team, \
+    TeamCompetition
 from .serializers import LabLevelSerializer, LabTaskSerializer
 
 
@@ -48,47 +49,125 @@ def make_solution_data(solution, competition):
         "user_last_name": user.last_name,
         "user_platoon": str(user.platoon),
         "spent": str(solution["datetime"] - competition.start).split(".")[0],
-        "datetime": solution["datetime"].strftime("%d.%m.%Y %H:%M:%S"),
-        "raw_datetime": solution["datetime"]
+        "datetime": solution["datetime"].strftime("%H:%M:%S"),
+        "raw_datetime": solution["datetime"],
+        "team_name": "",
+        "user_id": solution["user_id"]
     }
 
 
 @api_view(['GET'])
 def get_solutions(request, slug):
-    competition = get_object_or_404(Competition, slug=slug)
-    solutions = Answers.objects.filter(
-        Q(user__platoon__in=competition.platoons.all()) | Q(user__in=competition.non_platoon_users.all()),
+    try:
+        competition = TeamCompetition.objects.get(slug=slug)
+    except TeamCompetition.DoesNotExist:
+        competition = get_object_or_404(Competition, slug=slug)
+    total_tasks = competition.tasks.count()
+    is_team_competition = hasattr(competition, 'teams')
+
+    individual_filter = Q(user__isnull=False) & (
+            Q(user__platoon__in=competition.platoons.all()) |
+            Q(user__in=competition.non_platoon_users.all())
+    )
+    individual_answers_qs = Answers.objects.filter(
+        individual_filter,
         lab=competition.lab,
         datetime__lte=competition.finish,
         datetime__gte=competition.start
-    ).order_by('user').order_by('datetime').values()
+    )
 
-    tasks_to_complete = competition.tasks.count()
+    # 2a. If team competition, also query team answers.
+    team_answers_qs = Answers.objects.none()
+    if is_team_competition:
+        team_answers_qs = Answers.objects.filter(
+            team__in=competition.teams.all(),
+            lab=competition.lab,
+            datetime__lte=competition.finish,
+            datetime__gte=competition.start,
+            team__isnull=False
+        )
+
+    individual_data = {}
+    for answer in individual_answers_qs:
+        uid = answer.user.id
+        if uid not in individual_data:
+            individual_data[uid] = {
+                'answers': [],
+                'progress': 0,
+                'raw_datetime': answer.datetime
+            }
+        individual_data[uid]['answers'].append(answer)
+        if total_tasks > 0:
+            individual_data[uid]['progress'] = len(individual_data[uid]['answers'])
+        else:
+            individual_data[uid]['progress'] = 1  # if lab has no tasks, a single answer gives progress 1.
+        if answer.datetime < individual_data[uid]['raw_datetime']:
+            individual_data[uid]['raw_datetime'] = answer.datetime
 
     solutions_data = []
-    current_user_score = 0
-    current_user_id = None
-    for solution in solutions:
-        if tasks_to_complete:
-            if current_user_id is None:
-                current_user_id = solution["user_id"]
-            elif current_user_id != solution["user_id"]:
-                current_user_score = 0
-                current_user_id = solution["user_id"]
+    # Create solution entries for individual answers.
+    for uid, data in individual_data.items():
+        dummy_solution = {
+            "user_id": uid,
+            "datetime": data['raw_datetime']
+        }
+        sol = make_solution_data(dummy_solution, competition)
+        sol["progress"] = data['progress']
+        solutions_data.append(sol)
 
-            current_user_score += 1
-            if current_user_score == tasks_to_complete:
-                solutions_data.append(make_solution_data(solution, competition))
-        else:
-            solutions_data.append(make_solution_data(solution, competition))
+    # 4. Process team answers if applicable – group by team.
+    if is_team_competition:
+        team_data = {}
+        for answer in team_answers_qs:
+            tid = answer.team.id
+            if tid not in team_data:
+                team_data[tid] = {
+                    'answers': [],
+                    'progress': 0,
+                    'raw_datetime': answer.datetime,
+                    'team': answer.team
+                }
+            team_data[tid]['answers'].append(answer)
+            if total_tasks > 0:
+                team_data[tid]['progress'] = len(team_data[tid]['answers'])
+            else:
+                team_data[tid]['progress'] = 1
+            if answer.datetime < team_data[tid]['raw_datetime']:
+                team_data[tid]['raw_datetime'] = answer.datetime
 
-    solutions_data.sort(key=lambda x: x["raw_datetime"])
+        # For every team, create a solution entry for each member.
+        for tid, data in team_data.items():
+            team_obj = data['team']
+            for user in team_obj.users.all():
+                dummy_solution = {
+                    "user_id": user.id,
+                    "datetime": data['raw_datetime']
+                }
+                sol = make_solution_data(dummy_solution, competition)
+                sol["progress"] = data['progress']
+                sol["team_name"] = team_obj.name
+                solutions_data.append(sol)
+
+    # 5. Sorting: sort first by progress (descending), then by team_name (if present) and by submission time.
+    solutions_data.sort(key=lambda x: (-x["progress"], x["raw_datetime"], x["team_name"]))
+
+    # Re-assign positions based on sorted order.
     pos = 1
     for sol in solutions_data:
         sol["pos"] = pos
         pos += 1
 
-    return JsonResponse({"solutions": solutions_data})
+    # 3.a. If lab has tasks, include the total_tasks in the JSON.
+    response = {
+        "solutions": solutions_data,
+        "max_total_progress": competition.participants,
+        "total_progress":  sum(solution["progress"] for solution in solutions_data)
+    }
+    if total_tasks:
+        response["max_total_progress"] = competition.participants * total_tasks
+        response["total_tasks"] = total_tasks
+    print(response["max_total_progress"])
+    return JsonResponse(response)
 
 
 @api_view(['GET'])
