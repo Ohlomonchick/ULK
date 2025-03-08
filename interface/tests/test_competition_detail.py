@@ -5,7 +5,6 @@ from datetime import timedelta
 
 from interface.models import (
     Competition, Lab, Answers, User, Competition2User
-    # plus any other models you need, e.g. Platoon, LabLevel, etc.
 )
 
 
