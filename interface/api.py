@@ -215,8 +215,9 @@ def load_tasks(request, lab_name):
 
 
 def change_iso_timezone(utc_time):
+    print(utc_time)
     if utc_time[-1] == 'Z':
-        utc_time = utc_time[-1]
+        utc_time = utc_time[:-1]
     return datetime.fromisoformat(utc_time) + timedelta(hours=3)
 
 
