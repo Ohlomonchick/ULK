@@ -1,8 +1,15 @@
 .inline-group .tabular tr td {
     width: 100%;
-    max-width: 900px;
 }
+
 .inline-group .tabular tr td [id$="-tasks"] + .select2-container--jet {
-    max-width: 100% !important;
-    width: 50%; !important;
+    max-width: 44vw !important;
+}
+
+.select2-container--jet .select2-selection .select2-selection__rendered {
+    max-width: 93vw;
+}
+
+.inline-related h3 {
+    border-top: 1px solid #aeaeae;
 }

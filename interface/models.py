@@ -305,7 +305,7 @@ class Competition(models.Model):
 
     kkz = models.ForeignKey(Kkz, related_name="competitions", on_delete=models.CASCADE, verbose_name="ККЗ",
                             null=True, blank=True)
-    num_tasks = models.PositiveIntegerField("Количество заданий для распределения", default=1)
+    num_tasks = models.PositiveIntegerField("Количество заданий для распределения", default=1, blank=True)
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
     # issued_labs = models.ManyToManyField(IssuedLabs, blank=True)
 

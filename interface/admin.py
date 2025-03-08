@@ -113,12 +113,13 @@ class CompetitionAdmin(admin.ModelAdmin):
     all_non_platoon_users.short_description = 'Отдельные пользователи'
 
 
-class KkzLabInline(admin.TabularInline):
+class KkzLabInline(admin.StackedInline):
     model = KkzLab
     form = KkzLabInlineForm
     extra = 1
     fields = ['lab', 'tasks', 'num_tasks']
     filter_horizontal = ['tasks']
+    can_delete = False
 
     class Media:
         css = {'all': ('admin/css/kkz_custom.css',)}
