@@ -93,20 +93,20 @@ class GetSolutionsAPINewTestCase(TestCase):
         data = response.json()
         solutions = data["solutions"]
 
-        # Expect 3 distinct solutions.
-        self.assertEqual(len(solutions), 3)
+        # Expect 5 distinct solutions (2 with zero progress).
+        self.assertEqual(len(solutions), len(platoon_users) + len(non_platoon_users))
         # Positions must be 1,2,3.
         for i, sol in enumerate(solutions, start=1):
             self.assertEqual(sol["pos"], i)
         # Check that solutions are sorted ascending by raw_datetime.
         raw_datetimes = [sol["raw_datetime"] for sol in solutions]
         self.assertTrue(
-            all(raw_datetimes[i] <= raw_datetimes[i + 1] for i in range(len(raw_datetimes) - 1)),
+            all(raw_datetimes[i] <= raw_datetimes[i + 1] for i in range(len(raw_datetimes) - 1) if raw_datetimes[i+1] is not None),
             "Solutions must be sorted ascending by raw_datetime."
         )
-        # Since no tasks, each solution should have progress 1.
+        # Since no tasks, each solution should have progress 1 or 0
         for sol in solutions:
-            self.assertEqual(sol["progress"], 1)
+            self.assertTrue(sol["progress"] == 1 or sol["progress"] == 0)
         # For no tasks, max_total_progress equals participants.
         self.assertEqual(data["max_total_progress"], comp.participants)
         # Total progress equals number of solutions (1 each).
@@ -187,8 +187,8 @@ class GetSolutionsAPINewTestCase(TestCase):
         data = response.json()
         solutions = data["solutions"]
 
-        # Expect 3 solutions (for users with any answers).
-        self.assertEqual(len(solutions), 3)
+        # Expect 5 solutions (for all users, 2 not ).
+        self.assertEqual(len(solutions), len(platoon_users) + len(non_platoon_users))
         # Check progress values.
         for sol in solutions:
             if sol["user_first_name"] == "Platoon0":

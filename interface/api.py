@@ -48,8 +48,8 @@ def make_solution_data(solution, competition):
         "user_first_name": user.first_name,
         "user_last_name": user.last_name,
         "user_platoon": str(user.platoon),
-        "spent": str(solution["datetime"] - competition.start).split(".")[0],
-        "datetime": solution["datetime"].strftime("%H:%M:%S"),
+        "spent": str(solution["datetime"] - competition.start).split(".")[0] if solution["datetime"] else "",
+        "datetime": solution["datetime"].strftime("%H:%M:%S") if solution["datetime"] else "",
         "raw_datetime": solution["datetime"],
         "team_name": "",
         "user_id": solution["user_id"]
@@ -64,6 +64,12 @@ def get_solutions(request, slug):
         competition = get_object_or_404(Competition, slug=slug)
     total_tasks = competition.tasks.count()
     is_team_competition = hasattr(competition, 'teams')
+
+    all_individual_users = User.objects.filter(
+        platoon__in=competition.platoons.all()) | competition.non_platoon_users.all()
+    if is_team_competition:
+        team_user_ids = User.objects.filter(team__in=competition.teams.all()).values_list("id", flat=True)
+        all_individual_users = all_individual_users.exclude(id__in=team_user_ids)
 
     individual_filter = Q(user__isnull=False) & (
             Q(user__platoon__in=competition.platoons.all()) |
@@ -104,6 +110,14 @@ def get_solutions(request, slug):
         if answer.datetime < individual_data[uid]['raw_datetime']:
             individual_data[uid]['raw_datetime'] = answer.datetime
 
+    for user in all_individual_users:
+        if user.id not in individual_data:
+            individual_data[user.id] = {
+                'answers': [],
+                'progress': 0,
+                'raw_datetime': None
+            }
+
     solutions_data = []
     # Create solution entries for individual answers.
     for uid, data in individual_data.items():
@@ -134,6 +148,15 @@ def get_solutions(request, slug):
                 team_data[tid]['progress'] = 1
             if answer.datetime < team_data[tid]['raw_datetime']:
                 team_data[tid]['raw_datetime'] = answer.datetime
+
+        for team in competition.teams.all():
+            if team.id not in team_data:
+                team_data[team.id] = {
+                    'answers': [],
+                    'progress': 0,
+                    'raw_datetime': None,
+                    'team': team
+                }
 
         # For every team, create a solution entry for each member.
         for tid, data in team_data.items():
@@ -166,7 +189,6 @@ def get_solutions(request, slug):
     if total_tasks:
         response["max_total_progress"] = competition.participants * total_tasks
         response["total_tasks"] = total_tasks
-    print(response["max_total_progress"])
     return JsonResponse(response)
 
 
