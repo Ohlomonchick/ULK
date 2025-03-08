@@ -96,8 +96,7 @@ class CompetitionAdmin(admin.ModelAdmin):
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
         if obj and obj.lab:
-            formset.form.base_fields['level'].queryset = LabLevel.objects.filter(lab=obj.lab)
-
+            formset.parent_instance = obj
         return formset
 
     def delete_queryset(self, request, queryset):
@@ -152,17 +151,18 @@ class KkzAdmin(admin.ModelAdmin):
             tasks = list(kkz_lab.tasks.all())
             num_tasks = kkz_lab.num_tasks
 
-            if tasks and users:
+            if users:
                 for user in users:
-                    assigned_tasks = random.sample(tasks, min(num_tasks, len(tasks)))
                     competition2user, created = Competition2User.objects.get_or_create(
                         competition=competition,
                         user=user
                     )
-                    if competition.kkz.unified_tasks:
-                        competition.tasks.set(assigned_tasks)
-                    else:
-                        competition2user.tasks.set(assigned_tasks)
+                    if tasks:
+                        assigned_tasks = random.sample(tasks, min(num_tasks, len(tasks)))
+                        if competition.kkz.unified_tasks:
+                            competition.tasks.set(assigned_tasks)
+                        else:
+                            competition2user.tasks.set(assigned_tasks)
 
                         
 class TeamAdmin(admin.ModelAdmin):

@@ -7,7 +7,7 @@
                 Используйте ваш пароль от Киберполигона и ваше имя в PNET.</p>
         </div>
     {% endif %}
-    {% if not user.is_superuser %}
+    {% if not user.is_superuser and issue.level %}
         <span class="tag is-medium "><h5 class="title is-5">Ваш вариант: {{ issue.level.level_number }}</h5></span>
     {% endif %}
     <div id="answer-form">
@@ -33,10 +33,9 @@
         {% endif %}
     </div>
     <p><div class="content ml-2 mt-1">{{ object.description | safe  }}</div></p>
-    {% if not user.is_superuser %}
+    {% if not user.is_superuser and assigned_tasks %}
         <div class="box">
-        <h3 class="title is-3">Задания</h3>
-        {% if assigned_tasks %}
+            <h3 class="title is-3">Задания</h3>
             {% for task in assigned_tasks %}
                 <article class="media">
                 <div class="media-content">
@@ -51,22 +50,6 @@
                 </div>
             </article>
             {% endfor %}
-        {% endif %}
-
-        {% for task in issue.tasks.all %}
-            <article class="media">
-                <div class="media-content">
-                    <div class="content">
-                        <p>
-                            <strong>Задание {{ forloop.counter }} </strong>
-                            <br />
-                            {{ task.description }}
-                            <br />
-                        </p>
-                    </div>
-                </div>
-            </article>
-        {% endfor %}
         </div>
     {% endif %}
 

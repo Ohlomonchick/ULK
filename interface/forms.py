@@ -1,3 +1,5 @@
+import random
+
 from django import forms
 from .models import (User, Competition, LabLevel, LabTask, Competition2User, KkzLab, Kkz, Lab,
                                          Platoon, TeamCompetition, Team, TeamCompetition2Team)
@@ -125,11 +127,16 @@ class CompetitionForm(forms.ModelForm):
 
         for user in all_users:
             if user.id not in existing_user_ids:
-                Competition2User.objects.create(
+                competition2user, created = Competition2User.objects.update_or_create(
                     competition=instance,
                     user=user,
-                    level=instance.level
+                    level=instance.level,
                 )
+
+                if created and instance.tasks.exists():
+                    tasks = list(instance.tasks.all())
+                    assigned_tasks = random.sample(tasks, min(instance.num_tasks, len(tasks)))
+                    competition2user.tasks.set(assigned_tasks)
 
         all_users_ids = set(all_users.values_list('pk', flat=True))
         for user_id in existing_user_ids:
@@ -140,7 +147,6 @@ class CompetitionForm(forms.ModelForm):
 
 
 class KkzForm(forms.ModelForm):
-    labs = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(), label="Лабораторные работы")
     class Meta:
         model = Kkz
         fields = '__all__'
@@ -159,7 +165,6 @@ class KkzForm(forms.ModelForm):
     def save(self, commit=True):
         kkz = super().save(commit=False)
         if commit:
-            kkz.save()
             self.save_m2m()
             for lab in self.cleaned_data['labs']:
                 competition = Competition.objects.create(
