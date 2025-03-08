@@ -111,7 +111,7 @@ class CompetitionForm(forms.ModelForm):
         if 'non_platoon_users' in self.cleaned_data:
             instance.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
 
-        instance.participants = User.objects.filter(platoon__in=instance.platoons.all()).count()
+        instance.participants = len(self.get_all_users(instance))
         instance.save()
 
         self.handle_competition_users(instance)

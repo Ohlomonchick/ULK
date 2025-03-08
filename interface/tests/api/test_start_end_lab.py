@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
-from interface.models import User, Lab, Competition, Competition2User, Answers, LabLevel
+from interface.models import User, Lab, Competition, Competition2User, Answers, LabLevel, Team, TeamCompetition2Team, \
+    TeamCompetition
 from interface.api import get_issue
 from django.http import JsonResponse
 from django.utils import timezone
@@ -109,6 +110,36 @@ class GetIssueTests(TestCase):
         self.assertEqual(issue.id, self.issue.id)
 
 
+class TeamGetIssueTests(TestCase):
+    def setUp(self):
+        # Create a user, lab, competition, team, and link them.
+        self.user = User.objects.create(username='teamuser', pnet_login='teamlogin')
+        self.lab = Lab.objects.create(name='Biology Lab', answer_flag='flag')
+        self.competition = TeamCompetition.objects.create(
+            lab=self.lab,
+            start=timezone.now(),
+            finish=timezone.now() + timedelta(hours=2)
+        )
+        self.team = Team.objects.create(name='Team Alpha')
+        self.team.users.add(self.user)
+        self.issue = TeamCompetition2Team.objects.create(
+            competition=self.competition,
+            team=self.team
+        )
+        self.competition_filters = {'competition__finish__gt': timezone.now()}
+
+    def test_get_issue_team_success(self):
+        """
+        Should return a team issue if the user belongs to a team in the competition.
+        """
+        data = {'username': 'teamuser', 'lab': 'Biology Lab'}
+        issue, error_response = get_issue(data, self.competition_filters)
+        self.assertIsNotNone(issue)
+        self.assertIsNone(error_response)
+        self.assertTrue(hasattr(issue, 'team'))
+        self.assertEqual(issue.team, self.team)
+
+
 class StartLabViewTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
@@ -194,6 +225,47 @@ class StartLabViewTests(APITestCase):
         self.assertEqual(data["message"], "User or lab does not exist")  # or "No such issue"
 
 
+class StartLabViewTeamTests(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create(username='testuser', pnet_login='pnetlogin', last_name='Doe')
+        self.lab = Lab.objects.create(name='Chemistry Lab', answer_flag='flag')
+        self.competition = TeamCompetition.objects.create(
+            lab=self.lab,
+            start=timezone.now(),
+            finish=timezone.now() + timezone.timedelta(days=1)
+        )
+        # Create a Competition2User issue (might be created by default)
+        self.issue = Competition2User.objects.create(
+            competition=self.competition,
+            user=self.user
+        )
+        # Create a team and assign it to the issue via a TeamCompetition2Team record.
+        self.team = Team.objects.create(name="Team Beta")
+        self.team.users.add(self.user)
+        self.team_issue = TeamCompetition2Team.objects.create(
+            competition=self.competition,
+            team=self.team
+        )
+        self.url = reverse('interface_api:start-lab')
+
+    def test_start_lab_with_team(self):
+        """
+        Should return team details in the JSON response if the issue is a team issue.
+        """
+        request_data = {"username": "testuser", "lab": "Chemistry Lab"}
+        response = self.client.generic(
+            method='GET',
+            path=self.url,
+            data=json.dumps(request_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertIn("team", data)
+        self.assertEqual(data["team"], [self.user.pnet_login])
+
+
 class EndLabViewTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
@@ -238,3 +310,35 @@ class EndLabViewTests(APITestCase):
         self.assertIn(response.status_code, [400, 404])
         data = json.loads(response.content)
         self.assertIn("message", data)
+
+
+class EndLabViewTeamTests(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create(username='testuser', pnet_login='pnetlogin')
+        self.lab = Lab.objects.create(name='Chemistry Lab', answer_flag=None)
+        self.competition = TeamCompetition.objects.create(
+            lab=self.lab,
+            start=timezone.now() - timedelta(hours=1),
+            finish=timezone.now() + timedelta(days=1)
+        )
+        # Instead of a Competition2User issue, create a team issue.
+        self.team = Team.objects.create(name="Team Gamma")
+        self.team.users.add(self.user)
+        self.issue = TeamCompetition2Team.objects.create(
+            competition=self.competition,
+            team=self.team
+        )
+        self.url = reverse('interface_api:end-lab')
+
+    def test_end_lab_team_successful(self):
+        """
+        Should create an Answers object linked to the team if the issue is a team issue.
+        """
+        request_data = {"username": "testuser", "lab": "Chemistry Lab"}
+        response = self.client.post(self.url, request_data, format='json')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data["message"], "Task finished")
+        # Verify that an Answers object was created with the team field set.
+        self.assertTrue(Answers.objects.filter(team=self.team, lab=self.lab).exists())

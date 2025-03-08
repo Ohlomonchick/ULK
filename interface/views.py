@@ -36,7 +36,7 @@ class CompetitionListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(
                 competition_users__user=self.request.user
             )
-        return queryset
+        return queryset.exclude(teamcompetition__isnull=False)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -63,6 +63,25 @@ class CompetitionHistoryListView(CompetitionListView):
                 competition_users__user=self.request.user
             )
         return queryset
+
+
+class TeamCompetitionListView(CompetitionListView):
+    template_name = "interface/team_competition_list.html"
+    model = TeamCompetition
+
+    def get_queryset(self):
+        queryset = TeamCompetition.objects.order_by("-start").filter(finish__gt=timezone.now())
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(
+                Q(competition_users__user=self.request.user) |
+                Q(competition_teams__team__users=self.request.user)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['is_team_list'] = True
+        return context
 
 
 class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
@@ -100,6 +119,7 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
                 answer = self.request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
+                        print('USER: ', self.request.user)
                         competition2user = Competition2User.objects.get(
                             competition=competition,
                             user=self.request.user
@@ -134,11 +154,6 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             ).order_by('datetime').values()
             context["solutions"] = solutions
 
-            if not str(competition.participants).isnumeric() or int(competition.participants) == 0:
-                context["progress"] = 100
-            else:
-                context["progress"] = round(len(solutions) / int(competition.participants) * 100)
-
         if self.request.user.is_authenticated:
             try:
                 competition2user = Competition2User.objects.get(competition=competition, user=self.request.user)
@@ -150,6 +165,67 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
 
         context["object"] = competition
         context["button"] = (timezone.now() - competition.start).total_seconds() < 0
+
+        return context
+
+
+class TeamCompetitionDetailView(CompetitionDetailView):
+    model = TeamCompetition
+    template_name = "interface/competition_detail.html"
+
+    def set_submitted(self, context):
+        """
+        Extends parent's set_submitted() to support team participants.
+        If the user is part of a team in the competition, use the team branch;
+        otherwise, fallback to the single-user branch.
+        """
+        user = self.request.user
+        competition = self.object
+
+        # Try to find a team record in which the user is a member.
+        self.team_relation = competition.competition_teams.filter(team__users=user).first()
+
+        if self.team_relation:
+            lab = competition.lab
+            context["available"] = competition.finish > timezone.now()
+            # Check if an answer from this team already exists.
+            team_answer = Answers.objects.filter(
+                lab=lab,
+                team=self.team_relation.team,
+                lab_task=None,
+                datetime__lte=competition.finish,
+                datetime__gte=competition.start
+            ).first()
+
+            if team_answer:
+                context["submitted"] = True
+            else:
+                # Look for answer flag from GET parameters.
+                answer_flag = self.request.GET.get("answer_flag")
+                if answer_flag:
+                    if answer_flag == lab.answer_flag:
+                        # Create an Answer with the team field set.
+                        answer_object = Answers(lab=lab, team=self.team_relation.team, datetime=timezone.now())
+                        answer_object.save()
+                        context["submitted"] = True
+                    else:
+                        # Optionally, you can change the form field label to notify about an incorrect flag.
+                        context["form"].fields["answer_flag"].label = "Неверный флаг!"
+        else:
+            # Fallback: use the parent implementation (for single user participation)
+            context = super().set_submitted(context)
+
+        if context.get("submitted"):
+            context["available"] = False
+
+        return context
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context = self.set_submitted(context)
+        if context.get("assigned_tasks", []) == [] and self.team_relation:
+            context["assigned_tasks"] = self.team_relation.tasks.all()
+        context["is_team_competition"] = True
 
         return context
 
@@ -247,6 +323,7 @@ class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):
         context["progress"] = progress
         logging.debug(context)
         return context
+
 
 def registration(request):
     if request.method == 'POST':

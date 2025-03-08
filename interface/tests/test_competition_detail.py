@@ -4,8 +4,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from interface.models import (
-    Competition, Lab, Answers, User
-    # plus any other models you need, e.g. Platoon, LabLevel, etc.
+    Competition, Lab, Answers, User, Competition2User
 )
 
 
@@ -31,6 +30,13 @@ class CompetitionDetailViewTest(TestCase):
             start=timezone.now() - timedelta(hours=1),   # started 1 hour ago
             finish=timezone.now() + timedelta(hours=1),  # finishes in 1 hour
             participants=1  # just a placeholder, not strictly required
+        )
+
+        self.competition.non_platoon_users.add(self.user)
+
+        Competition2User.objects.create(
+            competition=self.competition,
+            user=self.user
         )
 
     def test_competition_detail_view(self):

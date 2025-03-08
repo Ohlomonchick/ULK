@@ -2,6 +2,7 @@ import datetime
 import logging
 
 from django.db import models
+from django.db.models import Q
 from django.db.models.signals import post_save, post_delete
 from django.utils.text import slugify
 from django_summernote.models import AbstractAttachment
@@ -100,20 +101,6 @@ class LabTask(models.Model):
         return self.description
 
 
-class Answers(models.Model):
-    lab = models.ForeignKey(Lab, related_name="lab", on_delete=models.CASCADE)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    datetime = models.DateTimeField(null=True)
-    lab_task = models.ForeignKey(LabTask, related_name="lab_task", on_delete=models.CASCADE, null=True)
-
-    def __str__(self):
-        return str(self.lab.name + " " + self.user.username)
-
-    class Meta:
-        verbose_name = 'Ответ'
-        verbose_name_plural = 'Ответы'
-
-
 class Platoon(models.Model):
     number = models.fields.IntegerField('Номер взвода', unique=True)
 
@@ -159,7 +146,61 @@ class User(AbstractUser):
         verbose_name_plural = 'Пользователи'
 
 
+class Team(models.Model):
+    name = models.CharField('Имя', max_length=255)
+    slug = models.SlugField('Название в адресной строке', unique=True, max_length=255)
+    users = models.ManyToManyField(User, verbose_name="Участники", blank=True)
+
+    class Meta:
+        verbose_name = 'Команда'
+        verbose_name_plural = 'Команды'
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def post_create(cls, sender, instance, created, *args, **kwargs):
+        if not created:
+            return
+
+        url = get_pnet_url()
+        Login = 'pnet_scripts'
+        Pass = 'eve'
+        cookie, xsrf = pf_login(url, Login, Pass)
+        logging.debug(f'create dir with name {instance.slug}')
+        create_directory(url, get_pnet_base_dir(), instance.slug, cookie)
+        logout(url)
+
+
+class Answers(models.Model):
+    lab = models.ForeignKey(Lab, related_name="lab", on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
+    datetime = models.DateTimeField(null=True)
+    lab_task = models.ForeignKey(LabTask, related_name="lab_task", on_delete=models.CASCADE, null=True)
+
+    def __str__(self):
+        if self.user:
+            return str(self.lab.name + " " + self.user.username)
+        else:
+            return str(self.lab.name + " " + self.team.slug)
+
+    class Meta:
+        verbose_name = 'Ответ'
+        verbose_name_plural = 'Ответы'
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                        Q(user__isnull=False, team__isnull=True) |
+                        Q(user__isnull=True, team__isnull=False)
+                ),
+                name="%(app_label)s_%(class)s_exclusive_user_team"
+            )
+        ]
+
+
 class IssuedLabs(models.Model):
+    """DEPRECATED"""
     lab = models.ForeignKey(
         Lab,
         related_name="lab_for_issue",
@@ -280,7 +321,6 @@ class Competition(models.Model):
         for issue in self.competition_users.all():
             issue.delete()
 
-        # self.delete_from_platform()
         super(Competition, self).delete(*args, **kwargs)
 
     class Meta:
@@ -320,7 +360,7 @@ class Competition2User(models.Model):
 
     deleted = models.BooleanField(default=False)
 
-    def delete_from_platform(self):
+    def delete_from_platform(self, final=False):
         if self.deleted:
             return
         if self.competition.lab.get_platform() == "PN":
@@ -335,14 +375,15 @@ class Competition2User(models.Model):
             logout(url)
 
         self.deleted = True
-        self.save()
+        if not final:
+            self.save()
 
     class Meta:
         verbose_name = 'Задание участника'
         verbose_name_plural = 'Задания участников'
 
     def delete(self, *args, **kwargs):
-        self.delete_from_platform()
+        self.delete_from_platform(final=True)
         super(Competition2User, self).delete(*args, **kwargs)
 
     @classmethod
@@ -361,32 +402,6 @@ class Competition2User(models.Model):
                                                 instance.user.username)
             logout(get_pnet_url())
         logger.debug(instance)
-
-
-class Team(models.Model):
-    name = models.CharField('Имя', max_length=255)
-    slug = models.SlugField('Название в адресной строке', unique=True, max_length=255)
-    users = models.ManyToManyField(User, verbose_name="Участники", blank=True)
-
-    class Meta:
-        verbose_name = 'Команда'
-        verbose_name_plural = 'Команды'
-
-    def __str__(self):
-        return self.name
-
-    @classmethod
-    def post_create(cls, sender, instance, created, *args, **kwargs):
-        if not created:
-            return
-
-        url = get_pnet_url()
-        Login = 'pnet_scripts'
-        Pass = 'eve'
-        cookie, xsrf = pf_login(url, Login, Pass)
-        logging.debug(f'create dir with name {instance.slug}')
-        create_directory(url, get_pnet_base_dir(), instance.slug, cookie)
-        logout(url)
 
 
 class TeamCompetition(Competition):

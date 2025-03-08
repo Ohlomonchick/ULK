@@ -1,0 +1,8 @@
+{# interface/templates/interface/team_competition_list.html #}
+{% extends 'interface/base.html' %}
+{% load static %}
+
+{% block content %}
+    <h1 class="title is-1">Соревнования</h1>
+    {% include 'interface/_competition_list_partial.html' %}
+{% endblock %}
