@@ -100,6 +100,7 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
                 answer = self.request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
+                        print('USER: ', self.request.user)
                         competition2user = Competition2User.objects.get(
                             competition=competition,
                             user=self.request.user

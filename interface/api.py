@@ -13,7 +13,7 @@ from datetime import timedelta, datetime
 
 from slugify import slugify
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User, Competition2User
+from .models import Competition, LabLevel, Lab, LabTask, Answers, User, Competition2User, TeamCompetition2Team
 from .serializers import LabLevelSerializer, LabTaskSerializer
 
 
@@ -183,15 +183,7 @@ def get_users_in_platoons(request):
     return JsonResponse(data, safe=False)
 
 
-# Хардкодный ответ (генерация потом)
-hardcode = r"""/testdir/ 1 1 1 1 1 1 1 1 1 1
-./ Горяиновd1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
-Горяиновd1/ Горяиновd2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
-Горяиновd1/ Горяиновf1 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0
-Горяиновd1/ Горяиновf3 -rwx------m-- admin admin Секретно:Низкий:Нет:0x0"""
-
-
-def create_var_text(text, second_name):
+def create_var_text(second_name):
     new_var = rf"""/testdir/ 1 1 1 1 1 1 1 1 1 1
 ./ {second_name}d1 drwxrwxrwxm-- admin admin Секретно:Низкий:Нет:0x0
 {second_name}d1/ {second_name}d2 drwxrwx---m-- admin admin Секретно:Низкий:Нет:0x0
@@ -242,12 +234,21 @@ def get_issue(data, competition_filters):
             JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND)
         )
 
-    issue_filters = {
+    team_issue_filters = {
         'competition__lab': lab,
-        'user': user
+        'team__users': user
     }
-    issue_filters.update(competition_filters)
-    issue = Competition2User.objects.filter(**issue_filters).first()
+    team_issue_filters.update(competition_filters)
+    issue = TeamCompetition2Team.objects.filter(**team_issue_filters).first()
+
+    if issue is None:
+        issue_filters = {
+            'competition__lab': lab,
+            'user': user
+        }
+        issue_filters.update(competition_filters)
+        issue = Competition2User.objects.filter(**issue_filters).first()
+
     if issue:
         return issue, None
     else:
@@ -268,13 +269,16 @@ def start_lab(request):
             return error_response
 
         response_data = {
-            "task": create_var_text(hardcode, issue.user.last_name),
             "tasks": [task.task_id for task in issue.competition.tasks.all()]
         }
-        if issue.level:
+        if hasattr(issue, 'user'):
+            response_data["task"] = create_var_text(issue.user.last_name),
+        if hasattr(issue, 'level') and issue.level:
             response_data["variant"] = issue.level.level_number
         if issue.competition.lab.answer_flag:
             response_data["flag"] = issue.competition.lab.answer_flag
+        if hasattr(issue, 'team') and issue.team:
+            response_data["team"] = [user.pnet_login for user in issue.team.users.all()]
         return JsonResponse(response_data)
 
 
@@ -288,6 +292,11 @@ def end_lab(request):
         if error_response:
             return error_response
 
-        ans = Answers(lab=issue.competition.lab, user=issue.user, datetime=timezone.now())
-        ans.save()
+        if hasattr(issue, 'user'):
+            ans = Answers(lab=issue.competition.lab, user=issue.user, datetime=timezone.now())
+            ans.save()
+        elif hasattr(issue, 'team'):
+            ans = Answers(lab=issue.competition.lab, team=issue.team, datetime=timezone.now())
+            ans.save()
+
         return JsonResponse({'message': 'Task finished'})
