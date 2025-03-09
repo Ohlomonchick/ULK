@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const startButton = document.getElementById("start-now");
     const videoContainer = document.getElementById("video-container");
     const video = document.getElementById("exam-video");
+    video.playbackRate = 1.5;
 
     if (startButton) {
         startButton.addEventListener("click", function () {
@@ -53,7 +54,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     } else if (data.error) {
                         console.error("Server Error:", data.error);
                     }
-                }, 6200);
+                }, 4000);
             })
             .catch(error => {
                 console.error("Fetch Error:", error.message);
