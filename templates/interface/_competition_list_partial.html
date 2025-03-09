@@ -1,85 +1,116 @@
-{# interface/templates/interface/_competition_list_partial.html #}
 {% load static %}
 
-    <div class="block">
-        <ul>
-            {% for comp in object_list %}
-                {% if not comp.kkz %}
-                    <div class="box" style="border: thin solid darkslategray;">
-                        {% if comp.start < now and now < comp.finish or user.is_superuser %}
-                            {% if is_team_list %}
-                                <h2 class="title is-3 is-link">
-                                  <a href="{% url 'interface:team-competition-detail' slug=comp.slug %}">{{ comp.lab.name }}</a>
-                                </h2>
-                            {% else %}
-                                <h2 class="title is-3 is-link">
-                                  <a href="{% url 'interface:competition-detail' slug=comp.slug %}">{{ comp.lab.name }}</a>
-                                </h2>
-                            {% endif %}
-                        {% else %}
-                            <h2 class="title is-3 is-link">{{ comp.lab.name }}</h2>
-                        {% endif %}
-
-                        {% if comp.start > now %}
-                            <h4 class="subtitle is-5 has-text-warning">Экзамен станет доступен: {{ comp.start|date:"H:i" }}</h4>
-                        {% elif comp.finish < now %}
-                            <h4 class="subtitle is-5 has-text-danger">Экзамен был завершён: {{ comp.finish }}</h4>
-                        {% else %}
-                            <h4 class="subtitle is-5 has-text-success">Экзамен доступен для выполнения до {{ comp.finish|date:"H:i" }}!</h4>
-                        {% endif %}
-                    </div>
-                {%  endif %}
-            {% empty %}
-                <li>Доступных экзаменов нет.</li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% if not is_team_list %}
+<div class="columns is-variable is-5">
+    <div class="column">
         <div class="box has-background-light">
-            <h2 class="title is-3">Контрольно-квалификационные задания</h2>
-            {% for kkz, comps in kkz_groups.items %}
-                <div class="box" style="border: thin solid darkslategray;">
-                    <h2 class="title is-3">{{ kkz.name }}</h2>
-                    <ul>
-                        {% for comp in comps %}
-                            <div class="box" style="border: thin solid gray;">
-                                {% if comp.start < now and now < comp.finish or user.is_superuser %}
-                                    <h3 class="title is-4 is-link">
+            <div style="min-height: 8rem; display: flex; align-items: center;">
+                <h2 class="title is-2">Экзамены</h2>
+            </div>
+            <ul>
+                {% for comp in object_list %}
+                    {% if not comp.kkz %}
+                        <div class="box" style="border: thin solid darkslategray; margin-bottom: 1rem;">
+                            {% if comp.start < now and now < comp.finish or user.is_superuser %}
+                                {% if is_team_list %}
+                                    <h2 class="title is-3 is-link">
+                                        <a href="{% url 'interface:team-competition-detail' slug=comp.slug %}">
+                                            {{ comp.lab.name }}
+                                        </a>
+                                    </h2>
+                                {% else %}
+                                    <h2 class="title is-3 is-link">
                                         <a href="{% url 'interface:competition-detail' slug=comp.slug %}">
                                             {{ comp.lab.name }}
                                         </a>
-                                    </h3>
-                                {% else %}
-                                    <h3 class="title is-4">{{ comp.lab.name }}</h3>
+                                    </h2>
                                 {% endif %}
-                            </div>
-                        {% endfor %}
-                    </ul>
-                {% if kkz.start > now %}
-                    <h4 class="subtitle is-5 has-text-warning">Экзамен станет доступен: {{ kkz.start|date:"H:i" }}</h4>
-                {% elif kkz.finish < now %}
-                    <h4 class="subtitle is-5 has-text-danger">Экзамен был завершён: {{ kkz.finish}}</h4>
-                {% else %}
-                    <h4 class="subtitle is-5 has-text-success">Экзамен доступен для выполнения до {{ kkz.finish|date:"H:i" }}!</h4>
+                            {% else %}
+                                <h2 class="title is-3 is-link">{{ comp.lab.name }}</h2>
+                            {% endif %}
+
+                            {% if comp.start > now %}
+                                <h4 class="subtitle is-5 has-text-warning">
+                                    Экзамен станет доступен: {{ comp.start|date:"H:i" }}
+                                </h4>
+                            {% elif comp.finish < now %}
+                                <h4 class="subtitle is-5 has-text-danger">
+                                    Экзамен был завершён: {{ comp.finish }}
+                                </h4>
+                            {% else %}
+                                <h4 class="subtitle is-5 has-text-success">
+                                    Экзамен доступен для выполнения до {{ comp.finish|date:"H:i" }}!
+                                </h4>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+
+                {% if object_list|length == 0 %}
+                    <li>Доступных экзаменов нет.</li>
                 {% endif %}
+            </ul>
+        </div>
+    </div>
+
+    {% if not is_team_list %}
+        <div class="column">
+            <div class="box has-background-light">
+                <div style="min-height: 8rem;">
+                    <h2 class="title is-3">Контрольно-квалификационные задания</h2>
                 </div>
-            {% empty %}
-                <p>Нет доступных контрольно-квалификационных заданий.</p>
-            {% endfor %}
+                {% for kkz, comps in kkz_groups.items %}
+                    <div class="box" style="border: thin solid darkslategray; margin-bottom: 1rem;">
+                        <h2 class="title is-3">{{ kkz.name }}</h2>
+                        <ul>
+                            {% for comp in comps %}
+                                <div class="box" style="border: thin solid gray; margin-bottom: 1rem;">
+                                    {% if comp.start < now and now < comp.finish or user.is_superuser %}
+                                        <h3 class="title is-4 is-link">
+                                            <a href="{% url 'interface:competition-detail' slug=comp.slug %}">
+                                                {{ comp.lab.name }}
+                                            </a>
+                                        </h3>
+                                    {% else %}
+                                        <h3 class="title is-4">{{ comp.lab.name }}</h3>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </ul>
+
+                        {% if kkz.start > now %}
+                            <h4 class="subtitle is-5 has-text-warning">
+                                Экзамен станет доступен: {{ kkz.start|date:"H:i" }}
+                            </h4>
+                        {% elif kkz.finish < now %}
+                            <h4 class="subtitle is-5 has-text-danger">
+                                Экзамен был завершён: {{ kkz.finish }}
+                            </h4>
+                        {% else %}
+                            <h4 class="subtitle is-5 has-text-success">
+                                Экзамен доступен для выполнения до {{ kkz.finish|date:"H:i" }}!
+                            </h4>
+                        {% endif %}
+                    </div>
+                {% empty %}
+                    <p>Нет доступных контрольно-квалификационных заданий.</p>
+                {% endfor %}
+            </div>
         </div>
     {% endif %}
+</div>
+
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    function checkForUpdates() {
-        fetch('/api/check_updates/')
-            .then(response => response.json())
-            .then(data => {
-                if (data.update_required) {
-                    location.reload();
-                }
-            })
-            .catch(error => console.error("Ошибка проверки обновлений:", error));
-    }
-    setInterval(checkForUpdates, 5000);
-});
+    document.addEventListener("DOMContentLoaded", function () {
+        function checkForUpdates() {
+            fetch('/api/check_updates/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.update_required) {
+                        location.reload();
+                    }
+                })
+                .catch(error => console.error("Ошибка проверки обновлений:", error));
+        }
+        setInterval(checkForUpdates, 5000);
+    });
 </script>

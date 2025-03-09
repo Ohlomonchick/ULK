@@ -92,8 +92,12 @@ class CompetitionForm(forms.ModelForm):
         self.fields['start'].widget.attrs['autocomplete'] = 'off'
         self.fields['finish'].widget.attrs['autocomplete'] = 'off'
         self.fields['platoons'].queryset = Platoon.objects.filter(number__gt=0)
-        self.fields['non_platoon_users'].help_text =\
+        self.fields['non_platoon_users'].help_text = \
             'Вы можете добавить студентов к взводам. Или создать экзамен только для отдельных студентов.'
+        self.fields['tasks'].help_text = \
+            'Вы можете выбрать набор заданий, которые будут распределены случайно. Если оставить пустым, то выберутся все задания.'
+        self.fields['num_tasks'].help_text = \
+            'Вы можете выбрать, какое количество заданий из выбранных будут распределены случайно.'
 
         if self.instance and hasattr(self.instance, 'lab') and self.instance.lab is not None:
             # Filter options to those belonging to the selected lab
@@ -197,6 +201,10 @@ class KkzLabInlineForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super(KkzLabInlineForm, self).__init__(*args, **kwargs)
+        self.fields['tasks'].help_text = \
+            'Вы можете выбрать набор заданий, которые будут распределены случайно. Если оставить пустым, то выберутся все задания.'
+        self.fields['num_tasks'].help_text = \
+            'Вы можете выбрать, какое количество заданий из выбранных будут распределены случайно.'
         if self.instance and self.instance.pk:
             self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
 
