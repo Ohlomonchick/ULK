@@ -149,23 +149,48 @@ class KkzAdmin(admin.ModelAdmin):
             competition.platoons.set(obj.platoons.all())
             competition.non_platoon_users.set(obj.non_platoon_users.all())
             users = obj.get_users()
-            tasks = list(kkz_lab.tasks.all())
+            tasks = list(kkz_lab.tasks.all() or kkz_lab.lab.options.all())
             num_tasks = kkz_lab.num_tasks
 
             if users:
-                for user in users:
-                    competition2user, created = Competition2User.objects.get_or_create(
-                        competition=competition,
-                        user=user
-                    )
-                    if tasks:
-                        assigned_tasks = random.sample(tasks, min(num_tasks, len(tasks)))
-                        if competition.kkz.unified_tasks:
-                            competition.tasks.set(assigned_tasks)
-                        else:
-                            competition2user.tasks.set(assigned_tasks)
+                if obj.unified_tasks:
+                    all_tasks = kkz_lab.tasks.all() or kkz_lab.lab.options.all()
+                    num_tasks = kkz_lab.num_tasks
 
-                        
+                    selected_tasks = random.sample(
+                        list(all_tasks),
+                        min(num_tasks, all_tasks.count())
+                    )
+                    kkz_lab.tasks.set(selected_tasks)  # Исправлено
+                    kkz_lab.save()
+
+                    competition.tasks.set(selected_tasks)  # Исправлено
+
+                    users = obj.get_users()
+                    for user in users:
+                        comp2user, _ = Competition2User.objects.update_or_create(
+                            competition=competition,
+                            user=user
+                        )
+                        comp2user.tasks.set(selected_tasks)  # Исправлено
+                else:
+                    users = obj.get_users()
+                    tasks = list(kkz_lab.tasks.all() or kkz_lab.lab.options.all())
+                    num_tasks = kkz_lab.num_tasks
+
+                    for user in users:
+                        comp2user, created = Competition2User.objects.get_or_create(
+                            competition=competition,
+                            user=user
+                        )
+                        if tasks:
+                            assigned_tasks = random.sample(
+                                tasks,
+                                min(num_tasks, len(tasks))
+                            )
+                            comp2user.tasks.set(assigned_tasks)
+
+
 class TeamAdmin(admin.ModelAdmin):
     exclude = ('slug', )
 

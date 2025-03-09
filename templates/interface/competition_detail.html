@@ -20,10 +20,11 @@
                     </div>
                 </div>
             </div>
-            <h2 class="has-text-weight-bold">Общий прогресс:</h2><br>
-            <progress class="progress is-success" value="{{ progress }}" max="100" id="total-progress-bar">{{ progress }}%</progress>
 
             {% if user.is_superuser %}
+                <h2 class="has-text-weight-bold">Общий прогресс:</h2><br>
+                <progress class="progress is-success" value="{{ progress }}" max="100" id="total-progress-bar">{{ progress }}%</progress>
+
                 {% if button %}
                     <div id="button-video-container" style="display: flex; align-items: center;">
                         <button id="start-now" class="button is-danger is-large"

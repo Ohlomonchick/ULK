@@ -137,8 +137,8 @@ class CompetitionForm(forms.ModelForm):
                     level=instance.level,
                 )
 
-                if created and instance.tasks.exists():
-                    tasks = list(instance.tasks.all())
+                if created:
+                    tasks = list(instance.tasks.all() or instance.lab.options.all())
                     assigned_tasks = random.sample(tasks, min(instance.num_tasks, len(tasks)))
                     competition2user.tasks.set(assigned_tasks)
 
@@ -168,8 +168,11 @@ class KkzForm(forms.ModelForm):
 
     def save(self, commit=True):
         kkz = super().save(commit=False)
+
         if commit:
+            kkz.save()
             self.save_m2m()
+
             for lab in self.cleaned_data['labs']:
                 competition = Competition.objects.create(
                     start=self.cleaned_data['start'],
@@ -179,6 +182,7 @@ class KkzForm(forms.ModelForm):
                 )
                 competition.platoons.set(self.cleaned_data['platoons'])
                 competition.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
+
         return kkz
 
 

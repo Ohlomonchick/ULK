@@ -52,20 +52,20 @@
                 </article>
                 {% endfor %}
 
-                {% for task in issue.tasks.all %}
-                    <article class="media">
-                    <div class="media-content">
-                        <div class="content">
-                            <p>
-                                <strong>Задание {{ forloop.counter }} </strong>
-                                <br />
-                                {{ task.description }}
-                                <br />
-                            </p>
-                        </div>
-                    </div>
-                </article>
-                {% endfor %}
+{#                {% for task in issue.tasks.all %}#}
+{#                    <article class="media">#}
+{#                    <div class="media-content">#}
+{#                        <div class="content">#}
+{#                            <p>#}
+{#                                <strong>Задание {{ forloop.counter }} </strong>#}
+{#                                <br />#}
+{#                                {{ task.description }}#}
+{#                                <br />#}
+{#                            </p>#}
+{#                        </div>#}
+{#                    </div>#}
+{#                </article>#}
+{#                {% endfor %}#}
             </div>
         {% endif %}
     {% endif %}
