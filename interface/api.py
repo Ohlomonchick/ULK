@@ -184,7 +184,8 @@ def get_solutions(request, slug):
     response = {
         "solutions": solutions_data,
         "max_total_progress": competition.participants,
-        "total_progress":  sum(solution["progress"] for solution in solutions_data)
+        "total_progress":  sum(solution["progress"] for solution in solutions_data),
+        "total_tasks": 1
     }
     if total_tasks:
         response["max_total_progress"] = competition.participants * total_tasks
