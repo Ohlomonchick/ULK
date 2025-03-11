@@ -107,7 +107,7 @@ def get_solutions(request, slug):
             individual_data[uid]['progress'] = len(individual_data[uid]['answers'])
         else:
             individual_data[uid]['progress'] = 1  # if lab has no tasks, a single answer gives progress 1.
-        if answer.datetime < individual_data[uid]['raw_datetime']:
+        if answer.datetime > individual_data[uid]['raw_datetime']:
             individual_data[uid]['raw_datetime'] = answer.datetime
 
     for user in all_individual_users:
@@ -146,7 +146,7 @@ def get_solutions(request, slug):
                 team_data[tid]['progress'] = len(team_data[tid]['answers'])
             else:
                 team_data[tid]['progress'] = 1
-            if answer.datetime < team_data[tid]['raw_datetime']:
+            if answer.datetime > team_data[tid]['raw_datetime']:
                 team_data[tid]['raw_datetime'] = answer.datetime
 
         for team in competition.teams.all():
