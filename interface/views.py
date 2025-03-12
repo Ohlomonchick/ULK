@@ -17,12 +17,20 @@ from rest_framework import viewsets
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
 
-class LabDetailView(LoginRequiredMixin, DetailView):
+class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Lab
 
+    def test_func(self):
+        # Allow only admin users
+        return self.request.user.is_staff
 
-class LabListView(LoginRequiredMixin, ListView):
+
+class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Lab
+
+    def test_func(self):
+        # Allow only admin users
+        return self.request.user.is_staff
 
 
 class CompetitionListView(LoginRequiredMixin, ListView):
@@ -340,7 +348,7 @@ def registration(request):
                     login(request, user)
                     if passwd == "test.test":
                         return redirect('registration/change_password')
-                    return redirect('/cyberpolygon/labs')
+                    return redirect('/cyberpolygon/competitions')
                 else:
                     form.add_error("platoon", "В этом взводе нет такого пользователя")
             else:
@@ -364,7 +372,7 @@ def change_password(request):
             cookie, xsrf = pf_login(url, Login, Pass)
             change_user_password(url, cookie, xsrf, user.pnet_login, request.POST.get('password1'))
             logout(url)
-            return redirect('/cyberpolygon/labs')
+            return redirect('/cyberpolygon/competitions')
         else:
             form = ChangePasswordForm()
     else:

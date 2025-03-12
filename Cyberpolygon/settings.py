@@ -177,7 +177,8 @@ SUMMERNOTE_CONFIG = {
     'attachment_model': 'interface.MyAttachment',
 }
 
-LOGIN_REDIRECT_URL = "/cyberpolygon/competitions"
+# it's django default url (only admin login for us)
+LOGIN_REDIRECT_URL = "/cyberpolygon/labs"
 LOGOUT_REDIRECT_URL = "/"
 AUTH_USER_MODEL = 'interface.User'
 

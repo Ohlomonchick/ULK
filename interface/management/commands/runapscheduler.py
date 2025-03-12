@@ -23,8 +23,8 @@ def delete_labs_job():
     """
     Удаляем лабы и соревнования через час после их окончания
     """
-    delete_time = timezone.now() + datetime.timedelta(hours=1)
-    competitions2users = Competition2User.objects.filter(competition__finish__gte=delete_time, deleted=False)
+    delete_time = timezone.now() - datetime.timedelta(hours=1)
+    competitions2users = Competition2User.objects.filter(competition__finish__lte=delete_time, deleted=False)
 
     for competition2user in competitions2users:
         competition2user.delete_from_platform()
@@ -34,10 +34,10 @@ def delete_labs_job():
 @util.close_old_connections
 def delete_competition2team_job():
     """
-    Удаляем лабы и соревнования через час после их окончания
+    Удаляем лабы и соревнования через 10 минут после их окончания
     """
-    delete_time = timezone.now() + datetime.timedelta(minutes=10)
-    competitions2teams = TeamCompetition2Team.objects.filter(competition__finish__gte=delete_time, deleted=False)
+    delete_time = timezone.now() - datetime.timedelta(minutes=10)
+    competitions2teams = TeamCompetition2Team.objects.filter(competition__finish__lte=delete_time, deleted=False)
 
     for competition2user in competitions2teams:
         competition2user.delete_from_platform()
