@@ -54,13 +54,15 @@ class Lab(models.Model):
         verbose_name_plural = 'Лабораторные работы'
 
     def save(self, *args, **kwargs):
-        self.slug = slugify(self.name)
+        is_new = not Lab.objects.filter(pk=self.pk).exists()
+        if is_new:
+            self.slug = slugify(self.name)
         address = os.environ.get('CREATE_ADDRESS', "")
         port = os.environ.get('CREATE_PORT', "")
 
-        if port and address and self.get_platform() == "PN":
-            serializer = LabSerializer(self)
-            requests.post(f"http://{address}:{port}", data=serializer.data)
+        # if port and address and self.get_platform() == "PN":
+        #     serializer = LabSerializer(self)
+        #     requests.post(f"http://{address}:{port}", data=serializer.data)
 
         super(Lab, self).save(*args, **kwargs)
 
