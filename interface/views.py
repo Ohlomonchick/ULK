@@ -347,8 +347,8 @@ def registration(request):  # pragma: no cover
                 if user.platoon == platoon:
                     login(request, user)
                     if passwd == "test.test":
-                        return redirect('registration/change_password')
-                    return redirect('/cyberpolygon/competitions')
+                        return redirect('change_password')
+                    return redirect('interface:competition-list')
                 else:
                     form.add_error("platoon", "В этом взводе нет такого пользователя")
             else:

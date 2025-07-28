@@ -37,7 +37,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('summernote/', include('django_summernote.urls')),
     path("accounts/", include("django.contrib.auth.urls")),
-    path("registration/change_password", change_password, name="ch_pass"),
+    path("registration/change_password", change_password, name="change_password"),
     path('api/', include(('interface.api_urls', 'interface'), namespace='interface_api'))
 ]
 

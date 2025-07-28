@@ -1,4 +1,3 @@
-import datetime
 import logging
 
 from django.db import models
@@ -10,8 +9,6 @@ from django.contrib.auth.models import AbstractUser
 
 from slugify import slugify
 from rest_framework import serializers
-import requests
-from urllib.parse import urljoin
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
@@ -57,12 +54,6 @@ class Lab(models.Model):
         is_new = not Lab.objects.filter(pk=self.pk).exists()
         if is_new:
             self.slug = slugify(self.name)
-        address = os.environ.get('CREATE_ADDRESS', "")
-        port = os.environ.get('CREATE_PORT', "")
-
-        # if port and address and self.get_platform() == "PN":
-        #     serializer = LabSerializer(self)
-        #     requests.post(f"http://{address}:{port}", data=serializer.data)
 
         super(Lab, self).save(*args, **kwargs)
 

@@ -2,10 +2,17 @@
 
 {% block extra_script %}
     {%if user.is_authenticated %}
-        <script>
-            console.log(window.location.href);
-            window.location.replace(window.location.href + "cyberpolygon/competitions/");
-        </script>
+        {% if user.is_staff %}
+            <script>
+                console.log(window.location.href);
+                window.location.replace("{% url 'interface:lab-list' %}");
+            </script>
+        {% else %}
+            <script>
+                console.log(window.location.href);
+                window.location.replace("{% url 'interface:competition-list' %}");
+            </script>
+        {% endif %}
     {% endif %}
 {% endblock %}
 
