@@ -70,7 +70,7 @@ class CompetitionFormTest(TestCase):
             "level": self.level.pk,  # Same for foreign key fields
             "platoons": [self.platoon.pk],  # ManyToMany => list of IDs
             "non_platoon_users": [u.pk for u in self.non_platoon_users],
-            "tasks": [self.task1.pk, self.task2.pk],
+            "tasks": [self.task1.pk, self.task2.pk]
         }
 
     @patch("interface.models.delete_lab_with_session_destroy", return_value=None)

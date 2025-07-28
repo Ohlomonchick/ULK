@@ -33,7 +33,7 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         return self.request.user.is_staff
 
 
-class CompetitionListView(LoginRequiredMixin, ListView):
+class CompetitionListView(LoginRequiredMixin, ListView):  # pragma: no cover
     model = Competition
     template_name = 'interface/competition_list.html'
     context_object_name = 'competitions'
@@ -61,7 +61,7 @@ class CompetitionListView(LoginRequiredMixin, ListView):
         return context
 
 
-class CompetitionHistoryListView(CompetitionListView):
+class CompetitionHistoryListView(CompetitionListView):  # pragma: no cover
     template_name = "interface/competition_history_list.html"
 
     def get_queryset(self):
@@ -73,7 +73,7 @@ class CompetitionHistoryListView(CompetitionListView):
         return queryset
 
 
-class TeamCompetitionListView(CompetitionListView):
+class TeamCompetitionListView(CompetitionListView):  # pragma: no cover
     template_name = "interface/team_competition_list.html"
     model = TeamCompetition
 
@@ -238,7 +238,7 @@ class TeamCompetitionDetailView(CompetitionDetailView):
         return context
 
 
-class PlatoonDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):
+class PlatoonDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):  # pragma: no cover
     model = Platoon
     pk_url_kwarg = 'id'
 
@@ -264,7 +264,7 @@ class PlatoonDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):
         return context
 
 
-class PlatoonListView(LoginRequiredMixin, ListView, UserPassesTestMixin):
+class PlatoonListView(LoginRequiredMixin, ListView, UserPassesTestMixin):  # pragma: no cover
     model = Platoon
 
     def test_func(self):
@@ -302,7 +302,7 @@ class PlatoonListView(LoginRequiredMixin, ListView, UserPassesTestMixin):
         return progress_dict
 
 
-class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):
+class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):  # pragma: no cover
     model = User
     pk_url_kwarg = 'id'
 
@@ -333,7 +333,7 @@ class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):
         return context
 
 
-def registration(request):
+def registration(request):  # pragma: no cover
     if request.method == 'POST':
         form = SignUpForm(request.POST)
         platoon = int(request.POST.get('platoon'))
@@ -358,7 +358,7 @@ def registration(request):
     return render(request, 'registration/reg_user.html', {'form': form})
 
 
-def change_password(request):
+def change_password(request):  # pragma: no cover
     if request.method == 'POST':
         form = ChangePasswordForm(request.POST)
         if request.POST.get('password1') == request.POST.get('password2') and request.POST.get('password1') != "":

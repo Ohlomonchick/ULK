@@ -1,0 +1,65 @@
+@startuml
+!theme vibrant
+top to bottom direction
+skinparam linetype ortho
+
+entity "Answers" as Answers
+entity "Competition" as Competition
+entity "User2Competition" as User2Competition <<Associative>>
+entity "IssuedLabs" as IssuedLabs
+entity "Kkz" as Kkz
+entity "KkzLab" as KkzLab
+entity "Lab" as Lab
+entity "LabLevel" as LabLevel
+entity "LabTask" as LabTask
+entity "Platoon" as Platoon
+entity "Team" as Team
+entity "TeamCompetition" as TeamCompetition
+entity "Team2TeamCompetition" as Team2TeamCompetition <<Associative>>
+entity "User" as User
+
+Lab        ||--o{ Answers
+LabTask    ||--o{ Answers
+Team       ||--o{ Answers
+
+Kkz        ||--o{ Competition
+Lab        ||--o{ Competition
+LabLevel   ||--o{ Competition
+Competition }o..o{ LabTask
+Competition }o..o{ Platoon
+Competition }o..o{ User
+
+Competition ||--o{ User2Competition
+User        ||--o{ User2Competition
+LabLevel    ||--o{ User2Competition
+User2Competition }o..o{ LabTask
+
+Lab        ||--o{ IssuedLabs
+LabLevel   ||--o{ IssuedLabs
+IssuedLabs }o..o{ LabTask
+
+Kkz        }o..o{ Platoon
+Kkz        }o..o{ User
+
+Kkz        ||--o{ KkzLab
+Lab        ||--o{ KkzLab
+KkzLab     }o..o{ LabTask
+
+Lab        ||--o{ LabLevel
+Lab        ||--o{ LabTask
+
+Team       }o..o{ User
+Platoon    ||--o{ User
+
+Competition    ||--|| TeamCompetition
+Kkz            ||--o{ TeamCompetition
+Lab            ||--o{ TeamCompetition
+LabLevel       ||--o{ TeamCompetition
+TeamCompetition }o..o{ LabTask
+TeamCompetition }o..o{ Platoon
+TeamCompetition }o..o{ User
+
+TeamCompetition   ||--o{ Team2TeamCompetition
+Team              ||--o{ Team2TeamCompetition
+Team2TeamCompetition }o..o{ LabTask
+@enduml

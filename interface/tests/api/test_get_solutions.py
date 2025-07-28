@@ -10,7 +10,7 @@ from interface.models import (
 )
 
 
-class GetSolutionsAPINewTestCase(TestCase):
+class GetSolutionsAPITestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
 

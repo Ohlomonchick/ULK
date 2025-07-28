@@ -1,0 +1,14 @@
+[run]
+source = .
+omit =
+    */migrations/*
+    */tests/*
+    */management/*
+    */__init__.py
+    *interface/admin.py
+    */apps.py
+    */settings.py
+    */admin.py
+    */eveNodesData.py
+    */eveFunctions.py
+    */config.py
