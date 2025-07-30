@@ -7,68 +7,80 @@
     <div class="columns is-centered">
         <div class="column is-two-thirds">
             <h1 class="title is-2">{{ object.lab.name }}</h1>
-            <div class="column is-one-quarter p-0 mb-4">
-                <div id="timer" class="message is-dark">
-                    <div class="message-body">
-                        <h2 class="has-text-weight-bold">Оставшееся время:</h2>
-
-                        <div id="countdown" class="has-text-weight-bold has-text-danger">
-                             {{ delta.hours }} <span>:</span>
-                             {{ delta.minutes }} <span>:</span>
-                             {{ delta.seconds }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+        </div>
+        <div class="column is-one-third"></div>
+    </div>
+    <div class="columns is-centered">
+        <div class="column is-two-thirds">
             {% if user.is_superuser %}
-                <h2 class="has-text-weight-bold">Общий прогресс:</h2><br>
-                <progress class="progress is-success" value="{{ progress }}" max="100" id="total-progress-bar">{{ progress }}%</progress>
+                <div class="box mb-5">
+                    <h2 class="has-text-weight-bold">Общий прогресс:</h2><br>
+                    <progress class="progress is-success" value="{{ progress }}" max="100" id="total-progress-bar">{{ progress }}%</progress>
 
-                {% if button %}
-                    <div id="button-video-container" style="display: flex; align-items: center;">
-                        <button id="start-now" class="button is-danger is-large"
-                                data-slug="{{ object.slug }}" data-lab="{{ object.lab.name }}"
-                                data-start="{{ object.start }}" data-finish="{{ object.finish }}">
-                            Начать сейчас
-                        </button>
-                        <div id="video-container" class="hidden">
-                            {% load static %}
-                                <video id="exam-video" style="width: auto; height: 62px; border-radius: 4px;" class="is-hidden" autoplay muted>
-                                    <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
-                                </video>
+                    {% if button %}
+                        <div id="button-video-container" style="display: flex; align-items: center;">
+                            <button id="start-now" class="button is-danger is-large"
+                                    data-slug="{{ object.slug }}" data-lab="{{ object.lab.name }}"
+                                    data-start="{{ object.start }}" data-finish="{{ object.finish }}">
+                                Начать сейчас
+                            </button>
+                            <div id="video-container" class="hidden">
+                                {% load static %}
+                                    <video id="exam-video" style="width: auto; height: 62px; border-radius: 4px;" class="is-hidden" autoplay muted>
+                                        <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
+                                    </video>
+                            </div>
                         </div>
+                    {% endif %}
+
+                    <div id="competition-slug" data-slug="{{ object.slug }}">
+                        <table class="table" style="border-spacing: 7px;">
+                        <thead>
+                            <tr>
+                                <th><abbr title="Позиция" style="text-decoration: none;">Поз.</abbr></th>
+                                <th>Имя</th>
+                                <th>Фамилия</th>
+                                <th>Взвод</th>
+                                {% if is_team_competition %}
+                                    <th>Команда</th>
+                                {% endif %}
+                                {% if object.tasks %}
+                                    <th>Решено</th>
+                                    <th>Прогресс</th>
+                                {% endif %}
+                                <th>Затраченное время</th>
+                                <th>Время сдачи</th>
+                            </tr>
+                        </thead>
+                        <tbody  id="solutions-table">
+
+                        </tbody>
+                        </table>
                     </div>
-                {% endif %}
-
-                <div id="competition-slug" data-slug="{{ object.slug }}">
-                    <table class="table" style="border-spacing: 7px;">
-                      <thead>
-                        <tr>
-                            <th><abbr title="Позиция" style="text-decoration: none;">Поз.</abbr></th>
-                            <th>Имя</th>
-                            <th>Фамилия</th>
-                            <th>Взвод</th>
-                            {% if is_team_competition %}
-                                <th>Команда</th>
-                            {% endif %}
-                            {% if object.tasks %}
-                                <th>Решено</th>
-                                <th>Прогресс</th>
-                            {% endif %}
-                            <th>Затраченное время</th>
-                            <th>Время сдачи</th>
-                        </tr>
-                      </thead>
-                      <tbody  id="solutions-table">
-
-                      </tbody>
-                    </table>
                 </div>
             {% endif %}
             {% with object=object.lab %}
                 {% include 'interface/lab_data.html' %}
             {% endwith %}
+
+        </div>
+        <div class="column is-one-third">
+            <div id="timer" class="message is-dark" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09);">
+                <div class="message-body">
+                    <h2 class="has-text-weight-bold">Оставшееся время:</h2>
+
+                    <div id="countdown" class="has-text-weight-bold has-text-danger">
+                         {{ delta.hours }} <span>:</span>
+                         {{ delta.minutes }} <span>:</span>
+                         {{ delta.seconds }}
+                    </div>
+                </div>
+            </div>
+
+            {% if not user.is_superuser and object.level %}
+                <span class="tag is-medium "><h5 class="title is-5">Ваш вариант: {{ object.level.level_number }}</h5></span>
+            {% endif %}
+            
             {% if user.is_superuser %}
                 {% if assigned_tasks %}
                     {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Задания" %}
@@ -78,6 +90,30 @@
                     {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Ваши задания" %}
                 {% endif %}
             {% endif %}
+
+            <div id="answer-form">
+                {% if not user.is_superuser and object.lab.answer_flag %}
+                    {% if submitted %}
+                        <div class="notification is-success">Вы выполнили работу!</div>
+                    {% elif available %}
+                        <form action="" method="get">
+                            {% csrf_token %}
+                            {% for field in form %}
+                                <div class="field">
+                                    <label class="label" for="{{ field.auto_id }}">{{ field.label }}</label>
+                                    <div class="control">
+                                        {{ field }}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            <input class="button is-danger" type="submit" value="Проверить">
+                        </form>
+                    {% else %}
+                        <div class="notification is-danger">Экзамен завершён</div>
+                    {% endif %}
+                {% endif %}
+            </div>
+
         </div>
     </div>
 

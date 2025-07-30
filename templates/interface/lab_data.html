@@ -7,31 +7,6 @@
                 Используйте ваш пароль от Киберполигона и ваше имя в PNET.</p>
         </div>
     {% endif %}
-    {% if not user.is_superuser and issue.level %}
-        <span class="tag is-medium "><h5 class="title is-5">Ваш вариант: {{ issue.level.level_number }}</h5></span>
-    {% endif %}
-    <div id="answer-form">
-        {% if not user.is_superuser and object.answer_flag %}
-            {% if submitted %}
-                <div class="notification is-success">Вы выполнили работу!</div>
-            {% elif available %}
-                <form action="" method="get">
-                    {% csrf_token %}
-                    {% for field in form %}
-                        <div class="field">
-                            <label class="label" for="{{ field.auto_id }}">{{ field.label }}</label>
-                            <div class="control">
-                                {{ field }}
-                            </div>
-                        </div>
-                    {% endfor %}
-                    <input class="button is-danger" type="submit" value="Проверить">
-                </form>
-            {% else %}
-                <div class="notification is-danger">Экзамен завершён</div>
-            {% endif %}
-        {% endif %}
-    </div>
     <p><div class="content ml-2 mt-1">{{ object.description | safe  }}</div></p>
 
 {% if not user.is_superuser %}
