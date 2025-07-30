@@ -6,6 +6,10 @@
         <div class="column is-two-thirds">
             <h1 class="title is-2">{{ object.name }}</h1>
             <p><div class="content ml-2 mt-1">{{ object.description | safe  }}</div></p>
+
+            {% include 'interface/_tasks_list.html' with tasks=object.options.all title="Задания" %}
         </div>
     </div>
+
+    
 {% endblock %}

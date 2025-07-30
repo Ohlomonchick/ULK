@@ -1,4 +1,5 @@
 from collections import defaultdict
+import datetime
 
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
@@ -9,7 +10,7 @@ from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
 from django.shortcuts import render, redirect
 from django.utils import timezone
-from interface.eveFunctions import pf_login, create_directory, create_user, logout, change_user_password
+from interface.eveFunctions import pf_login, logout, change_user_password
 
 from interface.serializers import *
 from rest_framework import viewsets
@@ -166,8 +167,20 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             try:
                 competition2user = Competition2User.objects.get(competition=competition, user=self.request.user)
                 assigned_tasks = competition2user.tasks.all()
+                for task in assigned_tasks:
+                    if Answers.objects.filter(
+                        lab=competition.lab,
+                        user=self.request.user,
+                        lab_task=task,
+                        datetime__lte=competition.finish,
+                        datetime__gte=competition.start
+                    ).exists():
+                        task.done = True
             except Competition2User.DoesNotExist:
-                assigned_tasks = []
+                if self.request.user.is_staff:
+                    assigned_tasks = competition.tasks.all()
+                else:
+                    assigned_tasks = []
 
             context["assigned_tasks"] = assigned_tasks
 

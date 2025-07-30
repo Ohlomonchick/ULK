@@ -69,6 +69,15 @@
             {% with object=object.lab %}
                 {% include 'interface/lab_data.html' %}
             {% endwith %}
+            {% if user.is_superuser %}
+                {% if assigned_tasks %}
+                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Задания" %}
+                {% endif %}
+            {% else %}
+                {% if assigned_tasks %}
+                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Ваши задания" %}
+                {% endif %}
+            {% endif %}
         </div>
     </div>
 
