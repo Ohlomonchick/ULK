@@ -6,9 +6,9 @@ sudo python3 deploy.py
 chmod 755 run_prod.sh
 chmod 755 run_scheduler.sh
 
-python3 manage.py collectstatic --noinput
-python3 manage.py makemigrations --noinput
-python3 manage.py migrate --noinput
+python3 ../manage.py collectstatic --noinput
+python3 ../manage.py makemigrations --noinput
+python3 ../manage.py migrate --noinput
 
 sudo rm -rf /etc/systemd/system/cyberpolygon.service
 sudo cp cyberpolygon.service /etc/systemd/system/cyberpolygon.service

@@ -5,7 +5,7 @@
 {% bulma %}
 {% font_awesome %}
 {% load static %}
-    <title>Киберполигон</title>
+    <title>ПИК</title>
 <link rel="shortcut icon" type="image/png" href="{% static 'icons/letter-k.png' %}"/>
 
 <!-- ... -->
@@ -30,7 +30,7 @@
                   <img src="{% static 'icons/vuz_logo.png' %}" />
               </figure>
             <a class="navbar-item pl-1 pr-1">
-              <h1><strong>КИБЕРПОЛИГОН</strong></h1>
+              <h1><strong>ПИК «КИБЕРПОЛИГОН»</strong></h1>
             </a>
 
           </div>
@@ -78,7 +78,7 @@
                                 <strong>Админ-панель</strong>
                             </a>
                         {% else %}
-                          <a class="button is-light" href="{% url 'ch_pass' %}">
+                          <a class="button is-light" href="{% url 'change_password' %}">
                             <strong>Сменить пароль</strong>
                           </a>
                         {% endif %}

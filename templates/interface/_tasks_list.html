@@ -1,0 +1,43 @@
+{% comment %}
+    Компонент для отображения списка заданий с эффектом стекла
+
+    Использование:
+    {% include 'interface/_tasks_list.html' with tasks=object.options.all %}
+    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Мои задания" %}
+    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Ваши задания" %}
+
+    Параметры:
+    - tasks: список объектов LabTask для отображения
+    - title: (опционально) кастомный заголовок, по умолчанию "Задания"
+
+    Примечание: Для отображения статуса выполнения используется related_name 
+    task.assigned_tasks.all (обратная связь от LabTask к Competition2User)
+{% endcomment %}
+
+{% if tasks %}
+    <div class="box" style="box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(255, 255, 255, 0.2);">
+        <h3 class="title is-3">{% if title %}{{ title }}{% else %}Задания{% endif %}</h3>
+        {% for task in tasks %}
+            <article class="media" style="margin-bottom: 1.5rem;">
+                <div class="media-content">
+                    <div class="content">
+                        <p>
+                            <strong class="title is-5">Задание {{ forloop.counter }}</strong>
+                            {% if task.done %}  
+                                <span class="tag is-success ml-2 has-text-white title is-6">
+                                    <span class="icon is-medium">
+                                        <i class="fas fa-check"></i>
+                                    </span>
+                                    &nbsp;Выполнено
+                                </span>
+                            {% endif %}
+                            <div class="mt-1">
+                                {{ task.description }}
+                            </div>
+                        </p>
+                    </div>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+{% endif %} 
