@@ -5,7 +5,7 @@
         {% if user.is_staff %}
             <script>
                 console.log(window.location.href);
-                window.location.replace("{% url 'interface:lab-list' %}");
+                window.location.replace("{% url 'interface:lab-menu' %}");
             </script>
         {% else %}
             <script>

@@ -177,7 +177,7 @@ SUMMERNOTE_CONFIG = {
     'attachment_model': 'interface.MyAttachment',
 }
 
-LOGIN_REDIRECT_URL = "interface:lab-list"
+LOGIN_REDIRECT_URL = "interface:lab-menu"
 LOGOUT_REDIRECT_URL = "/"
 AUTH_USER_MODEL = 'interface.User'
 
