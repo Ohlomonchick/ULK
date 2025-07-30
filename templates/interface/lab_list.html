@@ -18,7 +18,12 @@
 
 {% block content %}
     <div class="block">
-        <h1 class="title is-1">Лабораторные работы</h1>
+        <h1 class="title is-1">
+            Лабораторные работы - 
+            {% if object_list and object_list.0 %}
+                {{ object_list.0.get_program_display }}
+            {% endif %}
+        </h1>
         <ul>
         {% for lab in object_list %}
             <div class="box" style="border: thin solid darkslategray;">

@@ -33,6 +33,13 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         # Allow only admin users
         return self.request.user.is_staff
 
+    def get_queryset(self):
+        queryset = Lab.objects.all()
+        program = self.request.GET.get("program")
+        if program:
+            queryset = queryset.filter(program=program)
+        return queryset
+
 
 class CompetitionListView(LoginRequiredMixin, ListView):  # pragma: no cover
     model = Competition

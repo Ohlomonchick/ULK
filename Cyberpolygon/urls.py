@@ -21,7 +21,7 @@ from django.conf.urls.static import static
 from interface.views import registration, AnswerAPIView, change_password
 from interface.api import get_time, get_solutions, press_button, check_updates, check_availability
 
-admin.site.site_url = '/cyberpolygon/labs'
+admin.site.site_url = '/cyberpolygon/lab_menu'
 
 urlpatterns = [
     path('', registration, name="reg"),
