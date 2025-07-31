@@ -171,4 +171,6 @@ interface/migrations
 
 sre/run_prod.sh
 sre/nginx.conf
-sre/*.log
+sre/cyberpolygon.service
+sre/cyberpolygon-scheduler.service
+venv3.12

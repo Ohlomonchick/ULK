@@ -1,4 +1,5 @@
 {% load static %}
+{% load utm_filters %}
 
 <div class="columns is-variable is-5">
     <div class="column">
@@ -10,16 +11,17 @@
                 {% for comp in object_list %}
                     {% if not comp.kkz %}
                         <div class="box" style="border: thin solid darkslategray; margin-bottom: 1rem;">
+
                             {% if comp.start < now and now < comp.finish or user.is_superuser %}
                                 {% if is_team_list %}
                                     <h2 class="title is-3 is-link">
-                                        <a href="{% url 'interface:team-competition-detail' slug=comp.slug %}">
+                                        <a href="{% url 'interface:team-competition-detail' slug=comp.slug %}?utm_source={{ comp|get_utm_source_team }}">
                                             {{ comp.lab.name }}
                                         </a>
                                     </h2>
                                 {% else %}
                                     <h2 class="title is-3 is-link">
-                                        <a href="{% url 'interface:competition-detail' slug=comp.slug %}">
+                                        <a href="{% url 'interface:competition-detail' slug=comp.slug %}?utm_source={{ comp|get_utm_source_regular }}">
                                             {{ comp.lab.name }}
                                         </a>
                                     </h2>
@@ -66,7 +68,7 @@
                                 <div class="box" style="border: thin solid gray; margin-bottom: 1rem;">
                                     {% if comp.start < now and now < comp.finish or user.is_superuser %}
                                         <h3 class="title is-4 is-link">
-                                            <a href="{% url 'interface:competition-detail' slug=comp.slug %}">
+                                            <a href="{% url 'interface:competition-detail' slug=comp.slug %}?utm_source={{ comp|get_utm_source_regular }}">
                                                 {{ comp.lab.name }}
                                             </a>
                                         </h3>

@@ -13,7 +13,7 @@
     <div class="columns is-centered">
         <div class="column is-two-thirds">
             {% if user.is_superuser %}
-                <div class="box mb-5">
+                <div class="box mb-5" style="border: 1px solid rgba(0, 0, 0, 0.1)">
                     <h2 class="has-text-weight-bold">Общий прогресс:</h2><br>
                     <progress class="progress is-success" value="{{ progress }}" max="100" id="total-progress-bar">{{ progress }}%</progress>
 
@@ -65,7 +65,7 @@
 
         </div>
         <div class="column is-one-third">
-            <div id="timer" class="message is-dark" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09);">
+            <div id="timer" class="message is-dark" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09); border: 1px solid rgba(0, 0, 0, 0.1)">
                 <div class="message-body">
                     <h2 class="has-text-weight-bold">Оставшееся время:</h2>
 
@@ -91,8 +91,9 @@
                 {% endif %}
             {% endif %}
 
-            <div id="answer-form">
-                {% if not user.is_superuser and object.lab.answer_flag %}
+            
+            {% if not user.is_superuser and object.lab.answer_flag %}
+                <div id="answer-form" class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)"></div>
                     {% if submitted %}
                         <div class="notification is-success">Вы выполнили работу!</div>
                     {% elif available %}
@@ -111,8 +112,9 @@
                     {% else %}
                         <div class="notification is-danger">Экзамен завершён</div>
                     {% endif %}
-                {% endif %}
-            </div>
+                </div>
+            {% endif %}
+                
 
         </div>
     </div>

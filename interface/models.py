@@ -30,7 +30,6 @@ def get_platform_choices():
 
 
 class LabProgram(models.TextChoices):
-    ZIT = "ZIT", "ЗИТ"
     INFOBOR = "INFOBOR", "Информационное противоборство"
     COMPETITION = "COMPETITION", "Соревнования"
 
@@ -41,7 +40,7 @@ class Lab(models.Model):
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)
     slug = models.SlugField('Название в адресной строке', max_length=255)
     platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
-    program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices, default=LabProgram.ZIT)
+    program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices, default=LabProgram.INFOBOR)
     
 
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])

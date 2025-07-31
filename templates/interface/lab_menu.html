@@ -5,7 +5,7 @@
 <style>
     .square-card {
         position: relative;
-        width: 300px;
+        width: 400px;
         height: 300px;
         border-radius: 15px;
         overflow: hidden;
@@ -82,8 +82,8 @@
         }
         
         .square-card {
-            width: 280px;
-            height: 280px;
+            width: 340px;
+            height: 260px;
         }
         
     }
@@ -94,15 +94,7 @@
 <div class="container">
     <h1 class="title is-1 page-title">Лабораторные работы</h1>
     
-    <div class="cards-container">
-        <!-- Первый квадрат - ЗИТ -->
-        <a href="{% url 'interface:lab-list' %}?program=ZIT" class="square-card">
-            <img src="{% static 'images/computers.jpg' %}" alt="ЗИТ" class="background-image" width="300" height="300">
-            <div class="overlay">
-                <h2>ЗИТ</h2>
-            </div>
-        </a>
-        
+    <div class="cards-container">        
         <!-- Второй квадрат - Информационное противоборство -->
         <a href="{% url 'interface:lab-list' %}?program=INFOBOR" class="square-card">
             <img src="{% static 'images/hacker-fictional-hacking-system-9qw4il2t46qcf0rx.jpg' %}" alt="Информационное противоборство" class="background-image">
@@ -113,7 +105,7 @@
         
         <!-- Третий квадрат - Соревнования -->
         <a href="{% url 'interface:lab-list' %}?program=COMPETITION" class="square-card">
-            <img src="{% static 'images/armed_group.jpg' %}" alt="Соревнования" class="background-image" width="300" height="300">
+            <img src="{% static 'images/computers.jpg' %}" alt="Соревнования" class="background-image">
             <div class="overlay">
                 <h3>Соревнования</h3>
             </div>
