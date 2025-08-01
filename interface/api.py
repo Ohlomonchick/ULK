@@ -196,7 +196,11 @@ def get_solutions(request, slug):
 @api_view(['GET'])
 def load_levels(request, lab_name):  # pragma: no cover
     try:
-        lab = Lab.objects.get(name=lab_name)
+        # Сначала пытаемся найти по slug, затем по name
+        try:
+            lab = Lab.objects.get(slug=lab_name)
+        except Lab.DoesNotExist:
+            lab = Lab.objects.get(name=lab_name)
         levels = LabLevel.objects.filter(lab=lab)
         serializer = LabLevelSerializer(levels, many=True)
         return Response(serializer.data)
@@ -207,7 +211,11 @@ def load_levels(request, lab_name):  # pragma: no cover
 @api_view(['GET'])
 def load_tasks(request, lab_name):  # pragma: no cover
     try:
-        lab = Lab.objects.get(name=lab_name)
+        # Сначала пытаемся найти по slug, затем по name
+        try:
+            lab = Lab.objects.get(slug=lab_name)
+        except Lab.DoesNotExist:
+            lab = Lab.objects.get(name=lab_name)
         tasks = LabTask.objects.filter(lab=lab)
         serializer = LabTaskSerializer(tasks, many=True)
         return Response(serializer.data)
@@ -327,9 +335,13 @@ def get_issue(data, competition_filters):
         user = User.objects.filter(pnet_login=pnet_login).first()
 
     if lab_name:
-        lab = Lab.objects.filter(name=lab_name).first()
+        # Сначала пытаемся найти по slug, затем по name
+        lab = Lab.objects.filter(slug=lab_name).first()
+        if not lab:
+            lab = Lab.objects.filter(name=lab_name).first()
     else:
-        lab = Lab.objects.filter(name=lab_slug).first()
+        # Если передан lab_slug, ищем по slug
+        lab = Lab.objects.filter(slug=lab_slug).first()
 
     if not user or not lab:
         return (

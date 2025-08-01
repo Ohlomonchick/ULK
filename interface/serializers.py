@@ -43,11 +43,16 @@ class AnswerSerializer(serializers.ModelSerializer):
             # If lab is provided as a string (i.e. lab name), convert it to a Lab instance.
             if isinstance(attrs['lab'], str):
                 try:
-                    lab_instance = Lab.objects.get(name=attrs['lab'])
+                    # Сначала пытаемся найти по slug (более надежно для URL)
+                    lab_instance = Lab.objects.get(slug=attrs['lab'])
                 except Lab.DoesNotExist:
-                    raise serializers.ValidationError(
-                        {"non_field_errors": ["Lab with the provided name does not exist."]}
-                    )
+                    try:
+                        # Если не найден по slug, ищем по name
+                        lab_instance = Lab.objects.get(name=attrs['lab'])
+                    except Lab.DoesNotExist:
+                        raise serializers.ValidationError(
+                            {"non_field_errors": ["Lab with the provided name/slug does not exist."]}
+                        )
                 attrs['lab'] = lab_instance
 
         return attrs
