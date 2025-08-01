@@ -173,5 +173,4 @@ sre/run_prod.sh
 sre/nginx.conf
 sre/cyberpolygon.service
 sre/cyberpolygon-scheduler.service
-db.sqlite3
 venv3.12
