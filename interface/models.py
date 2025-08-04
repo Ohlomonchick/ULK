@@ -42,9 +42,10 @@ class Lab(models.Model):
     slug = models.SlugField('Название в адресной строке', max_length=255, unique=True)
     platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
     program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices, default=LabProgram.INFOBOR)
-    icon = models.CharField('Иконка', max_length=50, default='fas fa-laptop-code', help_text='FontAwesome класс иконки')
     
-
+    # Хранение изображения в БД
+    cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
+    
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
     ConnectorsData = models.JSONField('Коннекторы', default=default_json, validators=[validate_top_level_array])
     Connectors2CloudData = models.JSONField(
