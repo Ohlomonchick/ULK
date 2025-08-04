@@ -167,7 +167,6 @@ cython_debug/
 
 cyberpolygon.service
 nginx.conf
-interface/migrations
 
 sre/run_prod.sh
 sre/nginx.conf
