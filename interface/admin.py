@@ -41,7 +41,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     inlines = [LabLevelInline, LabTaskInline]
 
     def get_fieldsets(self, request, obj=None):
-        base_fields = ('name', 'slug', 'description', 'platform', 'program', 'cover', 'answer_flag')
+        base_fields = ('name', 'slug', 'description', 'platform', 'program', 'lab_type', 'cover', 'answer_flag')
         pnet_fields = ('NodesData', 'ConnectorsData', 'Connectors2CloudData', 'NetworksData')
 
         if obj and obj.platform == "PN":
