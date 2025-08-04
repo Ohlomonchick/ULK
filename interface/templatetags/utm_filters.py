@@ -1,5 +1,7 @@
 from django import template
 from django.utils import timezone
+from django.utils.safestring import mark_safe
+import re
 
 register = template.Library()
 
@@ -11,7 +13,6 @@ def get_utm_source(competition, is_team_list):
     """
     now = timezone.now()
     is_historical = competition.finish < now
-    
     if is_historical:
         return "history"
     elif is_team_list:
@@ -21,26 +22,32 @@ def get_utm_source(competition, is_team_list):
 
 @register.filter
 def get_utm_source_team(competition):
-    """
-    Для team competitions - автоматически определяет utm_source
-    """
+    """ Для team competitions - автоматически определяет utm_source """
     now = timezone.now()
     is_historical = competition.finish < now
-    
     if is_historical:
         return "history"
-    else:
-        return "team_competitions"
+    return "team_competitions"
 
 @register.filter
 def get_utm_source_regular(competition):
-    """
-    Для обычных competitions - автоматически определяет utm_source
-    """
+    """ Для обычных competitions - автоматически определяет utm_source """
     now = timezone.now()
     is_historical = competition.finish < now
-    
     if is_historical:
         return "history"
-    else:
-        return "competitions"
+    return "competitions"
+
+# --- NEW: очистка HTML от изображений и добавление класса для описания ---
+@register.filter
+def clean_html_images(html_content):
+    """Удаляет теги <img> из HTML, оставляет форматирование и добавляет класс lab-description к <p>."""
+    if not html_content:
+        return ""
+    # Remove <img ...> tags
+    cleaned = re.sub(r'<img[^>]*>', '', str(html_content))
+    # Remove empty paragraphs
+    cleaned = re.sub(r'<p>\s*</p>', '', cleaned)
+    # Add class to paragraphs
+    cleaned = cleaned.replace('<p', '<p class="lab-description"')
+    return mark_safe(cleaned)

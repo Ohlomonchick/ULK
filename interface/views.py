@@ -40,6 +40,25 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             queryset = queryset.filter(program=program)
         return queryset
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        labs = self.get_queryset().order_by('slug', 'lab_type')
+        lab_bundles = []
+        bundle_dict = {}
+        for lab in labs:
+            slug = lab.slug
+            if slug not in bundle_dict:
+                bundle_dict[slug] = {LabType.HW: None, LabType.PZ: None, LabType.EXAM: None}
+            bundle_dict[slug][lab.lab_type] = lab
+        for slug, labs_by_type in bundle_dict.items():
+            lab_bundles.append({
+                "name": labs_by_type[LabType.HW].name,
+                "slug": slug,
+                "labs": labs_by_type
+            })
+        context['lab_bundles'] = lab_bundles
+        return context
+
 
 class CompetitionListView(LoginRequiredMixin, ListView):  # pragma: no cover
     model = Competition

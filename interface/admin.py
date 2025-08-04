@@ -10,7 +10,6 @@ from .forms import CustomUserCreationForm, CompetitionForm, TeamCompetitionForm,
 from django.db.models import JSONField
 from django.db import transaction
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
-from django.contrib.admin.widgets import FilteredSelectMultiple
 
 
 
@@ -40,6 +39,27 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
         },
     }
     inlines = [LabLevelInline, LabTaskInline]
+
+    def get_fieldsets(self, request, obj=None):
+        base_fields = ('name', 'slug', 'description', 'platform', 'program', 'lab_type', 'cover', 'answer_flag')
+        pnet_fields = ('NodesData', 'ConnectorsData', 'Connectors2CloudData', 'NetworksData')
+
+        if obj and obj.platform == "PN":
+            return (
+                (None, {'fields': base_fields}),
+                ('PNETLab Конфигурация', {
+                    'fields': pnet_fields,
+                    'classes': ('collapse',)
+                })
+            )
+        else:
+            return (
+                (None, {'fields': base_fields}),
+            )
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        return form
 
 
 class MyUserAdmin(UserAdmin):

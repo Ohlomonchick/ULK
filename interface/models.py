@@ -32,19 +32,29 @@ def get_platform_choices():
 class LabProgram(models.TextChoices):
     INFOBOR = "INFOBOR", "Информационное противоборство"
     COMPETITION = "COMPETITION", "Соревнования"
+    CMD = "CMD", "Командная строка"
+
+
+class LabType(models.TextChoices):
+    HW = "HW", "Домашнее задание"
+    EXAM = "EXAM", "Экзамен"
+    PZ = "PZ", "Практическое занятие"
+    COMPETITION = "COMPETITION", "Соревнование"
 
 
 class Lab(models.Model):
     id = models.AutoField(primary_key=True)
-    name = models.CharField('Имя', max_length=255, unique=True)
+    name = models.CharField('Имя', max_length=255)
     description = models.TextField('Описание')
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)
-    slug = models.SlugField('Название в адресной строке', max_length=255, unique=True)
+    slug = models.SlugField('Название в адресной строке', max_length=255)
     platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
     program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices, default=LabProgram.INFOBOR)
-    icon = models.CharField('Иконка', max_length=50, default='fas fa-laptop-code', help_text='FontAwesome класс иконки')
+    lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices, default=LabType.HW)
     
-
+    # Хранение изображения в БД
+    cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
+    
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
     ConnectorsData = models.JSONField('Коннекторы', default=default_json, validators=[validate_top_level_array])
     Connectors2CloudData = models.JSONField(
@@ -58,6 +68,9 @@ class Lab(models.Model):
     class Meta:
         verbose_name = 'Лабораторная работа'
         verbose_name_plural = 'Лабораторные работы'
+        constraints = [
+            models.UniqueConstraint(fields=['slug', 'lab_type'], name='unique_slug_labtype')
+        ]
 
     def save(self, *args, **kwargs):
         # Генерируем slug на основе имени
@@ -207,62 +220,6 @@ class Answers(models.Model):
                 name="%(app_label)s_%(class)s_exclusive_user_team"
             )
         ]
-
-
-class IssuedLabs(models.Model):
-    """DEPRECATED"""
-    lab = models.ForeignKey(
-        Lab,
-        related_name="lab_for_issue",
-        on_delete=models.CASCADE,
-        verbose_name="Лабораторная работа"
-    )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,  verbose_name='Кому назначаем')
-    date_of_appointment = models.DateTimeField('Начало', blank=False)
-    end_date = models.DateTimeField('Конец', blank=False)
-    done = models.BooleanField('Завершено', default=False)
-    level = models.ForeignKey(LabLevel, related_name="issued", on_delete=models.CASCADE,
-                              verbose_name="Вариант", null=True, blank=True)
-    tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
-    deleted = models.BooleanField(default=False)
-
-    def clean(self):
-        if self.date_of_appointment >= self.end_date:
-            raise ValidationError("Начало должно быть позже конца!")
-        if self.end_date <= timezone.now():
-            raise ValidationError("Экзамен уже закончился!")
-
-    def save(self, *args, **kwargs):
-        super(IssuedLabs, self).save(*args, **kwargs)
-
-    def delete_from_platform(self):
-        if self.deleted:
-            return
-        if self.lab.get_platform() == "PN":
-            url = get_pnet_url()
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.lab.slug, get_pnet_base_dir(), cookie, xsrf,
-                                            self.user.username)
-            delete_lab_with_session_destroy(url, self.lab.name, get_pnet_base_dir(), cookie, xsrf,
-                                            self.user.username)
-            logout(url)
-
-        self.deleted = True
-        self.save()
-
-    def delete(self, *args, **kwargs):
-        self.delete_from_platform()
-        super(IssuedLabs, self).delete(*args, **kwargs)
-
-    # def __str__(self):
-    #     return str(self.lab.name) + " " + str(self.user.username)
-
-    class Meta:
-        verbose_name = 'Назначенная работа'
-        verbose_name_plural = 'Назначенные работы'
-
 
 class Kkz(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название ККЗ", null=True, blank=False)
