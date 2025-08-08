@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from interface.models import Answers, Lab, LabTask, User, Team, TeamCompetition, TeamCompetition2Team
+from interface.models import Answers, Competition, Competition2User, Lab, LabTask, User, Team, TeamCompetition, TeamCompetition2Team
 from interface.serializers import AnswerSerializer
 
 
@@ -16,6 +16,11 @@ class AnswerSerializerTests(TestCase):
             slug="test-lab",
             platform="NO"
         )
+        self.exam = Competition.objects.create(
+            lab=self.lab,
+            start=timezone.now(),
+            finish=timezone.now() + timezone.timedelta(hours=3)
+        )
         # Create users.
         self.user_by_pnet = User.objects.create(username="User1", pnet_login="user1")
         self.user_by_username = User.objects.create(username="User2", pnet_login="user2")
@@ -27,6 +32,16 @@ class AnswerSerializerTests(TestCase):
         )
         # A common datetime for tests.
         self.valid_datetime = timezone.now()
+        
+        # Create Competition2User objects linking users to the competition
+        self.competition2user = Competition2User.objects.create(
+            competition=self.exam,
+            user=self.user_by_pnet
+        )
+        self.competition2user2 = Competition2User.objects.create(
+            competition=self.exam,
+            user=self.user_by_username
+        )
 
     def test_validation_fails_without_user_info(self):
         """
@@ -88,6 +103,11 @@ class AnswerSerializerTests(TestCase):
         """
         # Create a user whose pnet_login is 'fallback' but whose username is different.
         fallback_user = User.objects.create(username="Fallback", pnet_login="fallback")
+        # Create a Competition2User for the fallback user
+        Competition2User.objects.create(
+            competition=self.exam,
+            user=fallback_user
+        )
         data = {
             "lab": self.lab.name,
             "datetime": self.valid_datetime,
@@ -144,12 +164,10 @@ class AnswerSerializerTests(TestCase):
             "task": "1"
         }
         serializer = AnswerSerializer(data=data)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
-        with self.assertRaises(ValidationError) as context:
-            serializer.save()
-        self.assertIn("non_field_errors", context.exception.detail)
+        self.assertFalse(serializer.is_valid(), serializer.errors)
+        self.assertIn("non_field_errors", serializer.errors)
         self.assertEqual(
-            context.exception.detail["non_field_errors"][0],
+            serializer.errors["non_field_errors"][0],
             "User with the provided credentials does not exist."
         )
 
