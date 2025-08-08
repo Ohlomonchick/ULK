@@ -8,13 +8,11 @@ class AnswerSerializer(serializers.ModelSerializer):
     user = serializers.CharField(write_only=True, required=False)
     task = serializers.IntegerField(write_only=True, required=False)
     lab_slug = serializers.CharField(write_only=True, required=False)
+    lab = serializers.CharField(required=False)
 
     class Meta:
         model = Answers
         fields = ("user", "lab", "datetime", "pnet_login", "task", "lab_slug")
-        extra_kwargs = {
-            'lab': {'required': False},
-        }
 
     def validate(self, attrs):
         # Validate that either pnet_login or user is provided

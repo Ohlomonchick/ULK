@@ -355,7 +355,6 @@ class Competition2User(models.Model):
 
     @classmethod
     def post_create(cls, sender, instance, created, *args, **kwargs):
-        logging.debug(f'post create Competition2User is called for')
         if not created:
             return
         lab = instance.competition.lab
@@ -407,9 +406,8 @@ class TeamCompetition2Team(models.Model):
 
     @classmethod
     def post_create(cls, sender, instance, created, *args, **kwargs):
-        # if not created:
-        #     return
-        logging.debug(f'post create TeamCompetition2Team is called for {instance.team.slug}')
+        if not created:
+            return
         lab = instance.competition.lab
         if lab.get_platform() == "PN":
             Login = 'pnet_scripts'

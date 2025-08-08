@@ -200,7 +200,7 @@
                         </table>
                     </div>
                 </div>
-            {% else %}
+            {% elif object.lab.platform == "PN" %}
                 <div class="iframe-container" style="position: relative;">
                     <button class="iframe-toggle-slider" id="expandIframeBtn">
                         <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
@@ -297,7 +297,6 @@
 
     <script src="{% static 'js/gsap.min.js' %}"></script>
     <script src="{% static 'js/Flip.min.js' %}"></script>
-    <script src="{% static 'js/pnet_controller.js' %}"></script>
 
     <script>
     gsap.registerPlugin(Flip);
@@ -479,13 +478,16 @@
 
 
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <script src="{% static 'js/luxon.min.js' %}"></script>
-    
-    <script src="{% static 'admin/js/button.js' %}"></script>
+    {% if object.lab.platform == "PN" and not user.is_superuser %}
+        <script src="{% static 'js/pnet_controller.js' %}"></script>
+        <script src="{% static 'js/luxon.min.js' %}"></script>
+        
+        <script src="{% static 'admin/js/button.js' %}"></script>
 
-    <div class="iframe-fullscreen-overlay" id="iframeOverlay"></div>
-    <button class="iframe-collapse-btn" id="collapseIframeBtn">
-        <i class="fas fa-compress"></i>
-    </button>
+        <div class="iframe-fullscreen-overlay" id="iframeOverlay"></div>
+        <button class="iframe-collapse-btn" id="collapseIframeBtn">
+            <i class="fas fa-compress"></i>
+        </button>
+    {% endif %}
 
 {% endblock %}

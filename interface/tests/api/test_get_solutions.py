@@ -111,8 +111,8 @@ class GetSolutionsAPITestCase(TestCase):
         self.assertEqual(data["max_total_progress"], comp.participants)
         # Total progress equals number of solutions (1 each).
         self.assertEqual(data["total_progress"], 3)
-        # total_tasks is only added if > 0.
-        self.assertNotIn("total_tasks", data)
+        # total_tasks != 1 is only added if > 0.
+        self.assertEqual(data["total_tasks"], 1)
 
     def test_with_tasks_competition(self):
         """
@@ -260,7 +260,7 @@ class GetSolutionsAPITestCase(TestCase):
         self.assertEqual(sol["progress"], 1)
         self.assertEqual(data["max_total_progress"], comp.participants)
         self.assertEqual(data["total_progress"], 1)
-        self.assertNotIn("total_tasks", data)
+        self.assertEqual(data["total_tasks"], 1)
 
     def test_team_competition_team(self):
         """
@@ -313,7 +313,7 @@ class GetSolutionsAPITestCase(TestCase):
         self.assertEqual(sol["team_name"], "Alpha Team")
         self.assertEqual(data["max_total_progress"], comp.participants)
         self.assertEqual(data["total_progress"], 1)
-        self.assertNotIn("total_tasks", data)
+        self.assertEqual(data["total_tasks"], 1)
 
     def test_sorting_mixed_individual_and_team(self):
         """
