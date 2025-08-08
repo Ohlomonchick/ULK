@@ -295,7 +295,7 @@ class Competition(models.Model):
         verbose_name_plural = 'Экзамены'
 
     def save(self, *args, **kwargs):
-        self.slug = slugify(self.lab.name + str(self.start))
+        self.slug = slugify(self.lab.name + str(self.start) + self.lab.lab_type)
         super(Competition, self).save(*args, **kwargs)
 
 

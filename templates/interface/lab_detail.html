@@ -3,10 +3,9 @@
 
 {% block content %}
     <div class="columns is-centered">
-        <div class="column is-two-thirds">
-            <h1 class="title is-2">{{ object.name }}</h1>
+        <div class="column is-full">
+            <h1 class="title is-2">{{ object.name }} - {{ object.get_lab_type_display }}</h1>
         </div>
-        <div class="column is-one-third"></div>
     </div>
     <div class="columns is-centered">
         <div class="column is-two-thirds">

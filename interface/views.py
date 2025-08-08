@@ -8,7 +8,7 @@ from interface.forms import LabAnswerForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from interface.eveFunctions import pf_login, logout, change_user_password
 
@@ -20,10 +20,21 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
 class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Lab
-
+    slug_url_kwarg = 'slug'
+    
     def test_func(self):
         # Allow only admin users
         return self.request.user.is_staff
+    
+    def get_queryset(self):
+        """
+        Фильтруем queryset по slug и lab_type из URL
+        """
+        queryset = super().get_queryset()
+        slug = self.kwargs.get('slug')
+        lab_type = self.kwargs.get('lab_type')
+        
+        return queryset.filter(slug=slug, lab_type=lab_type)
 
 
 class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
