@@ -134,3 +134,19 @@
     padding-left: 0 !important;
     padding-right: 0 !important;
 }
+
+/* Compact TimeDurationWidget inputs (days/hours/minutes) */
+.durationwidget input[type="number"],
+.durationwidget input[type="text"] {
+    width: 6rem;
+}
+
+.durationwidget .field.has-addons .control .button.is-static {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+.durationwidget .input {
+    height: 2.0rem;
+    font-size: 0.9rem;
+}

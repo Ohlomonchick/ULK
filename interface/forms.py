@@ -1,6 +1,8 @@
 import random
 
 from django import forms
+from durationwidget.widgets import TimeDurationWidget
+from django.utils import timezone
 from .models import (
     LabType,
     User,
@@ -319,16 +321,17 @@ class TeamCompetitionForm(CompetitionForm):
         return instance
 
 
+## Simplified: use TimeDurationWidget instead of custom MultiWidget/Field
 class SimpleCompetitionForm(forms.Form):
-    start = forms.DateTimeField(
-        label="Начало",
-        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"],
-        widget=forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"})
-    )
-    finish = forms.DateTimeField(
-        label="Конец",
-        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"],
-        widget=forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"})
+    duration = forms.DurationField(
+        label="Время на работу",
+        widget=TimeDurationWidget(
+            show_days=True,
+            show_hours=True,
+            show_minutes=True,
+            show_seconds=False,
+            attrs={'class': 'input is-small', 'style': 'width: 6rem;'}
+        )
     )
     tasks = forms.ModelMultipleChoiceField(
         label="Задания",
@@ -346,14 +349,9 @@ class SimpleCompetitionForm(forms.Form):
             self.fields["tasks"].queryset = qs
             # Preselect all tasks by default
             self.fields["tasks"].initial = list(qs.values_list("pk", flat=True))
-
-    def clean(self):
-        cleaned = super().clean()
-        start = cleaned.get("start")
-        finish = cleaned.get("finish")
-        if start and finish and start >= finish:
-            self.add_error("finish", "Конец должен быть позже начала")
-        return cleaned
+            # Prefill duration from lab.default_duration (timedelta)
+            if self.lab.default_duration:
+                self.fields["duration"].initial = self.lab.default_duration
 
     def create_competition(self):
         if self.lab is None:
@@ -370,8 +368,8 @@ class SimpleCompetitionForm(forms.Form):
 
         data = {
             "lab": str(self.lab.pk),
-            "start": self.cleaned_data["start"],
-            "finish": self.cleaned_data["finish"],
+            "start": timezone.now(),
+            "finish": timezone.now() + self.cleaned_data["duration"],
             "num_tasks": len(selected_tasks) if selected_tasks else 1,
             "platoons": [str(pk) for pk in platoon_ids],
             # pass tasks so CompetitionForm saves them before assigning to users
