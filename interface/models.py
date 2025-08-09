@@ -42,6 +42,12 @@ class LabType(models.TextChoices):
     COMPETITION = "COMPETITION", "Соревнование"
 
 
+class LearningYear(models.IntegerChoices):
+    FIRST = 1, "Первый"
+    SECOND = 2, "Второй"
+    THIRD = 3, "Третий"
+
+
 class Lab(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField('Имя', max_length=255)
@@ -51,6 +57,7 @@ class Lab(models.Model):
     platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
     program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices, default=LabProgram.INFOBOR)
     lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices, default=LabType.HW)
+    learning_years = models.JSONField('Годы обучения', default=list, null=True, blank=True)
     
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
@@ -126,6 +133,7 @@ class LabTask(models.Model):
 
 class Platoon(models.Model):
     number = models.fields.IntegerField('Номер взвода', unique=True)
+    learning_year = models.IntegerField('Год обучения', choices=LearningYear.choices, default=LearningYear.FIRST)
 
     def __str__(self):
         return str(self.number)

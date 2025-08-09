@@ -1,8 +1,22 @@
 import random
 
 from django import forms
-from .models import (LabType, User, Competition, LabLevel, LabTask, Competition2User, KkzLab, Kkz, Lab,
-                                         Platoon, TeamCompetition, Team, TeamCompetition2Team)
+from .models import (
+    LabType,
+    User,
+    Competition,
+    LabLevel,
+    LabTask,
+    Competition2User,
+    KkzLab,
+    Kkz,
+    Lab,
+    Platoon,
+    TeamCompetition,
+    Team,
+    TeamCompetition2Team,
+    LearningYear,
+)
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
@@ -229,6 +243,32 @@ class Competition2UserInlineForm(forms.ModelForm):
             self.fields['level'].queryset = LabLevel.objects.none()
 
             
+class LabForm(forms.ModelForm):
+    learning_years = forms.MultipleChoiceField(
+        choices=LearningYear.choices,
+        required=False,
+        widget=forms.SelectMultiple,
+        label='Годы обучения'
+    )
+
+    class Meta:
+        model = Lab
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Convert stored integers to strings for the MultipleChoiceField initial
+        current = self.instance.learning_years or []
+        self.fields['learning_years'].initial = [str(v) for v in current]
+        self.fields['learning_years'].help_text = 'Можно выбрать несколько значений.'
+
+    def clean_learning_years(self):
+        values = self.cleaned_data.get('learning_years') or []
+        try:
+            return [int(v) for v in values]
+        except (TypeError, ValueError):
+            return []
+
 class TeamCompetitionForm(CompetitionForm):
     teams = forms.ModelMultipleChoiceField(
         queryset=Team.objects.all(),
