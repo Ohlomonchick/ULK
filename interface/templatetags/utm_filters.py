@@ -51,3 +51,20 @@ def clean_html_images(html_content):
     # Add class to paragraphs
     cleaned = cleaned.replace('<p', '<p class="lab-description"')
     return mark_safe(cleaned)
+
+
+# --- NEW: маппинг типа лаборатории в CSS-класс Bulma и фильтр ---
+LAB_TYPE_TO_BULMA_CLASS = {
+    "HW": "is-primary",         # Домашнее задание
+    "PZ": "is-link",            # Практическое занятие
+    "EXAM": "is-danger",        # Экзамен
+    "COMPETITION": "is-warning" # Соревнование
+}
+
+
+@register.filter
+def lab_type_class(lab_type_value: str) -> str:
+    """Возвращает CSS-класс Bulma для переданного типа лаборатории."""
+    if not lab_type_value:
+        return "is-info"
+    return LAB_TYPE_TO_BULMA_CLASS.get(str(lab_type_value), "is-info")

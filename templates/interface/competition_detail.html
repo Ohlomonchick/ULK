@@ -241,7 +241,7 @@
         setInterval(refreshSolutions, 10000);
     </script>
 
-
+    {% if user.is_superuser %}
     <script>
         let end = false;
         window.onload = function() {
@@ -337,11 +337,14 @@
         setInterval(fetchTime, 30000);
     </script>
 
-
     <meta name="csrf-token" content="{{ csrf_token }}">
-    {% if user.is_superuser %}
+    {% if button %}
         <script src="{% static 'admin/js/button.js' %}"></script>
     {% endif %}
+
+    {% endif %}
+
+    
     {% if object.lab.platform == "PN" and not user.is_superuser %}
         <script src="{% static 'js/pnet_controller.js' %}"></script>
 

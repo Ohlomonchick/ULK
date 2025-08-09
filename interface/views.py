@@ -65,7 +65,8 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             lab_bundles.append({
                 "name": [lab.name for lab in labs_by_type.values() if lab is not None][0],
                 "slug": slug,
-                "labs": labs_by_type
+                "labs": labs_by_type,
+                "cover": [lab.cover for lab in labs_by_type.values() if lab is not None and lab.cover is not None][0]
             })
         context['lab_bundles'] = lab_bundles
         return context
