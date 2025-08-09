@@ -98,7 +98,8 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
 
 class CompetitionForm(forms.ModelForm):
     class Meta:
-        exclude = ('participants',)
+        # Exclude fields that should be auto-handled or managed elsewhere
+        exclude = ('participants', 'slug', 'deleted', 'kkz')
         model = Competition
 
     def __init__(self, *args, **kwargs):
@@ -316,3 +317,76 @@ class TeamCompetitionForm(CompetitionForm):
             through_instance.save()
 
         return instance
+
+
+class SimpleCompetitionForm(forms.Form):
+    start = forms.DateTimeField(
+        label="Начало",
+        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"],
+        widget=forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"})
+    )
+    finish = forms.DateTimeField(
+        label="Конец",
+        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"],
+        widget=forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"})
+    )
+    tasks = forms.ModelMultipleChoiceField(
+        label="Задания",
+        queryset=LabTask.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple()
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.lab = kwargs.pop("lab", None)
+        super().__init__(*args, **kwargs)
+        # Limit tasks to the current lab
+        if self.lab is not None:
+            qs = LabTask.objects.filter(lab=self.lab)
+            self.fields["tasks"].queryset = qs
+            # Preselect all tasks by default
+            self.fields["tasks"].initial = list(qs.values_list("pk", flat=True))
+
+    def clean(self):
+        cleaned = super().clean()
+        start = cleaned.get("start")
+        finish = cleaned.get("finish")
+        if start and finish and start >= finish:
+            self.add_error("finish", "Конец должен быть позже начала")
+        return cleaned
+
+    def create_competition(self):
+        if self.lab is None:
+            raise ValidationError("Лабораторная работа не указана")
+
+        selected_tasks = list(self.cleaned_data.get("tasks") or [])
+
+        # Build platoon ids: only real platoons (number > 0), optionally filtered by lab.learning_years
+        years = self.lab.learning_years or []
+        platoons_qs = Platoon.objects.filter(number__gt=0)
+        if years:
+            platoons_qs = platoons_qs.filter(learning_year__in=years)
+        platoon_ids = list(platoons_qs.values_list("pk", flat=True))
+
+        data = {
+            "lab": str(self.lab.pk),
+            "start": self.cleaned_data["start"],
+            "finish": self.cleaned_data["finish"],
+            "num_tasks": len(selected_tasks) if selected_tasks else 1,
+            "platoons": [str(pk) for pk in platoon_ids],
+            # pass tasks so CompetitionForm saves them before assigning to users
+            "tasks": [str(task.pk) for task in selected_tasks],
+        }
+
+
+        form = CompetitionForm(data=data)
+        if form.is_valid():
+            competition = form.save(commit=True)
+            return competition
+        else:
+            # Propagate errors into our simple form
+            for field, errors in form.errors.items():
+                for err in errors:
+                    self.add_error(field if field in self.fields else None, err)
+            print("self.errors: --------- ", self.errors)
+            raise ValidationError("Форма некорректна")

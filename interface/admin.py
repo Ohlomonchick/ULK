@@ -5,6 +5,7 @@ from django.contrib import admin
 from django_summernote.admin import SummernoteModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
+from durationwidget.widgets import TimeDurationWidget
 from .models import *
 from .forms import (
     CustomUserCreationForm,
@@ -15,7 +16,7 @@ from .forms import (
     Competition2UserInlineForm,
     LabForm,
 )
-from django.db.models import JSONField
+from django.db.models import DurationField, JSONField
 from django.db import transaction
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
 
@@ -46,11 +47,14 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
         JSONField: {
             'widget': CustomJSONEditorWidget(width="50%", height="30vh")
         },
+        DurationField: {
+            'widget': TimeDurationWidget(show_days=True, show_hours=True, show_minutes=True, show_seconds=False)
+        }
     }
     inlines = [LabLevelInline, LabTaskInline]
 
     def get_fieldsets(self, request, obj=None):
-        base_fields = ('name', 'slug', 'description', 'platform', 'program', 'lab_type', 'learning_years', 'cover', 'answer_flag')
+        base_fields = ('name', 'slug', 'description', 'platform', 'program', 'lab_type', 'learning_years', 'default_duration', 'cover', 'answer_flag')
         pnet_fields = ('NodesData', 'ConnectorsData', 'Connectors2CloudData', 'NetworksData')
 
         if obj and obj.platform == "PN":

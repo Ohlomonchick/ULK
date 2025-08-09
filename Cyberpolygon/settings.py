@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'django_summernote',
     'widget_tweaks',
     'django_json_widget',
+    'durationwidget',
     'interface',
     'django_apscheduler',
     'dynamic_config',

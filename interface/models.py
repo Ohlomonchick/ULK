@@ -58,6 +58,7 @@ class Lab(models.Model):
     program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices, default=LabProgram.INFOBOR)
     lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices, default=LabType.HW)
     learning_years = models.JSONField('Годы обучения', default=list, null=True, blank=True)
+    default_duration = models.DurationField('Время на работу', null=True, blank=True)
     
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)

@@ -7,13 +7,74 @@
             <h1 class="title is-2">{{ object.name }} - {{ object.get_lab_type_display }}</h1>
         </div>
     </div>
+    <form method="post">
+        {% csrf_token %}
     <div class="columns is-centered">
         <div class="column is-two-thirds">
+            <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+                <h3 class="title is-4">Выдать работу как {{ object.get_lab_type_display }}</h3>
+                <div class="field">
+                    <label class="label" for="{{ simple_form.start.id_for_label }}">{{ simple_form.start.label }}</label>
+                    <div class="control">{{ simple_form.start }}</div>
+                    {% if simple_form.start.errors %}
+                        <p class="help is-danger">{{ simple_form.start.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div class="field">
+                    <label class="label" for="{{ simple_form.finish.id_for_label }}">{{ simple_form.finish.label }}</label>
+                    <div class="control">{{ simple_form.finish }}</div>
+                    {% if simple_form.finish.errors %}
+                        <p class="help is-danger">{{ simple_form.finish.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div class="field">
+                    {% if platoons %}
+                        {% if platoons.count > 1 %}
+                            <p class="content">Работа будет выдана взводам: <b>{{ platoons.all|join:", " }}</b></p>
+                        {% else %}
+                            <p class="content">Работа будет выдана взводу: {{ platoons.all|join:", " }}</p>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-primary" type="submit">Создать</button>
+                    </div>
+                </div>
+            </div>
             <p><div class="content mt-2">{{ object.description | safe  }}</div></p>
         </div>
         <div class="column is-one-third">
-            {% include 'interface/_tasks_list.html' with tasks=object.options.all title="Задания" %}
+            {% if simple_form.fields.tasks.queryset %}
+                <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+                    <h3 class="title is-4">{{ simple_form.tasks.label }}</h3>
+                    {% for task in simple_form.fields.tasks.queryset %}
+                        <article class="media" style="margin-bottom: 1rem;">
+                            <div class="media-left" style="margin-right: 0.75rem; display: flex; align-items: start;">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="tasks" value="{{ task.pk }}" checked>
+                                </label>
+                            </div>
+                            <div class="media-content">
+                                <div class="content">
+                                    <p>
+                                        <strong class="title is-6">Задание {{ forloop.counter }}</strong>
+                                        <div class="mt-1">{{ task.description }}</div>
+                                    </p>
+                                </div>
+                            </div>
+                        </article>
+                    {% endfor %}
+                    {% if simple_form.tasks.errors %}
+                        <p class="help is-danger">{{ simple_form.tasks.errors.0 }}</p>
+                    {% endif %}
+                    <p class="help">Оставьте все отмеченными, чтобы включить все задания.</p>
+                </div>
+            {% endif %}
+
+
         </div>
     </div>
+</form>
 
 {% endblock %}
