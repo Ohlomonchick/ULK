@@ -8,7 +8,7 @@ from interface.forms import LabAnswerForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from interface.eveFunctions import pf_login, logout, change_user_password
 
@@ -20,10 +20,21 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
 class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Lab
-
+    slug_url_kwarg = 'slug'
+    
     def test_func(self):
         # Allow only admin users
         return self.request.user.is_staff
+    
+    def get_queryset(self):
+        """
+        Фильтруем queryset по slug и lab_type из URL
+        """
+        queryset = super().get_queryset()
+        slug = self.kwargs.get('slug')
+        lab_type = self.kwargs.get('lab_type')
+        
+        return queryset.filter(slug=slug, lab_type=lab_type)
 
 
 class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
@@ -52,9 +63,10 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             bundle_dict[slug][lab.lab_type] = lab
         for slug, labs_by_type in bundle_dict.items():
             lab_bundles.append({
-                "name": labs_by_type[LabType.HW].name,
+                "name": [lab.name for lab in labs_by_type.values() if lab is not None][0],
                 "slug": slug,
-                "labs": labs_by_type
+                "labs": labs_by_type,
+                "cover": [lab.cover for lab in labs_by_type.values() if lab is not None and lab.cover is not None][0]
             })
         context['lab_bundles'] = lab_bundles
         return context

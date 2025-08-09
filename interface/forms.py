@@ -1,7 +1,7 @@
 import random
 
 from django import forms
-from .models import (User, Competition, LabLevel, LabTask, Competition2User, KkzLab, Kkz, Lab,
+from .models import (LabType, User, Competition, LabLevel, LabTask, Competition2User, KkzLab, Kkz, Lab,
                                          Platoon, TeamCompetition, Team, TeamCompetition2Team)
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
@@ -14,7 +14,7 @@ class LabAnswerForm(forms.Form):
     answer_flag = forms.CharField(label="Флаг:", widget=forms.TextInput(attrs={'class': 'input', 'type': 'text'}))
 
 
-class SignUpForm(forms.ModelForm):
+class SignUpForm(forms.ModelForm):  # pragma: no cover
     password = forms.CharField(widget=forms.PasswordInput(), label = "Пароль")
     class Meta:
         fields = ["first_name", "last_name", "platoon"]
@@ -32,7 +32,7 @@ class ChangePasswordForm(forms.Form):
     password2 = forms.CharField(widget=forms.PasswordInput(), label = "Повторите пароль")
 
 
-class CustomUserCreationForm(UserCreationForm):
+class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
     password1 = forms.CharField(
         label='Пароль', required=False, widget=forms.PasswordInput,
         help_text='Пароль по умолчанию "test.test", но вы можете задать свой пароль'
@@ -150,7 +150,7 @@ class CompetitionForm(forms.ModelForm):
         return instance
 
 
-class KkzForm(forms.ModelForm):
+class KkzForm(forms.ModelForm):  # pragma: no cover
     class Meta:
         model = Kkz
         fields = '__all__'
@@ -195,7 +195,7 @@ class CustomFilteredSelectMultiple(FilteredSelectMultiple):
             'all': ('admin/css/kkz_custom.css',)
         }
 
-class KkzLabInlineForm(forms.ModelForm):
+class KkzLabInlineForm(forms.ModelForm):  # pragma: no cover
     class Meta:
         model = KkzLab
         fields = ['lab', 'tasks', 'num_tasks']
@@ -205,6 +205,7 @@ class KkzLabInlineForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super(KkzLabInlineForm, self).__init__(*args, **kwargs)
+        self.fields['lab'].queryset = Lab.objects.filter(lab_type=LabType.EXAM)
         self.fields['tasks'].help_text = \
             'Вы можете выбрать набор заданий, которые будут распределены случайно. Если оставить пустым, то выберутся все задания.'
         self.fields['num_tasks'].help_text = \
@@ -242,6 +243,7 @@ class TeamCompetitionForm(CompetitionForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['lab'].queryset = Lab.objects.filter(lab_type=LabType.COMPETITION)
         self.fields['non_platoon_users'].help_text = \
             'Вы можете добавить студентов к взводам. Или создать соревнование только для отдельных студентов.'
         self.fields['teams'].help_text = \

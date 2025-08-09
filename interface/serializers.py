@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from interface.models import Answers, LabLevel, LabTask, User, Lab, TeamCompetition2Team
+from .api_utils import get_issue
 
 
 class AnswerSerializer(serializers.ModelSerializer):
@@ -26,69 +27,27 @@ class AnswerSerializer(serializers.ModelSerializer):
                 {"non_field_errors": ["Either lab or lab_slug must be provided."]}
             )
 
-        # If lab is not provided but lab_slug is, look up the Lab by slug.
-        if not attrs.get('lab') and attrs.get('lab_slug'):
-            try:
-                lab_instance = Lab.objects.get(slug=attrs.get('lab_slug'))
-            except Lab.DoesNotExist:
-                raise serializers.ValidationError(
-                    {"non_field_errors": ["Lab with the provided slug does not exist."]}
-                )
-            attrs['lab'] = lab_instance
-            # Remove lab_slug since it's no longer needed.
-            attrs.pop('lab_slug')
+
+        attrs['username'] = attrs.get('user')
+        issue, error_response = get_issue(attrs, {'competition__finish__gte': timezone.now(), 'competition__start__lte': timezone.now()})
+        if error_response is None:
+            attrs['issue'] = issue
+        elif 'User or lab does not exist' in error_response.content.decode('utf-8'):
+            raise serializers.ValidationError(
+                {"non_field_errors": ["User with the provided credentials does not exist."]}
+            )
         else:
-            # If lab is provided as a string (i.e. lab name), convert it to a Lab instance.
-            if isinstance(attrs['lab'], str):
-                try:
-                    # Сначала пытаемся найти по slug (более надежно для URL)
-                    lab_instance = Lab.objects.get(slug=attrs['lab'])
-                except Lab.DoesNotExist:
-                    try:
-                        # Если не найден по slug, ищем по name
-                        lab_instance = Lab.objects.get(name=attrs['lab'])
-                    except Lab.DoesNotExist:
-                        raise serializers.ValidationError(
-                            {"non_field_errors": ["Lab with the provided name/slug does not exist."]}
-                        )
-                attrs['lab'] = lab_instance
+            raise serializers.ValidationError(
+                {"non_field_errors": ["Lab with the provided name/slug does not exist."]}
+            )
 
         return attrs
 
     def create(self, validated_data):
-        # Extract pnet_login and username
-        pnet_login = validated_data.pop('pnet_login', None)
-        username = validated_data.pop('user', None)
         lab_task_number = validated_data.pop('task', None)
-        lab_instance = validated_data['lab']
-        # Find the user based on pnet_login or username
-        try:
-            if pnet_login:
-                user = User.objects.get(pnet_login=pnet_login)
-            elif username:
-                try:
-                    user = User.objects.get(username=username)
-                except User.DoesNotExist:
-                    user = User.objects.get(pnet_login=username)
-            else:
-                raise serializers.ValidationError(
-                    {"non_field_errors": ["User could not be identified."]}
-                )
-        except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {"non_field_errors": ["User with the provided credentials does not exist."]}
-            )
-
-        team_comp = TeamCompetition2Team.objects.filter(
-            competition__lab=lab_instance,
-            competition__start__lte=timezone.now(),
-            competition__finish__gte=timezone.now(),
-            team__users=user,
-            deleted=False
-        ).first()
-        team = team_comp.team if team_comp else None
-
-        task = None
+        issue = validated_data.pop('issue', None)
+        lab_instance = issue.competition.lab
+        
         if lab_task_number:
             try:
                 task = LabTask.objects.get(lab=lab_instance, task_id=lab_task_number)
@@ -96,18 +55,20 @@ class AnswerSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"non_field_errors": ["Lab doesn't have task with such number."]}
                 )
+        else:
+            task = None
 
         # Create or update the Answers instance
-        if team:
+        if isinstance(issue, TeamCompetition2Team):
             answers_instance, created = Answers.objects.update_or_create(
-                team=team,
+                team=issue.team,
                 lab=lab_instance,
                 lab_task=task,
                 defaults={'datetime': validated_data.get('datetime')}
             )
         else:
             answers_instance, created = Answers.objects.update_or_create(
-                user=user,
+                user=issue.user,
                 lab=lab_instance,
                 lab_task=task,
                 defaults={'datetime': validated_data.get('datetime')}

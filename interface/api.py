@@ -1,21 +1,18 @@
-import logging
 import json
 
 from django.core.cache import cache
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework import status
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta, datetime
+from django.urls import reverse
 
-from slugify import slugify
-
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User, Competition2User, TeamCompetition2Team, \
-    TeamCompetition
+from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition
 from .serializers import LabLevelSerializer, LabTaskSerializer
+from .api_utils import get_issue
 
 
 @api_view(['GET'])
@@ -233,26 +230,17 @@ def change_iso_timezone(utc_time):  # pragma: no cover
 @api_view(['POST'])
 def press_button(request, action):  # pragma: no cover
     try:
-        lab_name = request.data.get('lab')
-        start_time = request.data.get('start')
-        finish_time = request.data.get('finish')
-
-        start_time = change_iso_timezone(start_time)
-        finish_time = change_iso_timezone(finish_time)
-
+        slug = request.data.get('slug')
+        print(slug)
         competition = Competition.objects.get(
-            lab__name=lab_name,
-            finish=finish_time,
-            start=start_time,
+            slug=slug
         )
         if action == "start":
             competition.start = timezone.now()
             competition.save()
             cache.set("competitions_update", True, timeout=60)
 
-            start_time_str = competition.start.strftime("%Y-%m-%d-%H-%M-%S-%f")
-            slug = slugify(f"{lab_name}{start_time_str}", allow_unicode=False)
-            competition_url = f"/cyberpolygon/competitions/{slug}/"
+            competition_url = reverse('interface:competition-detail', kwargs={'slug': slug})
             return JsonResponse({"redirect_url": competition_url}, status=200)
         else:
             return JsonResponse({"error": "Unknown action"}, status=400)
@@ -310,69 +298,6 @@ def parse_request_data(request):
         raise
 
 
-def get_issue(data, competition_filters):
-    """
-    Extract username/pnet_login and Competition from data,
-    then fetch corresponding User and Competition2User objects from DB.
-    If missing or invalid, return (None, response_with_error).
-    Otherwise, return (issue, None).
-    """
-    username = data.get("username")
-    pnet_login = data.get("pnet_login")
-    lab_name = data.get("lab")
-    lab_slug = data.get("lab_slug")
-
-    # Check required fields
-    if not (username or pnet_login) or not (lab_name or lab_slug):
-        return (
-            None,
-            JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)
-        )
-
-    if username:
-        user = User.objects.filter(username=username).first()
-    else:
-        user = User.objects.filter(pnet_login=pnet_login).first()
-
-    if lab_name:
-        # Сначала пытаемся найти по slug, затем по name
-        lab = Lab.objects.filter(slug=lab_name).first()
-        if not lab:
-            lab = Lab.objects.filter(name=lab_name).first()
-    else:
-        # Если передан lab_slug, ищем по slug
-        lab = Lab.objects.filter(slug=lab_slug).first()
-
-    if not user or not lab:
-        return (
-            None,
-            JsonResponse({'message': 'User or lab does not exist'}, status=status.HTTP_404_NOT_FOUND)
-        )
-
-    team_issue_filters = {
-        'competition__lab': lab,
-        'team__users': user
-    }
-    team_issue_filters.update(competition_filters)
-    issue = TeamCompetition2Team.objects.filter(**team_issue_filters).first()
-
-    if issue is None:
-        issue_filters = {
-            'competition__lab': lab,
-            'user': user
-        }
-        issue_filters.update(competition_filters)
-        issue = Competition2User.objects.filter(**issue_filters).first()
-
-    if issue:
-        return issue, None
-    else:
-        return (
-            None,
-            JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND)
-        )
-
-
 @api_view(['GET'])
 def start_lab(request):
     if request.method == 'GET':
@@ -394,6 +319,7 @@ def start_lab(request):
             response_data["flag"] = issue.competition.lab.answer_flag
         if hasattr(issue, 'team') and issue.team:
             response_data["team"] = [user.pnet_login for user in issue.team.users.all()]
+        response_data["type"] = issue.competition.lab.lab_type
         return JsonResponse(response_data)
 
 
@@ -415,3 +341,6 @@ def end_lab(request):
             ans.save()
 
         return JsonResponse({'message': 'Task finished'})
+
+
+
