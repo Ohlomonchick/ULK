@@ -8,8 +8,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta, datetime
-
-from slugify import slugify
+from django.urls import reverse
 
 from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition
 from .serializers import LabLevelSerializer, LabTaskSerializer
@@ -231,26 +230,17 @@ def change_iso_timezone(utc_time):  # pragma: no cover
 @api_view(['POST'])
 def press_button(request, action):  # pragma: no cover
     try:
-        lab_name = request.data.get('lab')
-        start_time = request.data.get('start')
-        finish_time = request.data.get('finish')
-
-        start_time = change_iso_timezone(start_time)
-        finish_time = change_iso_timezone(finish_time)
-
+        slug = request.data.get('slug')
+        print(slug)
         competition = Competition.objects.get(
-            lab__name=lab_name,
-            finish=finish_time,
-            start=start_time,
+            slug=slug
         )
         if action == "start":
             competition.start = timezone.now()
             competition.save()
             cache.set("competitions_update", True, timeout=60)
 
-            start_time_str = competition.start.strftime("%Y-%m-%d-%H-%M-%S-%f")
-            slug = slugify(f"{lab_name}{start_time_str}", allow_unicode=False)
-            competition_url = f"/cyberpolygon/competitions/{slug}/"
+            competition_url = reverse('interface:competition-detail', kwargs={'slug': slug})
             return JsonResponse({"redirect_url": competition_url}, status=200)
         else:
             return JsonResponse({"error": "Unknown action"}, status=400)

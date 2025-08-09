@@ -1,3 +1,4 @@
+from hashlib import md5
 import logging
 
 from django.db import models
@@ -25,15 +26,14 @@ def default_json():
 def get_platform_choices():
     return [
         ("PN", "PNETLab"),
-        ("NO", "Без платформы")
+        ("NO", "Без платформы"),
+        ("CMD", "Командная строка")
     ]
 
 
 class LabProgram(models.TextChoices):
     INFOBOR = "INFOBOR", "Информационное противоборство"
     COMPETITION = "COMPETITION", "Соревнования"
-    CMD = "CMD", "Командная строка"
-
 
 class LabType(models.TextChoices):
     HW = "HW", "Домашнее задание"
@@ -295,7 +295,11 @@ class Competition(models.Model):
         verbose_name_plural = 'Экзамены'
 
     def save(self, *args, **kwargs):
-        self.slug = slugify(self.lab.name + str(self.start) + self.lab.lab_type)
+        # Generate slug only once on creation; preserve on updates
+        if self._state.adding and not self.slug:
+            base_slug = slugify(f"{self.lab.name}-{self.start:%Y%m%d%H%M%S}-{self.lab.lab_type}")
+            unique_slug = base_slug + timezone.now().strftime("%Y%m%d%H%M%S%f")
+            self.slug = md5(unique_slug.encode('utf-8')).hexdigest()
         super(Competition, self).save(*args, **kwargs)
 
 
@@ -367,7 +371,6 @@ class Competition2User(models.Model):
             create_all_lab_nodes_and_connectors(get_pnet_url(), lab, get_pnet_base_dir(), cookie, xsrf,
                                                 instance.user.username)
             logout(get_pnet_url())
-        logger.debug(instance)
 
 
 class TeamCompetition(Competition):

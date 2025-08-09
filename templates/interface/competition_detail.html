@@ -5,144 +5,7 @@
 {% block container_class %}container-full-width{% endblock %}
 
 {% block extra_css %}
-<style>
-    /* Переопределяем стили Bulma для полной ширины контейнера */
-    .container-full-width {
-        max-width: 100% !important;
-        width: 100% !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-    }
-    
-    /* Стили для полноэкранного режима iframe */
-    .iframe-fullscreen {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        z-index: 9999 !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        border: none !important;
-        object-fit: cover !important;
-    }
-    
-    .iframe-fullscreen-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 9998;
-        display: none;
-    }
-    
-    /* Всплывающий ползунок */
-    .iframe-toggle-slider {
-        position: absolute;
-        top: 10px;
-        right: 0;
-        background: linear-gradient(135deg, #f14647, #ff3860);
-        color: white;
-        border: none;
-        border-radius: 0 20px 20px 0;
-        padding: 8px 16px;
-        font-size: 12px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(241, 70, 71, 0.3);
-        z-index: 10;
-        opacity: 0.8;
-        width: 40px;
-        overflow: hidden;
-        white-space: nowrap;
-        transform: translateX(100%);
-    }
-    
-    .iframe-toggle-slider:hover {
-        opacity: 1;
-        width: auto;
-        box-shadow: 0 6px 16px rgba(241, 70, 71, 0.4);
-    }
-    
-    .iframe-toggle-slider:active {
-        transform: translateX(100%) scale(0.95);
-    }
-    
-    .iframe-toggle-slider .slider-text {
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-    
-    .iframe-toggle-slider:hover .slider-text {
-        opacity: 1;
-    }
-    
-    /* Контейнер iframe */
-    .iframe-container {
-        position: relative;
-    }
-    
-    /* Кнопка сворачивания */
-    .iframe-collapse-btn {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        font-size: 20px;
-        cursor: pointer;
-        z-index: 10000;
-        transition: all 0.3s ease;
-        display: none;
-    }
-    
-    .iframe-collapse-btn:hover {
-        background: rgba(0, 0, 0, 0.9);
-        transform: scale(1.1);
-    }
-    
-    /* Анимация для контента */
-    .content-collapsed {
-        transition: all 0.5s ease;
-    }
-    
-    .content-collapsed .column.is-three-quarters {
-        width: 75% !important;
-    }
-    
-    .content-collapsed .column.is-one-quarter {
-        width: 25% !important;
-    }
-    
-    /* Стили для перемещенного iframe */
-    .iframe-moved-up {
-        order: -1;
-        margin-bottom: 20px;
-    }
-    
-    /* Скрытие скролла в полноэкранном режиме */
-    body.iframe-fullscreen-active {
-        overflow: hidden !important;
-    }
-    
-    html.iframe-fullscreen-active {
-        overflow: hidden !important;
-    }
-    
-    .iframe-fullscreen-active .flex-wrapper {
-        overflow: hidden !important;
-    }
-</style>
+    <link rel="stylesheet" href="{% static 'css/competition_detail.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -161,8 +24,7 @@
                     {% if button %}
                         <div id="button-video-container" style="display: flex; align-items: center;">
                             <button id="start-now" class="button is-danger is-large"
-                                    data-slug="{{ object.slug }}" data-lab="{{ object.lab.name }}"
-                                    data-start="{{ object.start }}" data-finish="{{ object.finish }}">
+                                    data-slug="{{ object.slug }}">
                                 Начать сейчас
                             </button>
                             <div id="video-container" class="hidden">
@@ -477,11 +339,11 @@
 
 
     <meta name="csrf-token" content="{{ csrf_token }}">
+    {% if user.is_superuser %}
+        <script src="{% static 'admin/js/button.js' %}"></script>
+    {% endif %}
     {% if object.lab.platform == "PN" and not user.is_superuser %}
         <script src="{% static 'js/pnet_controller.js' %}"></script>
-        <script src="{% static 'js/luxon.min.js' %}"></script>
-        
-        <script src="{% static 'admin/js/button.js' %}"></script>
 
         <div class="iframe-fullscreen-overlay" id="iframeOverlay"></div>
         <button class="iframe-collapse-btn" id="collapseIframeBtn">

@@ -63,7 +63,7 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             bundle_dict[slug][lab.lab_type] = lab
         for slug, labs_by_type in bundle_dict.items():
             lab_bundles.append({
-                "name": labs_by_type[LabType.HW].name,
+                "name": [lab.name for lab in labs_by_type.values() if lab is not None][0],
                 "slug": slug,
                 "labs": labs_by_type
             })

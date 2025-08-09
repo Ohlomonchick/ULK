@@ -7,22 +7,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (startButton) {
         startButton.addEventListener("click", function () {
             videoContainer.classList.remove("hidden");
-            const labName = startButton.dataset.lab;
-            const startTimeRaw = startButton.dataset.start;
-            const finishTimeRaw = startButton.dataset.finish;
-
-            let startTime, finishTime;
-            try {
-                startTime = parseLocalizedDate(startTimeRaw);
-                finishTime = parseLocalizedDate(finishTimeRaw);
-            } catch (error) {
-                console.error("Date parsing error:", error.message);
-                return;
-            }
-
-            console.log("Parsed Start Time:", startTime);
-            console.log("Parsed Finish Time:", finishTime);
-
+            const slug = startButton.dataset.slug;
+            console.log("slug", slug);
             fetch('/api/press_button/start/', {
                 method: 'POST',
                 headers: {
@@ -30,10 +16,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     'X-CSRFToken': getCsrfToken(),
                 },
                 body: JSON.stringify({
-                    lab: labName,
-                    action: 'start',
-                    start: luxon.DateTime.fromJSDate(startTime).toUTC().toISO(),
-                    finish: luxon.DateTime.fromJSDate(finishTime).toUTC().toISO(),
+                    slug: slug,
+                    action: 'start'
                 })
             })
             .then(response => {
@@ -64,21 +48,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 videoContainer.classList.add("hidden");
             };
         });
-    }
-
-    function parseLocalizedDate(dateStr) {
-        const { DateTime } = luxon;
-
-        if (!DateTime) {
-            throw new Error("Luxon is not loaded");
-        }
-
-        const parsedDate = DateTime.fromFormat(dateStr, "d MMMM yyyy г. HH:mm", { locale: "ru" });
-        if (!parsedDate.isValid) {
-            throw new Error(`Invalid date format. Input: ${dateStr}`);
-        }
-
-        return parsedDate.toJSDate();
     }
 
     function getCsrfToken() {
