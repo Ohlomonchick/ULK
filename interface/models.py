@@ -1,3 +1,4 @@
+from datetime import timedelta
 from hashlib import md5
 import logging
 
@@ -42,6 +43,12 @@ class LabType(models.TextChoices):
     COMPETITION = "COMPETITION", "Соревнование"
 
 
+class LearningYear(models.IntegerChoices):
+    FIRST = 1, "Первый"
+    SECOND = 2, "Второй"
+    THIRD = 3, "Третий"
+
+
 class Lab(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField('Имя', max_length=255)
@@ -51,6 +58,8 @@ class Lab(models.Model):
     platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
     program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices, default=LabProgram.INFOBOR)
     lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices, default=LabType.HW)
+    learning_years = models.JSONField('Годы обучения', default=list, null=True, blank=True)
+    default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=7))
     
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
@@ -126,6 +135,7 @@ class LabTask(models.Model):
 
 class Platoon(models.Model):
     number = models.fields.IntegerField('Номер взвода', unique=True)
+    learning_year = models.IntegerField('Год обучения', choices=LearningYear.choices, default=LearningYear.FIRST)
 
     def __str__(self):
         return str(self.number)
@@ -274,7 +284,6 @@ class Competition(models.Model):
                             null=True, blank=True)
     num_tasks = models.PositiveIntegerField("Количество заданий для распределения", default=1, blank=True)
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
-    # issued_labs = models.ManyToManyField(IssuedLabs, blank=True)
 
     def clean(self):
         if not self.start or not self.finish:
@@ -339,7 +348,7 @@ class Competition2User(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_pnet_base_dir(), cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.competition.lab.slug + '_' + self.competition.lab.lab_type.lower(), get_pnet_base_dir(), cookie, xsrf,
                                             self.user.username)
             delete_lab_with_session_destroy(url, self.competition.lab.name, get_pnet_base_dir(), cookie, xsrf,
                                             self.user.username)
@@ -437,7 +446,7 @@ class TeamCompetition2Team(models.Model):
             Login = 'pnet_scripts'
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
-            delete_lab_with_session_destroy(url, self.competition.lab.slug, get_pnet_base_dir(), cookie, xsrf,
+            delete_lab_with_session_destroy(url, self.competition.lab.slug + '_' + self.competition.lab.lab_type.lower(), get_pnet_base_dir(), cookie, xsrf,
                                             self.team.slug)
             for user in self.team.users.all():
                 change_user_workspace(

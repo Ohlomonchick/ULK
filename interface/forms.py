@@ -1,13 +1,59 @@
 import random
 
 from django import forms
-from .models import (LabType, User, Competition, LabLevel, LabTask, Competition2User, KkzLab, Kkz, Lab,
-                                         Platoon, TeamCompetition, Team, TeamCompetition2Team)
+from durationwidget.widgets import TimeDurationWidget
+from django.utils import timezone
+from .models import (
+    LabType,
+    User,
+    Competition,
+    LabLevel,
+    LabTask,
+    Competition2User,
+    KkzLab,
+    Kkz,
+    Lab,
+    Platoon,
+    TeamCompetition,
+    Team,
+    TeamCompetition2Team,
+    LearningYear,
+)
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
 from django.contrib.admin.widgets import FilteredSelectMultiple
+from django_select2 import forms as s2forms
 from .config import *
+
+
+class TeamWidget(s2forms.ModelSelect2MultipleWidget):
+    search_fields = [
+        "name__icontains",
+        "slug__icontains",
+    ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.attrs.update({
+            'data-minimum-input-length': 0,
+            'data-allow-clear': 'true',
+        })
+
+
+class UserWidget(s2forms.ModelSelect2MultipleWidget):
+    search_fields = [
+        "username__icontains",
+        "first_name__icontains",
+        "last_name__icontains",
+    ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.attrs.update({
+            'data-minimum-input-length': 0,
+            'data-allow-clear': 'true',
+        })
 
 
 class LabAnswerForm(forms.Form):
@@ -84,7 +130,8 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
 
 class CompetitionForm(forms.ModelForm):
     class Meta:
-        exclude = ('participants',)
+        # Exclude fields that should be auto-handled or managed elsewhere
+        exclude = ('participants', 'slug', 'deleted', 'kkz')
         model = Competition
 
     def __init__(self, *args, **kwargs):
@@ -229,6 +276,32 @@ class Competition2UserInlineForm(forms.ModelForm):
             self.fields['level'].queryset = LabLevel.objects.none()
 
             
+class LabForm(forms.ModelForm):
+    learning_years = forms.MultipleChoiceField(
+        choices=LearningYear.choices,
+        required=False,
+        widget=forms.SelectMultiple,
+        label='Годы обучения'
+    )
+
+    class Meta:
+        model = Lab
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Convert stored integers to strings for the MultipleChoiceField initial
+        current = self.instance.learning_years or []
+        self.fields['learning_years'].initial = [str(v) for v in current]
+        self.fields['learning_years'].help_text = 'Можно выбрать несколько значений.'
+
+    def clean_learning_years(self):
+        values = self.cleaned_data.get('learning_years') or []
+        try:
+            return [int(v) for v in values]
+        except (TypeError, ValueError):
+            return []
+
 class TeamCompetitionForm(CompetitionForm):
     teams = forms.ModelMultipleChoiceField(
         queryset=Team.objects.all(),
@@ -276,3 +349,123 @@ class TeamCompetitionForm(CompetitionForm):
             through_instance.save()
 
         return instance
+
+
+class SimpleCompetitionForm(forms.Form):
+    duration = forms.DurationField(
+        label="Время на работу",
+        widget=TimeDurationWidget(
+            show_days=True,
+            show_hours=True,
+            show_minutes=True,
+            show_seconds=False,
+            attrs={'class': 'input is-small', 'style': 'width: 6rem;'}
+        )
+    )
+    tasks = forms.ModelMultipleChoiceField(
+        label="Задания",
+        queryset=LabTask.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple()
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.lab = kwargs.pop("lab", None)
+        super().__init__(*args, **kwargs)
+        
+        if not self.lab:
+            return
+            
+        self._setup_tasks_field()
+        self._setup_duration_field()
+        
+        if self.lab.lab_type == LabType.COMPETITION:
+            self._add_competition_fields()
+    
+    def _setup_tasks_field(self):
+        """Configure tasks field for the current lab"""
+        qs = LabTask.objects.filter(lab=self.lab)
+        self.fields["tasks"].queryset = qs
+        self.fields["tasks"].initial = list(qs.values_list("pk", flat=True))
+    
+    def _setup_duration_field(self):
+        """Configure duration field with lab's default"""
+        if self.lab.default_duration:
+            self.fields["duration"].initial = self.lab.default_duration
+    
+    def _add_competition_fields(self):
+        """Add teams and users fields for competition labs"""
+        self.fields["teams"] = forms.ModelMultipleChoiceField(
+            label="Команды",
+            queryset=Team.objects.all(),
+            required=False,
+            widget=TeamWidget,
+            help_text="Выберите команды для участия в соревновании"
+        )
+        self.fields["users"] = forms.ModelMultipleChoiceField(
+            label="Отдельные пользователи",
+            queryset=User.objects.filter(platoon__number__gt=0),
+            required=False,
+            widget=UserWidget,
+            help_text="Выберите отдельных пользователей для участия в соревновании"
+        )
+
+    def create_competition(self):
+        if not self.lab:
+            raise ValidationError("Лабораторная работа не указана")
+
+        selected_tasks = list(self.cleaned_data.get("tasks") or [])
+        base_data = self._build_base_competition_data(selected_tasks)
+        
+        if self.lab.lab_type == LabType.COMPETITION:
+            form = self._create_team_competition_form(base_data)
+        else:
+            form = CompetitionForm(data=base_data)
+
+        return self._process_form(form)
+    
+    def _build_base_competition_data(self, selected_tasks):
+        """Build common competition data"""
+        platoon_ids = self._get_target_platoon_ids()
+        
+        return {
+            "lab": str(self.lab.pk),
+            "start": timezone.now(),
+            "finish": timezone.now() + self.cleaned_data["duration"],
+            "num_tasks": len(selected_tasks) if selected_tasks else 1,
+            "platoons": [str(pk) for pk in platoon_ids],
+            "tasks": [str(task.pk) for task in selected_tasks],
+        }
+    
+    def _get_target_platoon_ids(self):
+        """Get platoon IDs filtered by learning years"""
+        years = self.lab.learning_years or []
+        platoons_qs = Platoon.objects.filter(number__gt=0)
+        if years:
+            platoons_qs = platoons_qs.filter(learning_year__in=years)
+        return list(platoons_qs.values_list("pk", flat=True))
+    
+    def _create_team_competition_form(self, base_data):
+        """Create TeamCompetitionForm with additional competition-specific data"""
+        selected_teams = list(self.cleaned_data.get("teams") or [])
+        selected_users = list(self.cleaned_data.get("users") or [])
+        
+        competition_data = {
+            **base_data,
+            "teams": [str(team.pk) for team in selected_teams],
+            "non_platoon_users": [str(user.pk) for user in selected_users],
+        }
+        
+        return TeamCompetitionForm(data=competition_data)
+    
+    def _process_form(self, form):
+        """Process the form and handle errors"""
+        if form.is_valid():
+            return form.save(commit=True)
+        
+        # Propagate errors into our simple form
+        for field, errors in form.errors.items():
+            for err in errors:
+                self.add_error(field if field in self.fields else None, err)
+        
+        raise ValidationError("Форма некорректна")

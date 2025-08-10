@@ -36,6 +36,7 @@ urlpatterns = [
     path('cyberpolygon/', include(('interface.urls', 'interface'), namespace='interface')),
     path('admin/', admin.site.urls),
     path('summernote/', include('django_summernote.urls')),
+    path("select2/", include("django_select2.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     path("registration/change_password", change_password, name="change_password"),
     path('api/', include(('interface.api_urls', 'interface'), namespace='interface_api'))

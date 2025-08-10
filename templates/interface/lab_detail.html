@@ -1,5 +1,29 @@
 
 {% extends 'interface/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+    {% if object.lab_type == "COMPETITION" %}
+        {{ simple_form.media.css }}
+        <style>
+            .select2-container {
+                width: 100% !important;
+            }
+            .select2-selection--multiple {
+                min-height: 38px;
+                border: 1px solid #dbdbdb;
+                border-radius: 4px;
+            }
+            .select2-container--default .select2-selection--multiple .select2-selection__choice {
+                background-color: #3273dc;
+                border: 1px solid #3273dc;
+                color: white;
+                padding: 0 8px;
+                border-radius: 3px;
+            }
+        </style>
+    {% endif %}
+{% endblock %}
 
 {% block content %}
     <div class="columns is-centered">
@@ -7,13 +31,114 @@
             <h1 class="title is-2">{{ object.name }} - {{ object.get_lab_type_display }}</h1>
         </div>
     </div>
+    <form method="post" action="">
+        {% csrf_token %}
     <div class="columns is-centered">
         <div class="column is-two-thirds">
+            <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+                <h3 class="title is-4">Выдать работу как {{ object.get_lab_type_display }}</h3>
+                <div class="field">
+                    <label class="label" for="{{ simple_form.duration.id_for_label }}">{{ simple_form.duration.label }}</label>
+                    <div class="durationwidget">
+                        {{ simple_form.duration }}
+                    </div>
+                    {% if simple_form.duration.errors %}
+                        <p class="help is-danger">{{ simple_form.duration.errors.0 }}</p>
+                    {% endif %}
+                    <p class="help mb-2">Внимание! Отчёт времени начнётся с момента создания работы.</p>
+                </div>
+                <div class="field">
+                    {% if platoons %}
+                        {% if platoons.count > 1 %}
+                            <p class="content">Работа будет выдана взводам: <b>{{ platoons.all|join:", " }}</b></p>
+                        {% else %}
+                            <p class="content">Работа будет выдана взводу: {{ platoons.all|join:", " }}</p>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                
+                {# Competition-specific fields #}
+                {% if object.lab_type == "COMPETITION" %}
+                    {% if simple_form.teams %}
+                        <div class="field">
+                            <label class="label" for="{{ simple_form.teams.id_for_label }}">{{ simple_form.teams.label }}</label>
+                            <div class="control">
+                                {{ simple_form.teams }}
+                            </div>
+                            {% if simple_form.teams.help_text %}
+                                <p class="help">{{ simple_form.teams.help_text }}</p>
+                            {% endif %}
+                            {% if simple_form.teams.errors %}
+                                <p class="help is-danger">{{ simple_form.teams.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    {% if simple_form.users %}
+                        <div class="field">
+                            <label class="label" for="{{ simple_form.users.id_for_label }}">{{ simple_form.users.label }}</label>
+                            <div class="control">
+                                {{ simple_form.users }}
+                            </div>
+                            {% if simple_form.users.help_text %}
+                                <p class="help">{{ simple_form.users.help_text }}</p>
+                            {% endif %}
+                            {% if simple_form.users.errors %}
+                                <p class="help is-danger">{{ simple_form.users.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+
+                <div class="field">
+                    <div class="control" style="display: flex; align-items: center;">
+                        <button id="create-lab-button" class="button is-info" type="submit">Создать</button>
+                        <div id="lab-video-container" class="hidden" style="margin-left: 1rem;">
+                            <video id="lab-video" style="width: auto; height: 62px; border-radius: 4px;" muted preload="auto">
+                                <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
+                            </video>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <p><div class="content mt-2">{{ object.description | safe  }}</div></p>
         </div>
         <div class="column is-one-third">
-            {% include 'interface/_tasks_list.html' with tasks=object.options.all title="Задания" %}
+            {% if simple_form.fields.tasks.queryset %}
+                <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+                    <h3 class="title is-4 mb-1">{{ simple_form.tasks.label }}</h3>
+                    <p class="help mb-2">Выбранные задания будут включены в работу.</p>
+                    {% for task in simple_form.fields.tasks.queryset %}
+                        <article class="media" style="margin-bottom: 1rem;">
+                            <div class="media-left" style="margin-right: 0.75rem; display: flex; align-items: start;">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="tasks" value="{{ task.pk }}" checked>
+                                </label>
+                            </div>
+                            <div class="media-content">
+                                <div class="content">
+                                    <p>
+                                        <strong class="title is-6">Задание {{ forloop.counter }}</strong>
+                                        <div class="mt-1">{{ task.description }}</div>
+                                    </p>
+                                </div>
+                            </div>
+                        </article>
+                    {% endfor %}
+                    {% if simple_form.tasks.errors %}
+                        <p class="help is-danger">{{ simple_form.tasks.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+
         </div>
     </div>
+</form>
+
+<script src="{% static 'js/lab_detail.js' %}"></script>
+{% if object.lab_type == "COMPETITION" %}
+    <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
+    {{ simple_form.media.js }}
+{% endif %}
 
 {% endblock %}

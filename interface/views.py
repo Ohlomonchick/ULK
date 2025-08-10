@@ -1,10 +1,11 @@
 from collections import defaultdict
 import datetime
+from time import sleep
 
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from interface.models import *
-from interface.forms import LabAnswerForm
+from interface.forms import LabAnswerForm, SimpleCompetitionForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
@@ -35,6 +36,24 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         lab_type = self.kwargs.get('lab_type')
         
         return queryset.filter(slug=slug, lab_type=lab_type)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = SimpleCompetitionForm(request.POST, lab=self.object)
+        if form.is_valid():
+            competition = form.create_competition()
+            sleep(2)
+            return redirect('interface:competition-detail', slug=competition.slug)
+        context = self.get_context_data(object=self.object)
+        context["simple_form"] = form
+        return render(request, self.get_template_names(), context)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Provide empty form by default
+        context["simple_form"] = SimpleCompetitionForm(lab=self.object)
+        context["platoons"] = Platoon.objects.filter(learning_year__in=self.object.learning_years, number__gt=0)
+        return context
 
 
 class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
@@ -223,7 +242,9 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             context["assigned_tasks"] = assigned_tasks
 
         context["object"] = competition
-        context["button"] = (timezone.now() - competition.start).total_seconds() < 0
+        context["button_start_now"] = (timezone.now() - competition.start).total_seconds() < 0
+        context["button_end_now"] = not context["button_start_now"] and (competition.finish - timezone.now()).total_seconds() > 0
+        context["button_resume"] = not context["button_start_now"] and not context["button_end_now"]
 
         return context
 

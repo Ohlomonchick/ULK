@@ -235,13 +235,22 @@ def press_button(request, action):  # pragma: no cover
         competition = Competition.objects.get(
             slug=slug
         )
+        competition_url = reverse('interface:competition-detail', kwargs={'slug': slug})
         if action == "start":
             competition.start = timezone.now()
             competition.save()
-            cache.set("competitions_update", True, timeout=60)
-
-            competition_url = reverse('interface:competition-detail', kwargs={'slug': slug})
+            cache.set("competitions_update", True, timeout=60)            
             return JsonResponse({"redirect_url": competition_url}, status=200)
+        elif action == "end":
+            competition.finish = timezone.now()
+            competition.save()
+            cache.set("competitions_update", True, timeout=60)
+            return JsonResponse({"message": "Competition ended", "redirect_url": competition_url}, status=200)
+        elif action == "resume":
+            competition.finish = timezone.now() + timedelta(minutes=15)
+            competition.save()
+            cache.set("competitions_update", True, timeout=60)
+            return JsonResponse({"message": "Competition resumed", "redirect_url": competition_url}, status=200)
         else:
             return JsonResponse({"error": "Unknown action"}, status=400)
 
