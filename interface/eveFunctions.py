@@ -354,7 +354,7 @@ def delete_lab(url, cookie, lab_path):
 
 
 def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf, username):
-    lab_name = lab_object.slug
+    lab_name = lab_object.slug + '_' + lab_object.lab_type.lower()
     username = slugify(username)
     lab_path += "/" + username
 

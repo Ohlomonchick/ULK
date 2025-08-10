@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'django_json_widget',
     'durationwidget',
+    'django_select2',
     'interface',
     'django_apscheduler',
     'dynamic_config',

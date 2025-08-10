@@ -1,5 +1,6 @@
 from collections import defaultdict
 import datetime
+from time import sleep
 
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
@@ -41,6 +42,7 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         form = SimpleCompetitionForm(request.POST, lab=self.object)
         if form.is_valid():
             competition = form.create_competition()
+            sleep(2)
             return redirect('interface:competition-detail', slug=competition.slug)
         context = self.get_context_data(object=self.object)
         context["simple_form"] = form
@@ -240,7 +242,9 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             context["assigned_tasks"] = assigned_tasks
 
         context["object"] = competition
-        context["button"] = (timezone.now() - competition.start).total_seconds() < 0
+        context["button_start_now"] = (timezone.now() - competition.start).total_seconds() < 0
+        context["button_end_now"] = not context["button_start_now"] and (competition.finish - timezone.now()).total_seconds() > 0
+        context["button_resume"] = not context["button_start_now"] and not context["button_end_now"]
 
         return context
 

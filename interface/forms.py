@@ -23,7 +23,37 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
 from django.contrib.admin.widgets import FilteredSelectMultiple
+from django_select2 import forms as s2forms
 from .config import *
+
+
+class TeamWidget(s2forms.ModelSelect2MultipleWidget):
+    search_fields = [
+        "name__icontains",
+        "slug__icontains",
+    ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.attrs.update({
+            'data-minimum-input-length': 0,
+            'data-allow-clear': 'true',
+        })
+
+
+class UserWidget(s2forms.ModelSelect2MultipleWidget):
+    search_fields = [
+        "username__icontains",
+        "first_name__icontains",
+        "last_name__icontains",
+    ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.attrs.update({
+            'data-minimum-input-length': 0,
+            'data-allow-clear': 'true',
+        })
 
 
 class LabAnswerForm(forms.Form):
@@ -321,7 +351,6 @@ class TeamCompetitionForm(CompetitionForm):
         return instance
 
 
-## Simplified: use TimeDurationWidget instead of custom MultiWidget/Field
 class SimpleCompetitionForm(forms.Form):
     duration = forms.DurationField(
         label="Время на работу",
@@ -343,48 +372,100 @@ class SimpleCompetitionForm(forms.Form):
     def __init__(self, *args, **kwargs):
         self.lab = kwargs.pop("lab", None)
         super().__init__(*args, **kwargs)
-        # Limit tasks to the current lab
-        if self.lab is not None:
-            qs = LabTask.objects.filter(lab=self.lab)
-            self.fields["tasks"].queryset = qs
-            # Preselect all tasks by default
-            self.fields["tasks"].initial = list(qs.values_list("pk", flat=True))
-            # Prefill duration from lab.default_duration (timedelta)
-            if self.lab.default_duration:
-                self.fields["duration"].initial = self.lab.default_duration
+        
+        if not self.lab:
+            return
+            
+        self._setup_tasks_field()
+        self._setup_duration_field()
+        
+        if self.lab.lab_type == LabType.COMPETITION:
+            self._add_competition_fields()
+    
+    def _setup_tasks_field(self):
+        """Configure tasks field for the current lab"""
+        qs = LabTask.objects.filter(lab=self.lab)
+        self.fields["tasks"].queryset = qs
+        self.fields["tasks"].initial = list(qs.values_list("pk", flat=True))
+    
+    def _setup_duration_field(self):
+        """Configure duration field with lab's default"""
+        if self.lab.default_duration:
+            self.fields["duration"].initial = self.lab.default_duration
+    
+    def _add_competition_fields(self):
+        """Add teams and users fields for competition labs"""
+        self.fields["teams"] = forms.ModelMultipleChoiceField(
+            label="Команды",
+            queryset=Team.objects.all(),
+            required=False,
+            widget=TeamWidget,
+            help_text="Выберите команды для участия в соревновании"
+        )
+        self.fields["users"] = forms.ModelMultipleChoiceField(
+            label="Отдельные пользователи",
+            queryset=User.objects.filter(platoon__number__gt=0),
+            required=False,
+            widget=UserWidget,
+            help_text="Выберите отдельных пользователей для участия в соревновании"
+        )
 
     def create_competition(self):
-        if self.lab is None:
+        if not self.lab:
             raise ValidationError("Лабораторная работа не указана")
 
         selected_tasks = list(self.cleaned_data.get("tasks") or [])
+        base_data = self._build_base_competition_data(selected_tasks)
+        
+        if self.lab.lab_type == LabType.COMPETITION:
+            form = self._create_team_competition_form(base_data)
+        else:
+            form = CompetitionForm(data=base_data)
 
-        # Build platoon ids: only real platoons (number > 0), optionally filtered by lab.learning_years
-        years = self.lab.learning_years or []
-        platoons_qs = Platoon.objects.filter(number__gt=0)
-        if years:
-            platoons_qs = platoons_qs.filter(learning_year__in=years)
-        platoon_ids = list(platoons_qs.values_list("pk", flat=True))
-
-        data = {
+        return self._process_form(form)
+    
+    def _build_base_competition_data(self, selected_tasks):
+        """Build common competition data"""
+        platoon_ids = self._get_target_platoon_ids()
+        
+        return {
             "lab": str(self.lab.pk),
             "start": timezone.now(),
             "finish": timezone.now() + self.cleaned_data["duration"],
             "num_tasks": len(selected_tasks) if selected_tasks else 1,
             "platoons": [str(pk) for pk in platoon_ids],
-            # pass tasks so CompetitionForm saves them before assigning to users
             "tasks": [str(task.pk) for task in selected_tasks],
         }
-
-
-        form = CompetitionForm(data=data)
+    
+    def _get_target_platoon_ids(self):
+        """Get platoon IDs filtered by learning years"""
+        years = self.lab.learning_years or []
+        platoons_qs = Platoon.objects.filter(number__gt=0)
+        if years:
+            platoons_qs = platoons_qs.filter(learning_year__in=years)
+        return list(platoons_qs.values_list("pk", flat=True))
+    
+    def _create_team_competition_form(self, base_data):
+        """Create TeamCompetitionForm with additional competition-specific data"""
+        selected_teams = list(self.cleaned_data.get("teams") or [])
+        selected_users = list(self.cleaned_data.get("users") or [])
+        
+        competition_data = {
+            **base_data,
+            "teams": [str(team.pk) for team in selected_teams],
+            "non_platoon_users": [str(user.pk) for user in selected_users],
+        }
+        
+        return TeamCompetitionForm(data=competition_data)
+    
+    def _process_form(self, form):
+        """Process the form and handle errors"""
         if form.is_valid():
-            competition = form.save(commit=True)
-            return competition
-        else:
-            # Propagate errors into our simple form
-            for field, errors in form.errors.items():
-                for err in errors:
-                    self.add_error(field if field in self.fields else None, err)
-            print("self.errors: --------- ", self.errors)
-            raise ValidationError("Форма некорректна")
+            return form.save(commit=True)
+        
+        # Propagate errors into our simple form
+        for field, errors in form.errors.items():
+            for err in errors:
+                self.add_error(field if field in self.fields else None, err)
+        
+        raise ValidationError("Форма некорректна")

@@ -1,46 +1,28 @@
 
 {% extends 'interface/base.html' %}
+{% load static %}
 
 {% block extra_css %}
-<style>
-.durationwidget input[type="number"] {
-    width: 4rem !important;
-    text-align: center;
-    margin-right: 0.5rem;
-    vertical-align: middle;
-}
-
-.durationwidget .duration-label {
-    display: inline-block !important;
-    font-size: 0.875rem;
-    font-weight: 600;
-    margin-right: 1.5rem;
-    vertical-align: middle;
-    line-height: 2.5rem;
-}
-
-.duration-summary {
-    display: inline-block;
-    margin-left: 2rem;
-    padding: 0.5rem 0.75rem;
-    background-color: #f5f5f5;
-    border-radius: 4px;
-    border-left: 4px solid #3273dc;
-    font-size: 0.875rem;
-    vertical-align: middle;
-}
-
-/* Увеличенные чекбоксы для заданий */
-.media-left input[type="checkbox"] {
-    transform: scale(1.5);
-    margin-top: 0.25rem;
-}
-
-.media-left .checkbox {
-    display: flex;
-    align-items: flex-start;
-}
-</style>
+    {% if object.lab_type == "COMPETITION" %}
+        {{ simple_form.media.css }}
+        <style>
+            .select2-container {
+                width: 100% !important;
+            }
+            .select2-selection--multiple {
+                min-height: 38px;
+                border: 1px solid #dbdbdb;
+                border-radius: 4px;
+            }
+            .select2-container--default .select2-selection--multiple .select2-selection__choice {
+                background-color: #3273dc;
+                border: 1px solid #3273dc;
+                color: white;
+                padding: 0 8px;
+                border-radius: 3px;
+            }
+        </style>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -49,7 +31,7 @@
             <h1 class="title is-2">{{ object.name }} - {{ object.get_lab_type_display }}</h1>
         </div>
     </div>
-    <form method="post">
+    <form method="post" action="">
         {% csrf_token %}
     <div class="columns is-centered">
         <div class="column is-two-thirds">
@@ -63,6 +45,7 @@
                     {% if simple_form.duration.errors %}
                         <p class="help is-danger">{{ simple_form.duration.errors.0 }}</p>
                     {% endif %}
+                    <p class="help mb-2">Внимание! Отчёт времени начнётся с момента создания работы.</p>
                 </div>
                 <div class="field">
                     {% if platoons %}
@@ -73,9 +56,48 @@
                         {% endif %}
                     {% endif %}
                 </div>
+                
+                {# Competition-specific fields #}
+                {% if object.lab_type == "COMPETITION" %}
+                    {% if simple_form.teams %}
+                        <div class="field">
+                            <label class="label" for="{{ simple_form.teams.id_for_label }}">{{ simple_form.teams.label }}</label>
+                            <div class="control">
+                                {{ simple_form.teams }}
+                            </div>
+                            {% if simple_form.teams.help_text %}
+                                <p class="help">{{ simple_form.teams.help_text }}</p>
+                            {% endif %}
+                            {% if simple_form.teams.errors %}
+                                <p class="help is-danger">{{ simple_form.teams.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    {% if simple_form.users %}
+                        <div class="field">
+                            <label class="label" for="{{ simple_form.users.id_for_label }}">{{ simple_form.users.label }}</label>
+                            <div class="control">
+                                {{ simple_form.users }}
+                            </div>
+                            {% if simple_form.users.help_text %}
+                                <p class="help">{{ simple_form.users.help_text }}</p>
+                            {% endif %}
+                            {% if simple_form.users.errors %}
+                                <p class="help is-danger">{{ simple_form.users.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+
                 <div class="field">
-                    <div class="control">
-                        <button class="button is-primary" type="submit">Создать</button>
+                    <div class="control" style="display: flex; align-items: center;">
+                        <button id="create-lab-button" class="button is-info" type="submit">Создать</button>
+                        <div id="lab-video-container" class="hidden" style="margin-left: 1rem;">
+                            <video id="lab-video" style="width: auto; height: 62px; border-radius: 4px;" muted preload="auto">
+                                <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
+                            </video>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -84,7 +106,8 @@
         <div class="column is-one-third">
             {% if simple_form.fields.tasks.queryset %}
                 <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
-                    <h3 class="title is-4">{{ simple_form.tasks.label }}</h3>
+                    <h3 class="title is-4 mb-1">{{ simple_form.tasks.label }}</h3>
+                    <p class="help mb-2">Выбранные задания будут включены в работу.</p>
                     {% for task in simple_form.fields.tasks.queryset %}
                         <article class="media" style="margin-bottom: 1rem;">
                             <div class="media-left" style="margin-right: 0.75rem; display: flex; align-items: start;">
@@ -105,99 +128,17 @@
                     {% if simple_form.tasks.errors %}
                         <p class="help is-danger">{{ simple_form.tasks.errors.0 }}</p>
                     {% endif %}
-                    <p class="help">Оставьте все отмеченными, чтобы включить все задания.</p>
                 </div>
             {% endif %}
-
 
         </div>
     </div>
 </form>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Локализация TimeDurationWidget
-    function localizeDurationWidget() {
-        const durationWidget = document.querySelector('.durationwidget');
-        if (!durationWidget) return;
-        
-        // Словарь переводов
-        const translations = {
-            'Days': 'дней',
-            'Hours': 'часов', 
-            'Minutes': 'минут',
-            'Day': 'день',
-            'Hour': 'час',
-            'Minute': 'минута'
-        };
-        
-        // Заменяем текст в span.help элементах
-        const helpSpans = durationWidget.querySelectorAll('span.help');
-        helpSpans.forEach(span => {
-            let text = span.textContent.trim();
-            // Убираем лишние пробелы и символы
-            text = text.replace(/&nbsp;/g, '').replace(/\s+/g, ' ').trim();
-            
-            if (translations[text]) {
-                span.textContent = translations[text];
-                span.className = 'duration-label';
-                // Убираем инлайн-стили, чтобы CSS работал корректно
-                span.removeAttribute('style');
-            }
-        });
-        
-        // Заменяем summary текст (например "1 Hour 30 Minutes")
-        const summaryP = durationWidget.querySelector('p.help');
-        if (summaryP && summaryP.textContent.match(/(Hour|Minute|Day)/)) {
-            summaryP.classList.add('duration-summary');
-            summaryP.innerHTML = '<i class="fas fa-clock"></i> ' + formatDurationSummary();
-        }
-        
-        // Добавляем обработчики для live update summary
-        const inputs = durationWidget.querySelectorAll('input[type="number"]');
-        inputs.forEach(input => {
-            input.addEventListener('input', updateDurationSummary);
-        });
-    }
-    
-    function formatDurationSummary() {
-        const durationWidget = document.querySelector('.durationwidget');
-        const inputs = durationWidget.querySelectorAll('input[type="number"]');
-        
-        const days = parseInt(inputs[0]?.value || 0);
-        const hours = parseInt(inputs[1]?.value || 0);
-        const minutes = parseInt(inputs[2]?.value || 0);
-        
-        let parts = [];
-        
-        if (days > 0) {
-            const dayWord = days === 1 ? 'день' : (days < 5 ? 'дня' : 'дней');
-            parts.push(`${days} ${dayWord}`);
-        }
-        
-        if (hours > 0) {
-            const hourWord = hours === 1 ? 'час' : (hours < 5 ? 'часа' : 'часов');
-            parts.push(`${hours} ${hourWord}`);
-        }
-        
-        if (minutes > 0) {
-            const minWord = minutes === 1 ? 'минута' : (minutes < 5 ? 'минуты' : 'минут');
-            parts.push(`${minutes} ${minWord}`);
-        }
-        
-        return parts.length > 0 ? parts.join(' ') : 'Время не указано';
-    }
-    
-    function updateDurationSummary() {
-        const summaryP = document.querySelector('.durationwidget .duration-summary');
-        if (summaryP) {
-            summaryP.innerHTML = '<i class="fas fa-clock"></i> ' + formatDurationSummary();
-        }
-    }
-    
-    // Запускаем локализацию
-    localizeDurationWidget();
-});
-</script>
+<script src="{% static 'js/lab_detail.js' %}"></script>
+{% if object.lab_type == "COMPETITION" %}
+    <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
+    {{ simple_form.media.js }}
+{% endif %}
 
 {% endblock %}
