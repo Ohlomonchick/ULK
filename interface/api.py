@@ -10,7 +10,7 @@ from django.db.models import Q
 from datetime import timedelta, datetime
 from django.urls import reverse
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition
+from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 
@@ -307,6 +307,14 @@ def parse_request_data(request):
         raise
 
 
+def gey_lab_tasks(issue):
+    if issue.competition.lab.tasks_type == LabTasksType.CLASSIC:
+        tasks = [task.task_id for task in issue.competition.tasks.all()]
+    else:
+        tasks = [{'id': task.task_id, **task.json_config} for task in issue.competition.tasks.all()]
+    return tasks
+
+
 @api_view(['GET'])
 def start_lab(request):
     if request.method == 'GET':
@@ -318,7 +326,7 @@ def start_lab(request):
             return error_response
 
         response_data = {
-            "tasks": [task.task_id for task in issue.competition.tasks.all()]
+            "tasks": gey_lab_tasks(issue)
         }
         if hasattr(issue, 'user'):
             response_data["task"] = create_var_text(issue.user.last_name),

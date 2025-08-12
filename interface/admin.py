@@ -37,12 +37,60 @@ class LabLevelInline(admin.TabularInline):
 
 class LabTaskInline(admin.TabularInline):
     model = LabTask
-    extra = 1  # Shows one empty form by default
+    extra = 1
+    fields = ['task_id', 'description']  # Базовые поля по умолчанию
+    
+    formfield_overrides = {
+        JSONField: {
+            'widget': CustomJSONEditorWidget(width="100%", height="300px")
+        }
+    }
+    
+    def _get_parent_lab(self, request, obj=None):
+        """Получает родительский объект Lab различными способами"""
+        # Из сохраненной ссылки
+        if hasattr(self, 'parent_instance'):
+            return self.parent_instance
+        
+        # Из объекта LabTask
+        if obj and hasattr(obj, 'lab'):
+            return obj.lab
+            
+        # Из URL (для новых объектов)
+        if request and 'change' in request.path:
+            import re
+            match = re.search(r'/lab/(\d+)/change/', request.path)
+            if match:
+                try:
+                    from .models import Lab
+                    return Lab.objects.get(pk=int(match.group(1)))
+                except Lab.DoesNotExist:
+                    pass
+        
+        return None
+    
+    def get_fields(self, request, obj=None):
+        """Динамически определяет поля в зависимости от типа заданий Lab"""
+        parent_lab = self._get_parent_lab(request, obj)
+        base_fields = ['task_id', 'description']
+        
+        # Добавляем json_config только для JSON_CONFIGURED типа
+        if parent_lab and parent_lab.tasks_type == 'JSON_CONFIGURED':
+            base_fields.append('json_config')
+        
+        return base_fields
+    
+    def get_formset(self, request, obj=None, **kwargs):
+        """Сохраняет ссылку на родительский объект"""
+        if obj:
+            self.parent_instance = obj
+        return super().get_formset(request, obj, **kwargs)
 
 
 class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     form = LabForm
     summernote_fields = 'description'
+    list_display = ('name', 'lab_type', 'program', 'get_learning_years')
     formfield_overrides = {
         JSONField: {
             'widget': CustomJSONEditorWidget(width="50%", height="30vh")
@@ -53,8 +101,12 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     }
     inlines = [LabLevelInline, LabTaskInline]
 
+    def get_learning_years(self, obj):
+        return ", ".join(str(year) for year in obj.learning_years)
+    get_learning_years.short_description = 'Годы обучения'
+
     def get_fieldsets(self, request, obj=None):
-        base_fields = ('name', 'slug', 'description', 'platform', 'program', 'lab_type', 'learning_years', 'default_duration', 'cover', 'answer_flag')
+        base_fields = ('name', 'slug', 'description', 'platform', 'program', 'lab_type', 'learning_years', 'default_duration', 'tasks_type', 'cover', 'answer_flag')
         pnet_fields = ('NodesData', 'ConnectorsData', 'Connectors2CloudData', 'NetworksData')
 
         if obj and obj.platform == "PN":
@@ -73,6 +125,13 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         return form
+    
+    def get_formsets_with_inlines(self, request, obj=None):
+        # Передаем информацию о родительском объекте в inline-формы
+        for inline, formset in super().get_formsets_with_inlines(request, obj):
+            if obj and hasattr(inline, 'parent_instance'):
+                inline.parent_instance = obj
+            yield inline, formset
 
 
 class MyUserAdmin(UserAdmin):
@@ -252,8 +311,14 @@ class TeamCompetitionAdmin(CompetitionAdmin):
         qs = qs.filter(pk__in=TeamCompetition.objects.values_list('pk', flat=True))
         return qs
 
+
+class PlatoonAdmin(admin.ModelAdmin):
+    model = Platoon
+    list_display = ('number', 'learning_year')
+
+
 admin.site.register(Lab, LabModelAdmin)
-admin.site.register(Platoon, admin.ModelAdmin)
+admin.site.register(Platoon, PlatoonAdmin)
 admin.site.register(Competition, CompetitionAdmin)
 admin.site.register(User, MyUserAdmin)
 admin.site.register(Answers, admin.ModelAdmin)

@@ -193,3 +193,47 @@
 .hidden {
     display: none !important;
 }
+
+.clickable-box {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: thin solid darkslategray !important;
+    margin-bottom: 1rem;
+}
+
+.clickable-box:hover {
+    border: none !important;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    transform: translateY(-2px);
+}
+
+.clickable-box a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.clickable-box .title {
+    margin-bottom: 1.5rem;
+}
+
+.kkz-inner-box {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: thin solid gray !important;
+    margin-bottom: 1rem;
+}
+
+.kkz-inner-box:hover {
+    border: none !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.kkz-inner-box a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.kkz-inner-box .title {
+    margin-bottom: 0.75rem;
+}

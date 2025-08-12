@@ -3,6 +3,5 @@
 {% load static %}
 
 {% block content %}
-    <h1 class="title is-1">Прошедшие экзамены</h1>
-    {% include 'interface/_competition_list_partial.html' %}
+    {% include 'interface/_competition_list_partial.html' with list_title="Прошедшие работы" %}
 {% endblock %}

@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
     delete_lab_with_session_destroy, change_user_workspace, create_directory, get_user_workspace_relative_path
-from .validators import validate_top_level_array
+from .validators import validate_top_level_array, validate_lab_task_json_config
 from .config import *
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,11 @@ class LearningYear(models.IntegerChoices):
     THIRD = 3, "Третий"
 
 
+class LabTasksType(models.TextChoices):
+    CLASSIC = "CLASSIC", "Обычные"
+    JSON_CONFIGURED = "JSON_CONFIGURED", "C JSON-конфигурацией"
+
+
 class Lab(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField('Имя', max_length=255)
@@ -60,7 +65,8 @@ class Lab(models.Model):
     lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices, default=LabType.HW)
     learning_years = models.JSONField('Годы обучения', default=list, null=True, blank=True)
     default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=7))
-    
+    tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
+
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
     
@@ -124,6 +130,13 @@ class LabTask(models.Model):
     lab = models.ForeignKey(Lab, related_name="options", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
     task_id = models.CharField("Идентификатор задания", max_length=255, null=True)
     description = models.TextField("Описание задания", blank=True, null=True)
+    json_config = models.JSONField(
+        "Конфигурация задания", 
+        blank=True, 
+        null=True,
+        validators=[validate_lab_task_json_config],
+        help_text="JSON-конфигурация с полями: task_type ('input' или 'state'), answer, regex"
+    )
 
     class Meta:
         verbose_name = "Задание"

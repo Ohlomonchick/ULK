@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from interface.models import User, Lab, Competition, Competition2User, Answers, LabLevel, Team, TeamCompetition2Team, \
-    TeamCompetition
+    TeamCompetition, LabTask, LabTasksType
 from interface.api_utils import get_issue
 from django.http import JsonResponse
 from django.utils import timezone
@@ -591,3 +591,169 @@ class LabTypePriorityTests(TestCase):
         self.assertFalse(hasattr(issue, 'team'))
         self.assertEqual(issue.competition.lab.lab_type, 'PZ')
         self.assertEqual(issue.competition.lab.answer_flag, 'pz_flag')
+
+
+class LabTasksTypeTests(APITestCase):
+    """
+    Тесты для проверки работы с разными типами заданий: CLASSIC и JSON_CONFIGURED
+    """
+    
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create(username='testuser', pnet_login='pnetlogin', last_name='Doe')
+        self.url = reverse('interface_api:start-lab')
+
+    def test_classic_tasks_type(self):
+        """
+        Тест для проверки работы с CLASSIC типом заданий.
+        Должен возвращать простой список task_id.
+        """
+        # Создаем лабораторную работу с CLASSIC типом заданий
+        lab = Lab.objects.create(
+            name='Classic Lab',
+            tasks_type=LabTasksType.CLASSIC,
+            answer_flag='classic_flag'
+        )
+        
+        # Создаем соревнование
+        competition = Competition.objects.create(
+            lab=lab,
+            start=timezone.now(),
+            finish=timezone.now() + timedelta(days=1)
+        )
+        
+        # Создаем задания для лабораторной работы
+        task1 = LabTask.objects.create(
+            lab=lab,
+            task_id='task_1',
+            description='First task'
+        )
+        task2 = LabTask.objects.create(
+            lab=lab,
+            task_id='task_2',
+            description='Second task'
+        )
+        
+        # Добавляем задания к соревнованию
+        competition.tasks.add(task1, task2)
+        
+        # Создаем участие пользователя в соревновании
+        issue = Competition2User.objects.create(
+            competition=competition,
+            user=self.user
+        )
+        
+        # Выполняем запрос
+        request_data = {
+            "username": "testuser",
+            "lab": "Classic Lab"
+        }
+        response = self.client.generic(
+            method='GET',
+            path=self.url,
+            data=json.dumps(request_data),
+            content_type='application/json'
+        )
+        
+        # Проверяем результат
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        # Проверяем структуру ответа
+        self.assertIn("tasks", data)
+        self.assertIn("flag", data)
+        self.assertIn("type", data)
+        
+        # Для CLASSIC типа tasks должен быть простым списком строк
+        self.assertEqual(data["tasks"], ['task_1', 'task_2'])
+        self.assertEqual(data["flag"], 'classic_flag')
+
+    def test_json_configured_tasks_type(self):
+        """
+        Тест для проверки работы с JSON_CONFIGURED типом заданий.
+        Должен возвращать список объектов с id и json_config.
+        """
+        # Создаем лабораторную работу с JSON_CONFIGURED типом заданий
+        lab = Lab.objects.create(
+            name='JSON Lab',
+            tasks_type=LabTasksType.JSON_CONFIGURED,
+            answer_flag='json_flag'
+        )
+        
+        # Создаем соревнование
+        competition = Competition.objects.create(
+            lab=lab,
+            start=timezone.now(),
+            finish=timezone.now() + timedelta(days=1)
+        )
+        
+        # Создаем задания с JSON-конфигурацией
+        task1 = LabTask.objects.create(
+            lab=lab,
+            task_id='json_task_1',
+            description='First JSON task',
+            json_config={
+                'task_type': 'input',
+                'answer': 'correct_answer_1',
+                'regex': r'^correct_answer_1$'
+            }
+        )
+        task2 = LabTask.objects.create(
+            lab=lab,
+            task_id='json_task_2',
+            description='Second JSON task',
+            json_config={
+                'task_type': 'state',
+                'answer': 'state_value',
+                'regex': r'^state_\w+$'
+            }
+        )
+        
+        # Добавляем задания к соревнованию
+        competition.tasks.add(task1, task2)
+        
+        # Создаем участие пользователя в соревновании
+        issue = Competition2User.objects.create(
+            competition=competition,
+            user=self.user
+        )
+        
+        # Выполняем запрос
+        request_data = {
+            "username": "testuser",
+            "lab": "JSON Lab"
+        }
+        response = self.client.generic(
+            method='GET',
+            path=self.url,
+            data=json.dumps(request_data),
+            content_type='application/json'
+        )
+        
+        # Проверяем результат
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        # Проверяем структуру ответа
+        self.assertIn("tasks", data)
+        self.assertIn("flag", data)
+        self.assertIn("type", data)
+        
+        # Для JSON_CONFIGURED типа tasks должен быть списком объектов
+        expected_tasks = [
+            {
+                'id': 'json_task_1',
+                'task_type': 'input',
+                'answer': 'correct_answer_1',
+                'regex': r'^correct_answer_1$'
+            },
+            {
+                'id': 'json_task_2',
+                'task_type': 'state',
+                'answer': 'state_value',
+                'regex': r'^state_\w+$'
+            }
+        ]
+        
+        self.assertEqual(data["tasks"], expected_tasks)
+        self.assertEqual(data["flag"], 'json_flag')
