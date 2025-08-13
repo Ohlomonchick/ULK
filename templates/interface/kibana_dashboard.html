@@ -1,0 +1,41 @@
+{% extends 'interface/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/competition_detail.css' %}">
+    <style>
+        /* Override default hero-body padding for all screen sizes */
+        .hero-body-style {
+            padding: 0 !important;
+        }
+        
+        /* Specifically target the media query styles */
+        @media screen and (min-width: 769px), print {
+            .hero-body-style {
+                padding: 0 !important;
+            }
+        }
+        
+        /* Additional fallback for any hero-body within this page */
+        .hero-body {
+            padding: 0 !important;
+        }
+    </style>
+{% endblock %}
+
+{% block hero_class %}hero-body-style{% endblock %}
+{% block container_class %}container-full-width{% endblock %}
+
+{% block content %}
+<iframe 
+    id="kibanaFrame"
+    style="aspect-ratio: 16/9;"
+    src="/kibana/" 
+    width="100%"
+    class="mb-5"
+    height="100%"
+    frameborder="0">
+</iframe>
+
+<script src="{% static 'js/kibana_controller.js' %}"></script>
+{% endblock %}
