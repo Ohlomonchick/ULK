@@ -96,7 +96,7 @@
         {% endblock %}
 
         <section class="hero is-flex-grow-1">
-            <div class="hero-body is-flex-grow-1 is-flex is-align-items-center">
+            <div class="hero-body is-flex-grow-1 is-flex is-align-items-center {% block hero_class %}{% endblock %}">
                 <div class="container is-flex-grow-1 {% block container_class %}{% endblock %}">
                     {% block content %}
                     {% endblock %}
