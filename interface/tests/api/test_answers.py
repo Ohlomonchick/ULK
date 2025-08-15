@@ -253,4 +253,84 @@ class AnswerSerializerTests(TestCase):
         self.assertEqual(answer.team, team)
         self.assertIsNone(answer.user)
 
+    def test_multiple_answers_for_one_competition(self):
+        """
+        Test that multiple answers can be created for different tasks within the same competition.
+        """
+        # Create additional lab tasks for the same lab
+        lab_task2 = LabTask.objects.create(
+            lab=self.lab,
+            task_id="check2",
+            description="Task 2 description"
+        )
+        lab_task3 = LabTask.objects.create(
+            lab=self.lab,
+            task_id="3", 
+            description="Task 3 description"
+        )
+        
+        # Create answers for different tasks
+        data_task1 = {
+            "lab": self.lab.name,
+            "pnet_login": "user1",
+            "task": "1"
+        }
+        data_task2 = {
+            "lab": self.lab.name,
+            "pnet_login": "user1", 
+            "task": "check2"
+        }
+        data_task3 = {
+            "lab": self.lab.name,
+            "pnet_login": "user1",
+            "task": "3"
+        }
+        
+        # Create answers using serializer
+        serializer1 = AnswerSerializer(data=data_task1)
+        self.assertTrue(serializer1.is_valid(), serializer1.errors)
+        answer1 = serializer1.save()
+        
+        serializer2 = AnswerSerializer(data=data_task2)
+        self.assertTrue(serializer2.is_valid(), serializer2.errors)
+        answer2 = serializer2.save()
+        
+        serializer3 = AnswerSerializer(data=data_task3)
+        self.assertTrue(serializer3.is_valid(), serializer3.errors)
+        answer3 = serializer3.save()
+        
+        # Verify that all answers were created for the same user and lab
+        self.assertEqual(answer1.user, self.user_by_pnet)
+        self.assertEqual(answer2.user, self.user_by_pnet)
+        self.assertEqual(answer3.user, self.user_by_pnet)
+        
+        self.assertEqual(answer1.lab, self.lab)
+        self.assertEqual(answer2.lab, self.lab)
+        self.assertEqual(answer3.lab, self.lab)
+        
+        # Verify that each answer has a different lab_task
+        self.assertEqual(answer1.lab_task, self.lab_task)
+        self.assertEqual(answer2.lab_task, lab_task2)
+        self.assertEqual(answer3.lab_task, lab_task3)
+        
+        # Verify that all answers are different objects
+        self.assertNotEqual(answer1.pk, answer2.pk)
+        self.assertNotEqual(answer1.pk, answer3.pk)
+        self.assertNotEqual(answer2.pk, answer3.pk)
+        
+        # Verify that all answers are linked to the same competition through the user
+        self.assertEqual(answer1.user, answer2.user)
+        self.assertEqual(answer2.user, answer3.user)
+        
+        # Check that we can query all answers for this user in this competition
+        user_answers = Answers.objects.filter(
+            user=self.user_by_pnet,
+            lab=self.lab
+        )
+        self.assertEqual(user_answers.count(), 3)
+        
+        # Verify that all answers have different timestamps (they were created at different times)
+        timestamps = [answer.datetime for answer in user_answers]
+        self.assertEqual(len(set(timestamps)), 3)  # All timestamps should be unique 
+
     

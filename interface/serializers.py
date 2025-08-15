@@ -7,7 +7,7 @@ from .api_utils import get_issue
 class AnswerSerializer(serializers.ModelSerializer):
     pnet_login = serializers.CharField(write_only=True, required=False)
     user = serializers.CharField(write_only=True, required=False)
-    task = serializers.IntegerField(write_only=True, required=False)
+    task = serializers.CharField(write_only=True, required=False)
     lab_slug = serializers.CharField(write_only=True, required=False)
     lab = serializers.CharField(required=False)
 
@@ -44,7 +44,7 @@ class AnswerSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        lab_task_number = validated_data.pop('task', None)
+        lab_task_number = str(validated_data.pop('task', None)) if validated_data.get('task') else None
         issue = validated_data.pop('issue', None)
         lab_instance = issue.competition.lab
         datetime = timezone.now()
