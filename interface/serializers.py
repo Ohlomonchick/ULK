@@ -13,7 +13,7 @@ class AnswerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Answers
-        fields = ("user", "lab", "datetime", "pnet_login", "task", "lab_slug")
+        fields = ("user", "lab", "pnet_login", "task", "lab_slug")
 
     def validate(self, attrs):
         # Validate that either pnet_login or user is provided
@@ -47,6 +47,7 @@ class AnswerSerializer(serializers.ModelSerializer):
         lab_task_number = validated_data.pop('task', None)
         issue = validated_data.pop('issue', None)
         lab_instance = issue.competition.lab
+        datetime = timezone.now()
         
         if lab_task_number:
             try:
@@ -64,14 +65,14 @@ class AnswerSerializer(serializers.ModelSerializer):
                 team=issue.team,
                 lab=lab_instance,
                 lab_task=task,
-                defaults={'datetime': validated_data.get('datetime')}
+                defaults={'datetime': datetime}
             )
         else:
             answers_instance, created = Answers.objects.update_or_create(
                 user=issue.user,
                 lab=lab_instance,
                 lab_task=task,
-                defaults={'datetime': validated_data.get('datetime')}
+                defaults={'datetime': datetime}
             )
         return answers_instance
 
