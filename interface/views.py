@@ -452,6 +452,6 @@ def change_password(request):  # pragma: no cover
     return render(request, 'registration/change_password.html', {'form': form})
 
 
-class AnswerAPIView(LoginRequiredMixin, viewsets.ModelViewSet):
+class AnswerAPIView(LoginRequiredMixin):
     queryset = Answers.objects.all()
     serializer_class = AnswerSerializer

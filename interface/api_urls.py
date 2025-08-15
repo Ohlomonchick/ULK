@@ -3,7 +3,7 @@ from .views import AnswerAPIView
 from .api import *
 
 urlpatterns = [
-    path("answers", AnswerAPIView.as_view({'get': 'list', 'post': 'create'})),
+    path("answers", AnswerAPIView.as_view({'get': 'list', 'post': 'create'}), name='answer-list'),
     path("start", start_lab, name='start-lab'),
     path("end", end_lab, name='end-lab'),
     path('get_competition_time/<int:competition_id>/', get_time, name='get_time'),

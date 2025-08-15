@@ -256,3 +256,43 @@ class AnswerSerializerTests(TestCase):
         # The answer should be associated with the team, not the user.
         self.assertEqual(answer.team, team)
         self.assertIsNone(answer.user)
+
+    def test_api_answers_post_request(self):
+        """
+        Test that POST request to /api/answers endpoint works correctly.
+        """
+        from django.urls import reverse
+        from rest_framework.test import APIClient
+        from rest_framework import status
+        import json
+        
+        client = APIClient()
+        
+        # Test data for POST request
+        post_data = {
+            "lab": self.lab.name,
+            "datetime": self.valid_datetime.isoformat(),
+            "pnet_login": "user1",
+            "task": "1"
+        }
+        
+        # Make POST request to /api/answers
+        url = reverse('interface_api:answer-list')
+        response = client.post(url, post_data, format='json')
+        
+        # Check that the request was successful
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Verify that an Answers object was created
+        answer = Answers.objects.filter(
+            user=self.user_by_pnet,
+            lab=self.lab,
+            lab_task=self.lab_task
+        ).first()
+        
+        self.assertIsNotNone(answer)
+        self.assertEqual(answer.user, self.user_by_pnet)
+        self.assertEqual(answer.lab, self.lab)
+        self.assertEqual(answer.lab_task, self.lab_task)
+
+    
