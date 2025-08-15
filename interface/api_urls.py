@@ -13,4 +13,5 @@ urlpatterns = [
     path('check_availability/<slug:slug>/', check_availability, name='check_availability'),
     path('check_updates/', check_updates, name='check_updates'),
     path('get_users_in_platoons/', get_users_in_platoons, name='get_users_in_platoons'),
+    path('get_competition_solutions/<slug:slug>/', get_solutions, name='get_solutions'),
 ]

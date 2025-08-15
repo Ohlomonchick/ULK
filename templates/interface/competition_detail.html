@@ -328,7 +328,7 @@
 
             // Make an AJAX GET request to fetch the remaining time
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', '{% url 'get_time' competition_id=object.id %}', true);
+            xhr.open('GET', '{% url 'interface_api:get_time' competition_id=object.id %}', true);
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4 && xhr.status === 200) {
                     var response = JSON.parse(xhr.responseText);
