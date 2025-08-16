@@ -176,6 +176,7 @@ class User(AbstractUser):
                                 verbose_name="взвод",
                                 null=True)
     pnet_login = models.CharField('Имя в Pnet', max_length=255, primary_key=False, null=True, blank=True)
+    pnet_password = models.CharField('Пароль в Pnet', max_length=255, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.pk:
