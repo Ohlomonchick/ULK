@@ -1,4 +1,7 @@
 import json
+import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from django.core.cache import cache
 from rest_framework.decorators import api_view
@@ -9,10 +12,13 @@ from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta, datetime
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
+
 
 from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
+from .config import get_web_url
 
 
 @api_view(['GET'])
@@ -358,6 +364,64 @@ def end_lab(request):
             ans.save()
 
         return JsonResponse({'message': 'Task finished'})
+
+
+@csrf_exempt
+@api_view(['POST'])
+def get_pnet_auth(request):
+    """Аутентифицирует пользователя в PNET и возвращает cookies"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+    
+    user = request.user
+    if not user.pnet_login or not user.pnet_password:
+        return JsonResponse({'error': 'User PNET credentials not configured'}, status=400)
+    
+    try:
+        pnet_url = f"{get_web_url()}/pnetlab"
+        session = requests.Session()
+        session.verify = False
+        
+        # Получаем XSRF-TOKEN
+        preflight_response = session.get(f"{pnet_url}/store/public/auth/login/login", timeout=10)
+        if preflight_response.status_code not in [200, 202]:
+            return JsonResponse({'error': 'Failed to connect to PNET'}, status=500)
+        
+        xsrf_token = session.cookies.get('XSRF-TOKEN', '')
+        
+        # Аутентификация
+        headers = {'Content-Type': 'application/json;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest'}
+        if xsrf_token:
+            headers['X-XSRF-TOKEN'] = xsrf_token
+            
+        login_response = session.post(
+            f"{pnet_url}/store/public/auth/login/login",
+            headers=headers,
+            json={'username': user.pnet_login, 'password': user.pnet_password, 'html': '1', 'captcha': ''},
+            timeout=10
+        )
+        
+        if login_response.status_code not in [200, 201, 202]:
+            return JsonResponse({'error': 'PNET authentication failed'}, status=401)
+        
+        # Проверка JSON ответа для статуса 202
+        if login_response.status_code == 202:
+            try:
+                if not login_response.json().get('result', False):
+                    return JsonResponse({'error': 'PNET authentication failed'}, status=401)
+            except (ValueError, KeyError):
+                pass  # Продолжаем, возможно cookies установлены
+        
+        # Возвращаем cookies
+        cookies_dict = {cookie.name: cookie.value for cookie in session.cookies}
+        return JsonResponse({'success': True, 'cookies': cookies_dict, 'xsrf_token': xsrf_token})
+        
+    except requests.exceptions.Timeout:
+        return JsonResponse({'error': 'PNET request timeout'}, status=500)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({'error': 'Failed to connect to PNET'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Authentication error: {str(e)}'}, status=500)
 
 
 

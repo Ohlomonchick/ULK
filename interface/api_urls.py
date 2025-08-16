@@ -14,4 +14,5 @@ urlpatterns = [
     path('check_updates/', check_updates, name='check_updates'),
     path('get_users_in_platoons/', get_users_in_platoons, name='get_users_in_platoons'),
     path('get_competition_solutions/<slug:slug>/', get_solutions, name='get_solutions'),
+    path('get_pnet_auth/', get_pnet_auth, name='get_pnet_auth'),
 ]

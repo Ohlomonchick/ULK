@@ -20,3 +20,8 @@ def get_pnet_base_dir():
         return get_config(
             'PNET_BASE_DIR', os.environ.get('PNET_BASE_DIR', '/Practice work/Test_Labs/api_test_dir')
         )
+
+
+def get_web_url():
+    """Возвращает URL для внутренних запросов к nginx/веб-серверу"""
+    return get_config('WEB_URL', 'http://127.0.0.1:80')

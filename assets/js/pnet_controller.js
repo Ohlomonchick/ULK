@@ -3,35 +3,66 @@
     // Всегда просим HTML-консоль
     localStorage.setItem('html_console_mode', '1');
 
-    // 1) Префлайт, чтобы получить XSRF-TOKEN + сессию
-    await fetch('/store/public/auth/login/login', { method: 'GET', credentials: 'include' }).catch(()=>{});
+    try {
+        // 1) Получаем CSRF токен Django для нашего API
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                         document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+                         getCookie('csrftoken');
 
-    // 2) Достаём XSRF-TOKEN из cookie
-    const xsrf = decodeURIComponent(
-    (document.cookie.split('; ').find(r => r.startsWith('XSRF-TOKEN=')) || '').split('=')[1] || ''
-    );
+        // 2) Аутентифицируемся через наш API
+        const authResponse = await fetch('/api/get_pnet_auth/', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
 
-    // 3) Логинимся
-    const res = await fetch('/store/public/auth/login/login', {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-        'Content-Type': 'application/json;charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-XSRF-TOKEN': xsrf
-    },
-    body: JSON.stringify({
-        username: 'admin',
-        password: 'pnet',
-        html: '1',     // <<--- ключевая правка
-        captcha: ''
-    })
-    });
+        if (!authResponse.ok) {
+            const errorData = await authResponse.json().catch(() => ({}));
+            console.error('PNET authentication failed:', errorData.error || 'Unknown error');
+            return;
+        }
 
-    const data = await res.json().catch(() => ({}));
-    const iframe = document.getElementById('pnetFrame');
-    iframe.src = '/pnetlab/?t=' + Date.now(); // перезагрузим iframe уже авторизованным
+        const authData = await authResponse.json();
+        
+        // 3) Устанавливаем полученные cookies
+        if (authData.success && authData.cookies) {
+            Object.entries(authData.cookies).forEach(([name, value]) => {
+                document.cookie = `${name}=${value}; path=/; SameSite=Lax`;
+            });
+            
+            if (authData.xsrf_token) {
+                document.cookie = `XSRF-TOKEN=${authData.xsrf_token}; path=/; SameSite=Lax`;
+            }
+        }
+
+        // 4) Перезагружаем iframe с аутентифицированной сессией
+        const iframe = document.getElementById('pnetFrame');
+        iframe.src = '/pnetlab/?t=' + Date.now();
+        
+    } catch (error) {
+        console.error('Error during PNET authentication:', error);
+    }
 })();
+
+// Вспомогательная функция для получения cookie
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 
 // Функция для установки обработчика контроля location
 function setupIframeLocationControl(iframeElement) {
