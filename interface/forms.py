@@ -68,7 +68,16 @@ class SignUpForm(forms.ModelForm):  # pragma: no cover
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['platoon'].queryset = Platoon.objects.filter(number__gt=0)
+        platoons = Platoon.objects.all().order_by('number')
+        choices = []
+        for platoon in platoons:
+            if platoon.number == 0:
+                choices.append((platoon.id, "Вход без взвода"))
+            else:
+                choices.append((platoon.id, f"Взвод {platoon.number}"))
+        
+        self.fields['platoon'].choices = choices
+        self.fields['platoon'].required = False
         for name in self.fields.keys():
             self.fields[name].widget.attrs['autocomplete'] = 'off'
 
@@ -91,6 +100,14 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
         self.fields['password2'].required = False
         for name in self.fields.keys():
             self.fields[name].widget.attrs['autocomplete'] = 'off'
+        platoons = Platoon.objects.all().order_by('number')
+        choices = []
+        for platoon in platoons:
+            if platoon.number == 0:
+                choices.append((platoon.id, "Пользователь без взвода"))
+            else:
+                choices.append((platoon.id, f"Взвод {platoon.number}"))
+        self.fields['platoon'].choices = choices
 
     class Meta:
         model = User
@@ -109,12 +126,13 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
             user.username = user.last_name + "_" + user.first_name
         user.save()
         url = get_pnet_url()
-        Login = 'pnet_scripts'
-        Pass = 'eve'
-        cookie, xsrf = pf_login(url, Login, Pass)
-        create_directory(url, get_pnet_base_dir(), user.username, cookie)
-        create_user(url, user.username, password, '1', cookie)
-        logout(url)
+        if url:
+            Login = 'pnet_scripts'
+            Pass = 'eve'
+            cookie, xsrf = pf_login(url, Login, Pass)
+            create_directory(url, get_pnet_base_dir(), user.username, cookie)
+            create_user(url, user.username, password, '1', cookie)
+            logout(url)
 
         return user
 
@@ -404,7 +422,7 @@ class SimpleCompetitionForm(forms.Form):
         )
         self.fields["users"] = forms.ModelMultipleChoiceField(
             label="Отдельные пользователи",
-            queryset=User.objects.filter(platoon__number__gt=0),
+            queryset=User.objects.filter(platoon__number__gt=0) if self.lab.lab_type != LabType.COMPETITION else User.objects.all(),
             required=False,
             widget=UserWidget,
             help_text="Выберите отдельных пользователей для участия в соревновании"

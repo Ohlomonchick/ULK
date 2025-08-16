@@ -408,9 +408,12 @@ class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):  # pr
 def registration(request):  # pragma: no cover
     if request.method == 'POST':
         form = SignUpForm(request.POST)
-        platoon = int(request.POST.get('platoon'))
-        platoon = Platoon.objects.get(id=platoon)
-        form.platoon = platoon
+        platoon_id = request.POST.get('platoon')
+        if platoon_id:
+            platoon = Platoon.objects.get(id=int(platoon_id))
+            form.platoon = platoon
+        else:
+            platoon = None
         if form.is_valid():
             usname = request.POST.get('last_name') + "_" + request.POST.get('first_name')
             passwd = request.POST.get('password')
