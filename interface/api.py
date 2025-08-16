@@ -412,9 +412,26 @@ def get_pnet_auth(request):
             except (ValueError, KeyError):
                 pass  # Продолжаем, возможно cookies установлены
         
-        # Возвращаем cookies
+        # Возвращаем cookies и устанавливаем их в ответе
         cookies_dict = {cookie.name: cookie.value for cookie in session.cookies}
-        return JsonResponse({'success': True, 'cookies': cookies_dict, 'xsrf_token': xsrf_token})
+        response = JsonResponse({'success': True, 'cookies': cookies_dict, 'xsrf_token': xsrf_token})
+        
+        # Устанавливаем cookies в HTTP-ответе для автоматической синхронизации
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        for cookie in session.cookies:
+            logger.info(f"Setting cookie {cookie.name}={cookie.value} domain={cookie.domain} path={cookie.path}")
+            response.set_cookie(
+                cookie.name,
+                cookie.value,
+                path='/',  # Принудительно устанавливаем корневой путь
+                secure=False,  # Отключаем secure для HTTP
+                httponly=False,  # Разрешаем JavaScript доступ
+                samesite='Lax'
+            )
+        
+        return response
         
     except requests.exceptions.Timeout:
         return JsonResponse({'error': 'PNET request timeout'}, status=500)

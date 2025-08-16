@@ -1,15 +1,13 @@
 
-(async () => {
-    // Всегда просим HTML-консоль
+// Функция аутентификации в PNET
+async function authenticatePNET() {
     localStorage.setItem('html_console_mode', '1');
 
     try {
-        // 1) Получаем CSRF токен Django для нашего API
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
                          document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
                          getCookie('csrftoken');
 
-        // 2) Аутентифицируемся через наш API
         const authResponse = await fetch('/api/get_pnet_auth/', {
             method: 'POST',
             credentials: 'include',
@@ -23,30 +21,44 @@
         if (!authResponse.ok) {
             const errorData = await authResponse.json().catch(() => ({}));
             console.error('PNET authentication failed:', errorData.error || 'Unknown error');
-            return;
+            return false;
         }
 
         const authData = await authResponse.json();
         
-        // 3) Устанавливаем полученные cookies
-        if (authData.success && authData.cookies) {
-            Object.entries(authData.cookies).forEach(([name, value]) => {
-                document.cookie = `${name}=${value}; path=/; SameSite=Lax`;
-            });
-            
-            if (authData.xsrf_token) {
-                document.cookie = `XSRF-TOKEN=${authData.xsrf_token}; path=/; SameSite=Lax`;
-            }
+        if (authData.success) {
+            console.log('PNET authentication successful');
+            return true;
         }
-
-        // 4) Перезагружаем iframe с аутентифицированной сессией
-        const iframe = document.getElementById('pnetFrame');
-        iframe.src = '/pnetlab/?t=' + Date.now();
         
     } catch (error) {
         console.error('Error during PNET authentication:', error);
     }
-})();
+    return false;
+}
+
+// Инициализируем iframe после аутентификации
+async function initializePNETFrame() {
+    const iframe = document.getElementById('pnetFrame');
+    if (!iframe) return;
+
+    // Аутентифицируемся и загружаем iframe
+    const authSuccess = await authenticatePNET();
+    if (authSuccess) {
+        // Устанавливаем src только после успешной аутентификации
+        const targetSrc = iframe.getAttribute('data-src');
+        if (targetSrc) {
+            iframe.src = targetSrc + '?t=' + Date.now();
+        }
+    }
+}
+
+// Запускаем после загрузки DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializePNETFrame);
+} else {
+    initializePNETFrame();
+}
 
 // Вспомогательная функция для получения cookie
 function getCookie(name) {
@@ -108,7 +120,6 @@ function setupIframeLocationControl(iframeElement) {
 $(document).ready(function() {
     let isFullscreen = false;
     let originalIframeStyles = null;
-    let originalIframePosition = null;
     
     // Устанавливаем контроль location для исходного iframe
     const originalIframe = document.getElementById('pnetFrame');
@@ -121,10 +132,13 @@ $(document).ready(function() {
         
         const iframe = $('#pnetFrame');
         const iframeContainer = $('.iframe-container');
-        const contentContainer = $('.columns.is-centered').last();
-        const titleContainer = $('.columns.is-centered').first();
         
+        // Сохраняем оригинальные стили
         originalIframeStyles = {
+            position: iframe.css('position'),
+            top: iframe.css('top'),
+            left: iframe.css('left'),
+            zIndex: iframe.css('z-index'),
             height: iframe.css('height'),
             width: iframe.css('width'),
             marginBottom: iframe.css('margin-bottom'),
@@ -133,27 +147,12 @@ $(document).ready(function() {
             border: iframe.css('border')
         };
         
-        // Сохраняем оригинальную позицию для возврата
-        originalIframePosition = {
-            parent: iframeContainer.parent(),
-            nextSibling: iframeContainer.next()
-        };
-        
-        // Безопасно перемещаем контейнер без перезагрузки iframe
-        const clonedContainer = iframeContainer.clone(true);
-        iframeContainer.replaceWith(clonedContainer);
-        clonedContainer.appendTo('body');
-        clonedContainer.addClass('iframe-moved-up');
-        
-        // Обновляем ссылки на элементы после клонирования
-        const newIframe = clonedContainer.find('#pnetFrame');
-        const newExpandBtn = clonedContainer.find('#expandIframeBtn');
-        
-        // Переустанавливаем обработчик load для контроля location
-        setupIframeLocationControl(newIframe[0]);
-        
-        newIframe.addClass('iframe-fullscreen');
-        newIframe.css({
+        // Переводим iframe в полноэкранный режим
+        iframe.css({
+            'position': 'fixed',
+            'top': '0',
+            'left': '0',
+            'z-index': '9999',
             'height': '100vh',
             'width': '100vw',
             'margin-bottom': '0',
@@ -164,16 +163,9 @@ $(document).ready(function() {
         
         $('#iframeOverlay').fadeIn(300);
         $('#collapseIframeBtn').fadeIn(300);
-        newExpandBtn.fadeOut(200);
-        
-        contentContainer.addClass('content-collapsed');
-        titleContainer.addClass('content-collapsed');
+        $('#expandIframeBtn').fadeOut(200);
         
         $('body, html').addClass('iframe-fullscreen-active');
-        
-        $('html, body').animate({
-            scrollTop: iframe.offset().top
-        }, 500);
         
         isFullscreen = true;
     }
@@ -181,15 +173,15 @@ $(document).ready(function() {
     function collapseIframe() {
         if (!isFullscreen) return;
         
-        const iframeContainer = $('.iframe-container.iframe-moved-up');
-        const iframe = iframeContainer.find('#pnetFrame');
-        const contentContainer = $('.columns.is-centered').last();
-        const titleContainer = $('.columns.is-centered').first();
+        const iframe = $('#pnetFrame');
         
-        iframe.removeClass('iframe-fullscreen');
-        
+        // Восстанавливаем оригинальные стили
         if (originalIframeStyles) {
             iframe.css({
+                'position': originalIframeStyles.position,
+                'top': originalIframeStyles.top,
+                'left': originalIframeStyles.left,
+                'z-index': originalIframeStyles.zIndex,
                 'height': originalIframeStyles.height,
                 'width': originalIframeStyles.width,
                 'margin-bottom': originalIframeStyles.marginBottom,
@@ -201,32 +193,9 @@ $(document).ready(function() {
         
         $('#iframeOverlay').fadeOut(300);
         $('#collapseIframeBtn').fadeOut(300);
-        
-        iframeContainer.removeClass('iframe-moved-up');
-        
-        // Безопасно возвращаем контейнер на оригинальное место
-        if (originalIframePosition) {
-            iframeContainer.prependTo(originalIframePosition.parent);
-        } else {
-            iframeContainer.prependTo(contentContainer.find('.column.is-three-quarters'));
-        }
-        
-        // Обновляем ссылку на кнопку разворачивания
-        const newExpandBtn = iframeContainer.find('#expandIframeBtn');
-        newExpandBtn.fadeIn(200);
-        
-        // Переустанавливаем обработчик load для контроля location после возврата
-        const returnedIframe = iframeContainer.find('#pnetFrame')[0];
-        setupIframeLocationControl(returnedIframe);
-        
-        contentContainer.removeClass('content-collapsed');
-        titleContainer.removeClass('content-collapsed');
+        $('#expandIframeBtn').fadeIn(200);
         
         $('body, html').removeClass('iframe-fullscreen-active');
-        
-        $('html, body').animate({
-            scrollTop: 0
-        }, 500);
         
         isFullscreen = false;
     }
