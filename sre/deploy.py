@@ -4,13 +4,14 @@ from jinja2 import Template
 
 # Configuration dictionary - общий контекст для всех шаблонов
 context = {
-    'ip': f'{os.environ.get("NGINX_IP", "192.168.100.10")}:80',
+    'ip': os.environ.get("NGINX_IP", "192.168.100.10"),
     'workdir': os.environ.get('WORKDIR', os.getcwd()),
     'run_script': os.path.abspath('run_prod.sh'),
     'scheduler_script': os.path.abspath('run_scheduler.sh'),
     'gunicorn_conf': os.path.abspath('gunicorn.conf.py'),
     'use_postgres': os.environ.get('USE_POSTGRES', 'yes'),
     'db_host': os.environ.get('DB_HOST', '192.168.100.5'),
+    'pnet_ip': os.environ.get('PNET_IP', '192.168.100.10'),
     'user': 'root',
     'group': 'root',
     'log_dir': '/var/log',

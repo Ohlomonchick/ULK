@@ -15,6 +15,7 @@ export USE_POSTGRES=no
 export DB_HOST=192.168.100.5
 # export NGINX_IP=192.168.100.10
 export NGINX_IP=127.0.0.1
+export PNET_IP=192.168.1.10
 export WORKDIR="$PROJECT_ROOT"
 
 sudo -E python3 deploy.py

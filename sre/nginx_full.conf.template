@@ -31,7 +31,7 @@ http {
 
     # Можно так удобнее
     upstream pnetlab {
-        server 192.168.1.8;
+        server {{ pnet_ip }};
     }
 
     upstream django {
@@ -92,8 +92,8 @@ http {
             proxy_cookie_path   /    /;
 
             # Редиректы с апстрима на наш префикс
-            proxy_redirect http://192.168.1.8/  /pnetlab/;
-            proxy_redirect https://192.168.1.8/ /pnetlab/;
+            proxy_redirect http://{{ pnet_ip }}/  /pnetlab/;
+            proxy_redirect https://{{ pnet_ip }}/ /pnetlab/;
 
             # sub_filter будет работать только при незжатом ответе
             proxy_set_header Accept-Encoding "";
@@ -102,10 +102,10 @@ http {
             sub_filter_types text/html text/css application/javascript application/json;
 
             # Сносим абсолюты на IP -> делаем относительными
-            sub_filter 'http://192.168.1.8/'  '/';
-            sub_filter 'https://192.168.1.8/' '/';
-            sub_filter 'src="//192.168.1.8/'  'src="/';
-            sub_filter 'href="//192.168.1.8/' 'href="/';
+            sub_filter 'http://{{ pnet_ip }}/'  '/';
+            sub_filter 'https://{{ pnet_ip }}/' '/';
+            sub_filter 'src="//{{ pnet_ip }}/'  'src="/';
+            sub_filter 'href="//{{ pnet_ip }}/' 'href="/';
 
             # Не добавляй сюда CORS — он не нужен при same-origin
         }
@@ -126,15 +126,15 @@ http {
             proxy_cookie_path   /    /;
 
             # Здесь редиректы можно оставлять в корень
-            proxy_redirect http://192.168.1.8/  /;
-            proxy_redirect https://192.168.1.8/ /;
+            proxy_redirect http://{{ pnet_ip }}/  /;
+            proxy_redirect https://{{ pnet_ip }}/ /;
 
             proxy_set_header Accept-Encoding "";
 
             sub_filter_once off;
             sub_filter_types text/html text/css application/javascript application/json;
-            sub_filter 'http://192.168.1.8/'  '/';
-            sub_filter 'https://192.168.1.8/' '/';
+            sub_filter 'http://{{ pnet_ip }}/'  '/';
+            sub_filter 'https://{{ pnet_ip }}/' '/';
         }
 
         # Статические файлы Django
@@ -152,9 +152,6 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-
-            # Включаем передачу тела запроса
-            proxy_pass_request_body on;
         }
 
         #error_page  404              /404.html;
