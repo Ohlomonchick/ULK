@@ -1,7 +1,7 @@
 #!/bin/bash
 export PROD=True
-export USE_POSTGRES=no
-export DB_HOST=192.168.100.5
+export USE_POSTGRES={{ use_postgres }}
+export DB_HOST={{ db_host }}
 
 #source /mnt/c/Users/Dmitry/PycharmProjects/Cyberpolygon/polygon_linux/bin/activate
 

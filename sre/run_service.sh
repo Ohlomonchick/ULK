@@ -1,14 +1,29 @@
 #!/bin/bash
+
+# Nginx configuration: теперь используется полная конфигурация nginx вместо sites-available
+# Конфигурация генерируется из nginx_full.conf.template и копируется в /etc/nginx/nginx.conf
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+dos2unix -r "$SCRIPT_DIR"
+cd "$SCRIPT_DIR"
+
 export PROD=True
-export USE_POSTGRES=yes
+export USE_POSTGRES=no
 export DB_HOST=192.168.100.5
-sudo python3 deploy.py
+# export NGINX_IP=192.168.100.10
+export NGINX_IP=127.0.0.1
+export WORKDIR="$PROJECT_ROOT"
+
+sudo -E python3 deploy.py
 chmod 755 run_prod.sh
 chmod 755 run_scheduler.sh
 
-python3 ../manage.py collectstatic --noinput
-python3 ../manage.py makemigrations --noinput
-python3 ../manage.py migrate --noinput
+python3 "$PROJECT_ROOT/manage.py" collectstatic --noinput
+python3 "$PROJECT_ROOT/manage.py" makemigrations --noinput
+python3 "$PROJECT_ROOT/manage.py" migrate --noinput
 
 sudo rm -rf /etc/systemd/system/cyberpolygon.service
 sudo cp cyberpolygon.service /etc/systemd/system/cyberpolygon.service
@@ -20,7 +35,7 @@ sudo chmod 444 /etc/systemd/system/cyberpolygon-scheduler.service
 
 sudo cp logrotate.conf /etc/logrotate.d/cyberpolygon
 sudo chmod 644 /etc/logrotate.d/cyberpolygon
-sudo logrotate --debug /etc/logrotate.d/cyberpolygon
+sudo logrotate -v /etc/logrotate.d/cyberpolygon
 
 sudo chmod -R 777 /media
 sudo chmod -R 777 /static

@@ -3,12 +3,12 @@ Description=Cyberpolygon-appscheduler
 After=network.target
 
 [Service]
-User=root
-WorkingDirectory={%workdir%}
-ExecStart={%run_script%}
+User={{ user }}
+WorkingDirectory={{ workdir }}
+ExecStart={{ scheduler_script }}
 Restart=always
-StandardOutput=append:/var/log/cyberpolygon_scheduler.log
-StandardError=append:/var/log/cyberpolygon_scheduler.log
+StandardOutput=append:{{ log_dir }}/cyberpolygon_scheduler.log
+StandardError=append:{{ log_dir }}/cyberpolygon_scheduler.log
 
 [Install]
 WantedBy=multi-user.target

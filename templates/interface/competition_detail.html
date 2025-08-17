@@ -257,19 +257,9 @@
         setInterval(refreshSolutions, 10000);
     </script>
 
-    {% if user.is_superuser %}
     <script>
         let end = false;
-        window.onload = function() {
-            if (localStorage.getItem('end') === 'true') {
-                end = true;
-            } else {
-                end = false;
-            }
-            fetchTime();
-            refreshSolutions();
-        }
-
+        
         function updateTimer() {
             const countdownElem = document.getElementById('countdown');
             const text = countdownElem.textContent.trim();
@@ -321,7 +311,6 @@
                 (seconds < 10 ? '0' : '') + seconds;
         }
 
-
         function fetchTime() {
             // Get the competition ID from the template (assuming you pass it in context)
             var competitionId = "{{ object.pk }}";
@@ -343,9 +332,17 @@
             };
             xhr.send();
         }
+
         window.onload = function() {
+            if (localStorage.getItem('end') === 'true') {
+                end = true;
+            } else {
+                end = false;
+            }
             fetchTime();
-            refreshSolutions();
+            {% if user.is_superuser %}
+                refreshSolutions();
+            {% endif %}
         }
 
         // Update the timer every second
@@ -358,7 +355,6 @@
         <script src="{% static 'admin/js/button.js' %}"></script>
     {% endif %}
 
-    {% endif %}
 
     
     {% if object.lab.platform == "PN" and not user.is_superuser %}
