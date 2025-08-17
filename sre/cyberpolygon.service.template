@@ -3,12 +3,12 @@ Description=Cyberpolygon-interface
 After=network.target
 
 [Service]
-User=root
-WorkingDirectory={%workdir%}
-ExecStart={%run_script%}
+User={{ user }}
+WorkingDirectory={{ workdir }}
+ExecStart={{ run_script }}
 Restart=always
-StandardOutput=append:/var/log/cyberpolygon.log
-StandardError=append:/var/log/cyberpolygon.log
+StandardOutput=append:{{ log_dir }}/cyberpolygon.log
+StandardError=append:{{ log_dir }}/cyberpolygon.log
 
 [Install]
 WantedBy=multi-user.target

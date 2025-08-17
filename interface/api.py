@@ -1,4 +1,9 @@
 import json
+import requests
+import urllib3
+
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from django.core.cache import cache
 from rest_framework.decorators import api_view
@@ -9,10 +14,13 @@ from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta, datetime
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
+
 
 from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
+from .config import get_pnet_base_dir, get_web_url
 
 
 @api_view(['GET'])
@@ -231,7 +239,6 @@ def change_iso_timezone(utc_time):  # pragma: no cover
 def press_button(request, action):  # pragma: no cover
     try:
         slug = request.data.get('slug')
-        print(slug)
         competition = Competition.objects.get(
             slug=slug
         )
@@ -360,4 +367,148 @@ def end_lab(request):
         return JsonResponse({'message': 'Task finished'})
 
 
+@csrf_exempt
+@api_view(['POST'])
+def get_pnet_auth(request):
+    """Аутентифицирует пользователя в PNET и возвращает cookies"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+    
+    user = request.user
+    if not user.pnet_login or not user.pnet_password:
+        return JsonResponse({'error': 'User PNET credentials not configured'}, status=400)
+    
+    try:
+        pnet_url = f"{get_web_url()}/pnetlab"
+        session = requests.Session()
+        session.verify = False
+        
+        # Получаем XSRF-TOKEN
+        preflight_response = session.get(f"{pnet_url}/store/public/auth/login/login", timeout=10)
+        if preflight_response.status_code not in [200, 202]:
+            return JsonResponse({'error': 'Failed to connect to PNET'}, status=500)
+        
+        xsrf_token = session.cookies.get('XSRF-TOKEN', '')
+        
+        # Аутентификация
+        headers = {'Content-Type': 'application/json;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest'}
+        if xsrf_token:
+            headers['X-XSRF-TOKEN'] = xsrf_token
+            
+        login_response = session.post(
+            f"{pnet_url}/store/public/auth/login/login",
+            headers=headers,
+            json={'username': user.pnet_login, 'password': user.pnet_password, 'html': '1', 'captcha': ''},
+            timeout=10
+        )
+        
+        if login_response.status_code not in [200, 201, 202]:
+            return JsonResponse({'error': 'PNET authentication failed'}, status=401)
+        
+        # Проверка JSON ответа для статуса 202
+        if login_response.status_code == 202:
+            try:
+                if not login_response.json().get('result', False):
+                    return JsonResponse({'error': 'PNET authentication failed'}, status=401)
+            except (ValueError, KeyError):
+                pass  # Продолжаем, возможно cookies установлены
+        
+        # Возвращаем cookies и устанавливаем их в ответе
+        cookies_dict = {cookie.name: cookie.value for cookie in session.cookies}
+        response = JsonResponse({'success': True, 'cookies': cookies_dict, 'xsrf_token': xsrf_token})
+        
+        # Устанавливаем cookies в HTTP-ответе для автоматической синхронизации
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        for cookie in session.cookies:
+            logger.info(f"Setting cookie {cookie.name}={cookie.value} domain={cookie.domain} path={cookie.path}")
+            response.set_cookie(
+                cookie.name,
+                cookie.value,
+                path='/',  # Принудительно устанавливаем корневой путь
+                secure=False,  # Отключаем secure для HTTP
+                httponly=False,  # Разрешаем JavaScript доступ
+                samesite='Lax'
+            )
+        
+        return response
+        
+    except requests.exceptions.Timeout:
+        return JsonResponse({'error': 'PNET request timeout'}, status=500)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({'error': 'Failed to connect to PNET'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Authentication error: {str(e)}'}, status=500)
 
+
+
+
+@csrf_exempt
+@api_view(['POST'])
+def create_pnet_lab_session(request):
+    """Создает сессию лабы в PNET после аутентификации"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+    
+    slug = request.data.get('slug')
+    if not slug:
+        return JsonResponse({'error': 'Competition slug required'}, status=400)
+    
+    try:
+        competition = Competition.objects.get(slug=slug)
+        user = request.user
+        
+        if not user.pnet_login:
+            return JsonResponse({'error': 'User PNET login not configured'}, status=400)
+        
+        # Получаем путь до лабы пользователя
+        from .utils import get_pnet_lab_name
+        
+        base_path = get_pnet_base_dir()
+        lab_name = get_pnet_lab_name(competition.lab)
+        lab_file_name = lab_name + '.unl'
+        lab_path = f"/{base_path.rstrip('/').lstrip('/')}/{user.pnet_login}/{lab_file_name}"
+        
+        # Отправляем запрос на создание сессии лабы
+        pnet_url = f"{get_web_url()}/pnetlab"
+        session = requests.Session()
+        session.verify = False
+        
+        # Копируем cookies из запроса (должны быть установлены после аутентификации)
+        for cookie_name, cookie_value in request.COOKIES.items():
+            session.cookies.set(cookie_name, cookie_value)
+        
+        # Создаем сессию лабы
+        full_url = f"{pnet_url}/api/labs/session/factory/create"
+        payload = {'path': lab_path}
+        
+        create_session_response = session.post(
+            full_url,
+            headers={
+                'Content-Type': 'application/json;charset=UTF-8',
+                'Accept': 'application/json, text/plain, */*',
+                'Referer': f"{pnet_url}/store/public/admin/main/view",
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            json=payload,
+            timeout=10
+        )
+        
+        if create_session_response.status_code != 200:
+            return JsonResponse({'error': 'Failed to create lab session'}, status=500)
+        
+        return JsonResponse({
+            'success': True,
+            'lab_path': lab_path,
+            'redirect_url': '/legacy/topology'
+        })
+        
+    except Competition.DoesNotExist:
+        return JsonResponse({'error': 'Competition not found'}, status=404)
+    except requests.exceptions.Timeout:
+        return JsonResponse({'error': 'PNET request timeout'}, status=500)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({'error': 'Failed to connect to PNET'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Session creation error: {str(e)}'}, status=500)

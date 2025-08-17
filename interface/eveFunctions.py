@@ -2,13 +2,15 @@ import requests
 from slugify import slugify
 import logging
 import json
+
+from interface.utils import get_pnet_lab_name
 from .config import *
 
 logger = logging.getLogger(__name__)
 
 
 def get_user_workspace_relative_path():
-    STUDENT_WORKSPACE = 'Practice work/Test_Labs'
+    STUDENT_WORKSPACE = get_student_workspace()
     base_dir = get_pnet_base_dir()
     if STUDENT_WORKSPACE in base_dir:
         base_dir = base_dir.replace(STUDENT_WORKSPACE, '')
@@ -39,6 +41,7 @@ def pf_login(url, name, password):
 
 def create_user(url, username, password, user_role, cookie):
     username = slugify(username)
+    relative_path = get_user_workspace_relative_path()
     user_params = {
         "data": [
             {
@@ -48,7 +51,7 @@ def create_user(url, username, password, user_role, cookie):
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
-                "user_workspace": f'{get_user_workspace_relative_path()}/{username}',
+                "user_workspace": f'{relative_path}/{username}',
                 "note": "",
                 "max_node": "",
                 "max_node_lab": ""
@@ -63,7 +66,7 @@ def create_user(url, username, password, user_role, cookie):
             verify=False
         )
         logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(
-            username, password, f'{get_user_workspace_relative_path()}/{username}', r.text)
+            username, password, f'{relative_path}/{username}', r.text)
         )
     except Exception as e:
         logger.debug("Error with creating user\n{}\n".format(e))
@@ -354,7 +357,7 @@ def delete_lab(url, cookie, lab_path):
 
 
 def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf, username):
-    lab_name = lab_object.slug + '_' + lab_object.lab_type.lower()
+    lab_name = get_pnet_lab_name(lab_object)
     username = slugify(username)
     lab_path += "/" + username
 
@@ -363,6 +366,7 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf,
     logger.debug(lab)
 
     create_session(url, lab, cookie)
+    filter_user(url, cookie, xsrf).text
     users = filter_user(url, cookie, xsrf).json()
 
     r = get_sessions_count(url, cookie).json()

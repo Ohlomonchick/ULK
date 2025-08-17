@@ -1,6 +1,6 @@
 # gunicorn.conf.py
 # Non logging stuff
-bind = "0.0.0.0:8001"
+bind = "0.0.0.0:8002"
 workers = 2
 # Access log - records incoming HTTP requests
 accesslog = "/var/log/cyberpolygon.access.log"

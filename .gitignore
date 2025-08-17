@@ -174,3 +174,4 @@ sre/cyberpolygon.service
 sre/cyberpolygon-scheduler.service
 venv3.12
 nginx-1.29.0/
+.cursor/

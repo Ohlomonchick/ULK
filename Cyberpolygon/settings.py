@@ -87,7 +87,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Cyberpolygon.wsgi.application'
 
-if not os.environ.get('USE_POSTGRES', ''):
+if not os.environ.get('USE_POSTGRES', '') == 'yes':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',

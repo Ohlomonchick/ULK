@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
     delete_lab_with_session_destroy, change_user_workspace, create_directory, get_user_workspace_relative_path
+from interface.utils import get_pnet_lab_name
 from .validators import validate_top_level_array, validate_lab_task_json_config
 from .config import *
 logger = logging.getLogger(__name__)
@@ -176,6 +177,7 @@ class User(AbstractUser):
                                 verbose_name="взвод",
                                 null=True)
     pnet_login = models.CharField('Имя в Pnet', max_length=255, primary_key=False, null=True, blank=True)
+    pnet_password = models.CharField('Пароль в Pnet', max_length=255, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.pk:
@@ -364,9 +366,7 @@ class Competition2User(models.Model):
                 Login = 'pnet_scripts'
                 Pass = 'eve'
                 cookie, xsrf = pf_login(url, Login, Pass)
-                delete_lab_with_session_destroy(url, self.competition.lab.slug + '_' + self.competition.lab.lab_type.lower(), get_pnet_base_dir(), cookie, xsrf,
-                                                self.user.username)
-                delete_lab_with_session_destroy(url, self.competition.lab.name, get_pnet_base_dir(), cookie, xsrf,
+                delete_lab_with_session_destroy(url, get_pnet_lab_name(self.competition.lab), get_pnet_base_dir(), cookie, xsrf,
                                                 self.user.username)
                 logout(url)
 
@@ -395,7 +395,7 @@ class Competition2User(models.Model):
                 Login = 'pnet_scripts'
                 Pass = 'eve'
                 cookie, xsrf = pf_login(url, Login, Pass)
-                create_lab(url, lab.slug, "", get_pnet_base_dir(), cookie, xsrf,
+                create_lab(url, get_pnet_lab_name(lab), "", get_pnet_base_dir(), cookie, xsrf,
                            instance.user.username)
                 create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), cookie, xsrf,
                                                     instance.user.username)

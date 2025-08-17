@@ -18,6 +18,8 @@ from rest_framework import viewsets
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
+from interface.utils import get_pnet_password
+
 
 class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Lab
@@ -441,13 +443,14 @@ def change_password(request):  # pragma: no cover
             user.set_password(request.POST.get('password1'))
             user.save()
             login(request, user)
-            url = "http://172.18.4.160"
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            cookie, xsrf = pf_login(url, Login, Pass)
-            change_user_password(url, cookie, xsrf, user.pnet_login, request.POST.get('password1'))
-            logout(url)
-            return redirect('/cyberpolygon/competitions')
+            url = get_pnet_url()
+            if url:
+                Login = 'pnet_scripts'
+                Pass = 'eve'
+                cookie, xsrf = pf_login(url, Login, Pass)
+                change_user_password(url, cookie, xsrf, user.pnet_login, get_pnet_password(request.POST.get('password1')))
+                logout(url)
+                return redirect('/cyberpolygon/competitions')
         else:
             form = ChangePasswordForm()
     else:

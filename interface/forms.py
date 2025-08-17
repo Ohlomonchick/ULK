@@ -3,6 +3,8 @@ import random
 from django import forms
 from durationwidget.widgets import TimeDurationWidget
 from django.utils import timezone
+
+from interface.utils import get_pnet_password
 from .models import (
     LabType,
     User,
@@ -119,6 +121,7 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
         if not password:
             password = "test.test"  # Set your default password here
         user.set_password(password)
+        user.pnet_password = get_pnet_password(password)
         if commit:
             user.save()
 
@@ -131,7 +134,7 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
             create_directory(url, get_pnet_base_dir(), user.username, cookie)
-            create_user(url, user.username, password, '1', cookie)
+            create_user(url, user.username, user.pnet_password, '1', cookie)
             logout(url)
 
         return user
@@ -457,6 +460,9 @@ class SimpleCompetitionForm(forms.Form):
     
     def _get_target_platoon_ids(self):
         """Get platoon IDs filtered by learning years"""
+        if self.lab.lab_type == LabType.COMPETITION:
+            return []
+
         years = self.lab.learning_years or []
         platoons_qs = Platoon.objects.filter(number__gt=0)
         if years:
