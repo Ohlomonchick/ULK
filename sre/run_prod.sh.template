@@ -3,7 +3,4 @@ export PROD=True
 export USE_POSTGRES={{ use_postgres }}
 export DB_HOST={{ db_host }}
 
-# Nginx configuration теперь обрабатывается в deploy.py
-# Полная конфигурация копируется в /etc/nginx/nginx.conf
-
 gunicorn Cyberpolygon.wsgi:application -c {{ gunicorn_conf }}

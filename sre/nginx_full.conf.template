@@ -1,5 +1,5 @@
 #user  nobody;
-worker_processes  1;
+worker_processes auto;
 
 #error_log  logs/error.log;
 #error_log  logs/error.log  notice;
@@ -9,6 +9,7 @@ worker_processes  1;
 
 events {
     worker_connections  1024;
+    use epoll;
 }
 
 http {
@@ -20,6 +21,11 @@ http {
     #                  '"$http_user_agent" "$http_x_forwarded_for"';
 
     #access_log  logs/access.log  main;
+
+    proxy_buffering on;
+    proxy_buffer_size 64k;
+    proxy_buffers 4 64k;
+    proxy_busy_buffers_size 128k;
 
     sendfile        on;
     #tcp_nopush     on;
