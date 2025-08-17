@@ -52,6 +52,11 @@ def get_pnet_base_dir():
         )
 
 
+@cache_for_minutes(1)
+def get_student_workspace():
+    return get_config('STUDENT_WORKSPACE', 'Practice work/Test_Labs')
+
+
 def get_web_url():
     """Возвращает URL для внутренних запросов к nginx/веб-серверу"""
     return get_config('WEB_URL', 'http://127.0.0.1:80')

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_user_workspace_relative_path():
-    STUDENT_WORKSPACE = 'Practice work/Test_Labs'
+    STUDENT_WORKSPACE = get_student_workspace()
     base_dir = get_pnet_base_dir()
     if STUDENT_WORKSPACE in base_dir:
         base_dir = base_dir.replace(STUDENT_WORKSPACE, '')
