@@ -1,12 +1,32 @@
 
+// Функция получения CSRF токена
+function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+           document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+           getCookie('csrftoken');
+}
+
+// Функция извлечения slug из URL
+function getCompetitionSlugFromURL() {
+    const path = window.location.pathname;
+    // Проверяем разные возможные паттерны URL
+    let matches = path.match(/\/competitions\/([^\/]+)\//);  // /competitions/{slug}/
+    if (!matches) {
+        matches = path.match(/\/team_competitions\/([^\/]+)\//);  // /team_competitions/{slug}/
+    }
+    if (!matches) {
+        matches = path.match(/\/competition\/([^\/]+)\//);  // /competition/{slug}/ (если есть такой паттерн)
+    }
+    
+    return matches ? matches[1] : null;
+}
+
 // Функция аутентификации в PNET
 async function authenticatePNET() {
     localStorage.setItem('html_console_mode', '1');
 
     try {
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                         document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
-                         getCookie('csrftoken');
+        const csrfToken = getCSRFToken();
 
         const authResponse = await fetch('/api/get_pnet_auth/', {
             method: 'POST',
@@ -27,7 +47,6 @@ async function authenticatePNET() {
         const authData = await authResponse.json();
         
         if (authData.success) {
-            console.log('PNET authentication successful');
             return true;
         }
         
@@ -37,19 +56,87 @@ async function authenticatePNET() {
     return false;
 }
 
+// Функция создания сессии лабы в PNET
+async function createLabSession(slug) {
+    try {
+        const csrfToken = getCSRFToken();
+
+        const sessionResponse = await fetch('/api/create_pnet_lab_session/', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ slug: slug })
+        });
+
+        if (!sessionResponse.ok) {
+            const errorData = await sessionResponse.json().catch(() => ({}));
+            console.error('Lab session creation failed:', errorData.error || 'Unknown error');
+            return null;
+        }
+
+        const sessionData = await sessionResponse.json();
+        
+        if (sessionData.success) {
+            return sessionData;
+        }
+        
+    } catch (error) {
+        console.error('Error during lab session creation:', error);
+    }
+    return null;
+}
+
+// Функция перенаправления iframe на топологию
+function redirectToTopology(iframe) {
+    if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.location.href = '/legacy/topology';
+    }
+}
+
 // Инициализируем iframe после аутентификации
 async function initializePNETFrame() {
     const iframe = document.getElementById('pnetFrame');
-    if (!iframe) return;
+    if (!iframe) {
+        return;
+    }
 
-    // Аутентифицируемся и загружаем iframe
+    // Получаем slug соревнования из URL
+    const competitionSlug = getCompetitionSlugFromURL();
+    if (!competitionSlug) {
+        console.error('Could not extract competition slug from URL:', window.location.pathname);
+        return;
+    }
+
+    // Аутентифицируемся в PNET
     const authSuccess = await authenticatePNET();
-    if (authSuccess) {
-        // Устанавливаем src только после успешной аутентификации
-        const targetSrc = iframe.getAttribute('data-src');
-        if (targetSrc) {
-            iframe.src = targetSrc + '?t=' + Date.now();
-        }
+    if (!authSuccess) {
+        console.error('PNET authentication failed');
+        return;
+    }
+
+    // Создаем сессию лабы
+    const sessionData = await createLabSession(competitionSlug);
+    if (!sessionData) {
+        console.error('Lab session creation failed');
+        return;
+    }
+
+    // Загружаем iframe с базовым URL PNET
+    const targetSrc = iframe.getAttribute('data-src');
+    if (targetSrc) {
+        iframe.src = targetSrc + '?t=' + Date.now();
+        
+        // После загрузки iframe перенаправляем на топологию
+        iframe.addEventListener('load', function() {
+            // Небольшая задержка для полной загрузки
+            setTimeout(() => {
+                redirectToTopology(iframe);
+            }, 1000);
+        }, { once: true });
     }
 }
 
