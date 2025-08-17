@@ -136,7 +136,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
 
 class MyUserAdmin(UserAdmin):
     add_form = CustomUserCreationForm
-    list_display = ("username", "is_staff", "platoon")
+    list_display = ("username", "is_staff", "platoon", "pnet_login", "pnet_password")
     model = User
     fieldsets = UserAdmin.fieldsets
     fieldsets = ((None, {'fields': ('username', 'password', 'platoon')}),) + fieldsets[1:]
