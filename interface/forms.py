@@ -465,8 +465,7 @@ class SimpleCompetitionForm(forms.Form):
 
         years = self.lab.learning_years or []
         platoons_qs = Platoon.objects.filter(number__gt=0)
-        if years:
-            platoons_qs = platoons_qs.filter(learning_year__in=years)
+        platoons_qs = platoons_qs.filter(learning_year__in=years)
         return list(platoons_qs.values_list("pk", flat=True))
     
     def _create_team_competition_form(self, base_data):

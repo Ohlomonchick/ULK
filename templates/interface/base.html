@@ -54,11 +54,6 @@
             </div>
 
             <div class="navbar-end">
-                {% if pnet_username %}
-                    <div class="navbar-item no-hover">
-                        <h4 id="allow-copy"  class="title is-6 has-text-white">Ваше имя в PNET: {{ pnet_username }}</h4>
-                    </div>
-                {% endif %}
               <div class="navbar-item no-hover">
                 <div class="buttons">
                     {% if user.is_authenticated %}
@@ -117,88 +112,19 @@
     <!-- jQuery для анимаций -->
     <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
     
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var allowCopyElement = document.getElementById('allow-copy');
-        allowCopyElement.oncontextmenu = function(event) {
-            event.stopPropagation();
+    <!-- Передача URL из Django в JavaScript -->
+    <script>
+        window.navbarUrls = {
+            'competition-list': "{% url 'interface:competition-list' %}",
+            'team-competition-list': "{% url 'interface:team-competition-list' %}",
+            'competition-history-list': "{% url 'interface:competition-history-list' %}",
+            'lab-menu': "{% url 'interface:lab-menu' %}",
+            'lab-list': "{% url 'interface:lab-list' %}",
+            'platoon-list': "{% url 'interface:platoon-list' %}",
+            'reg': "{% url 'reg' %}",
+            'login': "{% url 'login' %}"
         };
-        allowCopyElement.onselectstart = function(event) {
-            event.stopPropagation();
-        };
-        
-        // Определение текущей страницы и подсветка активного элемента
-        function highlightCurrentPage() {
-            const currentPath = window.location.pathname;
-            const urlParams = new URLSearchParams(window.location.search);
-            const utmSource = urlParams.get('utm_source');
-            const navbarItems = document.querySelectorAll('.navbar-item');
-            
-            // Маппинг текста ссылки к путям и utm_source
-            const pageMapping = {
-                'экзамен': {
-                    paths: ["{% url 'interface:competition-list' %}"],
-                    utm_sources: ['competitions']
-                },
-                'соревнован': {
-                    paths: ["{% url 'interface:team-competition-list' %}"],
-                    utm_sources: ['team_competitions']
-                },
-                'истори': {
-                    paths: ["{% url 'interface:competition-history-list' %}"],
-                    utm_sources: ['history']
-                },
-                'лабораторн': {
-                    paths: ["{% url 'interface:lab-menu' %}", "{% url 'interface:lab-list' %}"],
-                    utm_sources: ['labs', 'lab-menu']
-                },
-                'взвод': {
-                    paths: ["{% url 'interface:platoon-list' %}"],
-                    utm_sources: ['platoons']
-                },
-                'войти': {
-                    paths: ["{% url 'reg' %}", "{% url 'login' %}"],
-                    utm_sources: ['reg', 'login']
-                }
-            };
-            
-            navbarItems.forEach(item => {
-                const linkText = item.textContent.trim().toLowerCase();
-                
-                // Проверяем каждый тип страницы
-                for (const [key, mapping] of Object.entries(pageMapping)) {
-                    if (linkText.includes(key)) {
-                        let isActive = false;
-                        
-                        // Если есть utm_source - проверяем только его
-                        if (utmSource) {
-                            isActive = mapping.utm_sources.includes(utmSource);
-                        } else {
-                            // Fallback на проверку пути только если нет utm_source
-                            isActive = mapping.paths.some(path => currentPath.includes(path));
-                        }
-                        
-                        if (isActive) {
-                            item.classList.add('active');
-                            break;
-                        }
-                    }
-                }
-            });
-        }
-        
-        // Запуск функции подсветки
-        highlightCurrentPage();
-        
-        // Дополнительная анимация при наведении
-        $('.navbar-item').hover(
-            function() {
-                $(this).addClass('hover-effect');
-            },
-            function() {
-                $(this).removeClass('hover-effect');
-            }
-        );
-    });
-</script>
+    </script>
+    
+    <script src="{% static 'js/navbar_controller.js' %}"></script>
 </body>

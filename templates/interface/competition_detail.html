@@ -34,22 +34,6 @@
                                 </video>
                             </div>
                         </div>  
-                    {% elif button_end_now %}
-                        <p class="help mb-2">Работа закончится в {{ object.finish|date:"H:i" }}, но вы можете закончить её сейчас</p>
-                        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-                            <button id="end-now" class="button is-danger is-medium"
-                                    data-slug="{{ object.slug }}">
-                                Закончить сейчас
-                            </button>
-                        </div>
-                    {% elif button_resume %}
-                        <p class="help mb-2">Работа закончилась в {{ object.finish|date:"H:i" }}, но вы можете продлить её на 15 минут</p>
-                        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-                            <button id="resume" class="button is-danger is-medium"
-                                    data-slug="{{ object.slug }}">
-                                Продлить на 15 минут
-                            </button>
-                        </div>
                     {% endif %}
 
                     <div id="competition-slug" data-slug="{{ object.slug }}">
@@ -76,6 +60,23 @@
                         </tbody>
                         </table>
                     </div>
+                    {% if button_end_now %}
+                        <p class="help mb-2">Работа закончится в {{ object.finish|date:"H:i" }}, но вы можете закончить её сейчас</p>
+                        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
+                            <button id="end-now" class="button is-danger is-medium"
+                                    data-slug="{{ object.slug }}">
+                                Закончить сейчас
+                            </button>
+                        </div>
+                    {% elif button_resume %}
+                        <p class="help mb-2">Работа закончилась в {{ object.finish|date:"H:i" }}, но вы можете продлить её на 15 минут</p>
+                        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
+                            <button id="resume" class="button is-danger is-medium"
+                                    data-slug="{{ object.slug }}">
+                                Продлить на 15 минут
+                            </button>
+                        </div>
+                    {% endif %}
                 </div>
             {% elif object.lab.platform == "PN" %}
                 <div class="iframe-container" style="position: relative;">

@@ -88,38 +88,48 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupVideoForm() {
     const submitButton = document.getElementById('create-lab-button');
     const form = submitButton?.closest('form');
+    const loadingContainer = document.getElementById('loading-container');
+    const loadingText = document.getElementById('loading-text');
     const videoContainer = document.getElementById('lab-video-container');
     const video = document.getElementById('lab-video');
     
-    if (!form || !submitButton || !videoContainer || !video) {
+    if (!form || !submitButton || !loadingContainer || !loadingText || !videoContainer || !video) {
         return;
     }
     
     let redirectUrl = null;
     let responseReceived = false;
     let videoFinished = false;
+    let loadingInterval = null;
     
     // Ускоряем видео как в competition_detail
     video.playbackRate = 1.5;
+    
+    // Фразы загрузки
+    const loadingPhrases = [
+        'Создаём лабораторные работы',
+        'Поднимаем виртуальные машины',
+        'Настраиваем сеть'
+    ];
     
     // Обработчик клика на кнопку
     submitButton.addEventListener('click', function(e) {
         if (form.checkValidity()) {
             e.preventDefault();
-            showVideoAndSubmitForm();
+            showLoadingAndSubmitForm();
         }
     });
     
     // Дублируем обработчик на submit формы на случай других способов отправки
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        showVideoAndSubmitForm();
+        showLoadingAndSubmitForm();
     });
     
-    function showVideoAndSubmitForm() {
-        // Показываем и запускаем видео
-        videoContainer.classList.remove('hidden');
-        video.play();
+    function showLoadingAndSubmitForm() {
+        // Показываем анимацию загрузки
+        loadingContainer.classList.remove('hidden');
+        startLoadingAnimation();
         
         // Отправляем форму
         const formData = new FormData(form);
@@ -135,17 +145,19 @@ function setupVideoForm() {
             if (response.redirected) {
                 redirectUrl = response.url;
                 responseReceived = true;
+                stopLoadingAnimation();
+                showVideo();
                 handleRedirect();
             } else {
                 // Ошибка формы - заменяем содержимое страницы
                 return response.text().then(html => {
                     document.documentElement.innerHTML = html;
-                    hideVideo();
+                    stopLoadingAnimation();
                 });
             }
         })
         .catch(() => {
-            hideVideo();
+            stopLoadingAnimation();
         });
     }
     
@@ -155,23 +167,50 @@ function setupVideoForm() {
         handleRedirect();
     });
     
+    function startLoadingAnimation() {
+        let phraseIndex = 0;
+        let dotCount = 0;
+        
+        loadingInterval = setInterval(() => {
+            const phrase = loadingPhrases[phraseIndex];
+            const dots = '.'.repeat(dotCount + 1);
+            loadingText.textContent = phrase + dots;
+            
+            dotCount++;
+            if (dotCount >= 5) {
+                dotCount = 0;
+                phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
+            }
+        }, 500); // Меняем каждые 500мс
+    }
+    
+    function stopLoadingAnimation() {
+        if (loadingInterval) {
+            clearInterval(loadingInterval);
+            loadingInterval = null;
+        }
+        loadingContainer.classList.add('hidden');
+    }
+    
+    function showVideo() {
+        // Скрываем загрузку и показываем видео
+        loadingContainer.classList.add('hidden');
+        videoContainer.classList.remove('hidden');
+        video.play();
+    }
+    
     function handleRedirect() {
         if (redirectUrl && responseReceived) {
             if (videoFinished) {
                 // Видео закончилось - делаем редирект
                 window.location.href = redirectUrl;
-            } else {
-                // Ответ пришёл раньше - добавляем затухание
-                video.style.transition = 'opacity 1s ease-out';
-                video.style.opacity = '0.3';
             }
+            // Убираем затухание - видео остаётся ярким
         }
     }
     
     function hideVideo() {
         videoContainer.classList.add('hidden');
-        video.style.opacity = '1';
-        video.style.transition = '';
         video.pause();
         video.currentTime = 0;
     }

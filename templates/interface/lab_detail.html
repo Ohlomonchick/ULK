@@ -93,6 +93,9 @@
                 <div class="field">
                     <div class="control" style="display: flex; align-items: center;">
                         <button id="create-lab-button" class="button is-info" type="submit">Создать</button>
+                        <div id="loading-container" class="hidden" style="margin-left: 1rem;">
+                            <div id="loading-text" class="has-text-info" style="font-size: 1.1rem; font-weight: 500;"></div>
+                        </div>
                         <div id="lab-video-container" class="hidden" style="margin-left: 1rem;">
                             <video id="lab-video" style="width: auto; height: 62px; border-radius: 4px;" muted preload="auto">
                                 <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
