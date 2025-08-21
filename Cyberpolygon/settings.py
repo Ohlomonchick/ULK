@@ -99,11 +99,11 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('DB_NAME', 'cyberpolygon'),
+            'NAME': os.environ.get('DB_NAME', 'postgres2'),
             'USER': os.environ.get('DB_USER', 'postgres'),
             'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
             'HOST': os.environ.get('DB_HOST', 'localhost'),
-            'PORT': os.environ.get('DB_PORT', '5431'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
             'OPTIONS': {
                 'client_encoding': 'UTF8',
             },
