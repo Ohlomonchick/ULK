@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('interface', '0032_cleanup_orphaned_records'),
+        ('interface', '0033_5_fix_lab_table_structure'),
     ]
 
     operations = [

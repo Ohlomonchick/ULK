@@ -1,4 +1,6 @@
 import random
+import concurrent.futures
+from typing import List
 
 from django import forms
 from durationwidget.widgets import TimeDurationWidget
@@ -24,7 +26,9 @@ from .models import (
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
+from interface.pnet_session_manager import execute_pnet_operation_if_needed, with_pnet_session_if_needed
 from django.contrib.admin.widgets import FilteredSelectMultiple
+from django.conf import settings
 from django_select2 import forms as s2forms
 from .config import *
 
@@ -196,26 +200,64 @@ class CompetitionForm(forms.ModelForm):
     def handle_competition_users(self, instance):
         all_users = self.get_all_users(instance)
         existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
+        new_users = [user for user in all_users if user.id not in existing_user_ids]
+        
+        if new_users:
+            with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_users_parallel(instance, new_users))
 
-        for user in all_users:
-            if user.id not in existing_user_ids:
-                competition2user, created = Competition2User.objects.update_or_create(
-                    competition=instance,
-                    user=user,
-                    level=instance.level,
-                )
-
-                if created:
-                    tasks = list(instance.tasks.all() or instance.lab.options.all())
-                    assigned_tasks = random.sample(tasks, min(instance.num_tasks, len(tasks)))
-                    competition2user.tasks.set(assigned_tasks)
-
+        # Удаляем пользователей, которых больше нет в списке
         all_users_ids = set(all_users.values_list('pk', flat=True))
-        for user_id in existing_user_ids:
-            if user_id not in all_users_ids:
-                Competition2User.objects.get(competition=instance, user_id=user_id).delete()
+        def _delete_users_operation():
+            for user_id in existing_user_ids:
+                if user_id not in all_users_ids:
+                    Competition2User.objects.get(competition=instance, user_id=user_id).delete()
+
+        with_pnet_session_if_needed(instance.lab, _delete_users_operation)
 
         return instance
+
+    def _create_competition_users_parallel(self, instance, users: List[User]):
+        """
+        Параллельное создание Competition2User записей.
+        """
+        def _create_single_competition_user(user):
+            """Создание одной записи Competition2User"""
+            
+            competition2user, created = Competition2User.objects.update_or_create(
+                competition=instance,
+                user=user,
+                level=instance.level,
+            )
+            
+            if created:
+                tasks = list(instance.tasks.all() or instance.lab.options.all())
+                assigned_tasks = random.sample(tasks, min(instance.num_tasks, len(tasks)))
+                competition2user.tasks.set(assigned_tasks)
+            
+            return competition2user
+
+        created_competition_users = []
+        db_engine = settings.DATABASES['default']['ENGINE']
+        
+        if 'sqlite' in db_engine.lower():
+            max_workers = 1  # SQLite не поддерживает параллельные записи
+        else:
+            max_workers = min(5, len(users))
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_user = {executor.submit(_create_single_competition_user, user): user for user in users}
+            
+            # Ждем завершения всех операций
+            for future in concurrent.futures.as_completed(future_to_user):
+                user = future_to_user[future]
+                try:
+                    competition2user = future.result()
+                    created_competition_users.append(competition2user)
+                    # PNet операции выполняются в сигнале post_create с использованием глобальной сессии
+                except Exception as exc:
+                    print(f'Пользователь {user.username} вызвал исключение: {exc}')
+        
+        return created_competition_users
 
 
 class KkzForm(forms.ModelForm):  # pragma: no cover

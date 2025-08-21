@@ -6,3 +6,29 @@ def get_pnet_password(user_password):
 
 def get_pnet_lab_name(lab):
     return lab.slug + '_' + lab.lab_type.lower()
+
+
+def get_database_type():
+    """
+    Определяет тип базы данных на основе настроек Django.
+    Возвращает 'sqlite' или 'postgresql'.
+    """
+    from django.conf import settings
+    from django.db import connection
+    
+    # Проверяем engine базы данных
+    engine = settings.DATABASES['default']['ENGINE']
+    
+    if 'sqlite' in engine:
+        return 'sqlite'
+    elif 'postgresql' in engine:
+        return 'postgresql'
+    else:
+        # Fallback - определяем по connection
+        vendor = connection.vendor
+        if vendor == 'sqlite':
+            return 'sqlite'
+        elif vendor == 'postgresql':
+            return 'postgresql'
+        else:
+            raise ValueError(f"Неподдерживаемый тип базы данных: {vendor}")

@@ -87,7 +87,7 @@ class GetSolutionsAPITestCase(TestCase):
             datetime=now - timedelta(minutes=5)
         )
 
-        url = reverse("get_solutions", kwargs={"slug": comp.slug})
+        url = reverse("interface_api:get_solutions", kwargs={"slug": comp.slug})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -181,7 +181,7 @@ class GetSolutionsAPITestCase(TestCase):
         Answers.objects.create(user=non_platoon_users[0], lab=lab, datetime=now - timedelta(minutes=10))
         Answers.objects.create(user=non_platoon_users[0], lab=lab, datetime=now - timedelta(minutes=9))
 
-        url = reverse("get_solutions", kwargs={"slug": comp.slug})
+        url = reverse("interface_api:get_solutions", kwargs={"slug": comp.slug})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -246,7 +246,7 @@ class GetSolutionsAPITestCase(TestCase):
         now = timezone.now()
         Answers.objects.create(user=individual_user, lab=lab, datetime=now - timedelta(minutes=15))
 
-        url = reverse("get_solutions", kwargs={"slug": comp.slug})
+        url = reverse("interface_api:get_solutions", kwargs={"slug": comp.slug})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -299,7 +299,7 @@ class GetSolutionsAPITestCase(TestCase):
         Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=20))
         Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=10))
 
-        url = reverse("get_solutions", kwargs={"slug": comp.slug})
+        url = reverse("interface_api:get_solutions", kwargs={"slug": comp.slug})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -356,7 +356,7 @@ class GetSolutionsAPITestCase(TestCase):
         Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=30))
         Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=20))
 
-        url = reverse("get_solutions", kwargs={"slug": comp.slug})
+        url = reverse("interface_api:get_solutions", kwargs={"slug": comp.slug})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
