@@ -90,6 +90,10 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 "cover": [lab.cover for lab in labs_by_type.values() if lab is not None and lab.cover is not None][0]
             })
         context['lab_bundles'] = lab_bundles
+
+        from django.conf import settings
+        db_engine = settings.DATABASES['default']['ENGINE']
+        print("DB ENGINE: ", db_engine)
         return context
 
 

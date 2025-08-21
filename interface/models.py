@@ -13,11 +13,11 @@ from slugify import slugify
 from rest_framework import serializers
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
-    delete_lab_with_session_destroy, change_user_workspace, create_directory, get_user_workspace_relative_path
-from interface.utils import get_pnet_lab_name
+from django.conf import settings
+from interface.eveFunctions import pf_login, logout, create_directory, get_user_workspace_relative_path
+from interface.config import get_pnet_url, get_pnet_base_dir
 from .validators import validate_top_level_array, validate_lab_task_json_config
-from .config import *
+from .pnet_session_manager import execute_pnet_operation_if_needed
 logger = logging.getLogger(__name__)
 
 
@@ -311,8 +311,13 @@ class Competition(models.Model):
             raise ValidationError("Экзамен уже закончился!")
 
     def delete(self, *args, **kwargs):
-        for issue in self.competition_users.all():
-            issue.delete()
+
+        def _delete_operation(session_manager):
+            with session_manager:
+                for issue in self.competition_users.all():
+                    issue.delete()
+
+        execute_pnet_operation_if_needed(self.lab, _delete_operation)
 
         super(Competition, self).delete(*args, **kwargs)
 
@@ -360,15 +365,11 @@ class Competition2User(models.Model):
     def delete_from_platform(self, final=False):
         if self.deleted:
             return
-        if self.competition.lab.get_platform() == "PN":
-            url = get_pnet_url()
-            if url:
-                Login = 'pnet_scripts'
-                Pass = 'eve'
-                cookie, xsrf = pf_login(url, Login, Pass)
-                delete_lab_with_session_destroy(url, get_pnet_lab_name(self.competition.lab), get_pnet_base_dir(), cookie, xsrf,
-                                                self.user.username)
-                logout(url)
+        
+        execute_pnet_operation_if_needed(
+            self.competition.lab, 
+            lambda session_manager: session_manager.delete_lab_for_user(self.competition.lab, self.user.username)
+        )
 
         self.deleted = True
         if not final:
@@ -387,19 +388,12 @@ class Competition2User(models.Model):
         if not created:
             return
         lab = instance.competition.lab
-        if lab.get_platform() == "PN":
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            url = get_pnet_url()
-            if url:
-                Login = 'pnet_scripts'
-                Pass = 'eve'
-                cookie, xsrf = pf_login(url, Login, Pass)
-                create_lab(url, get_pnet_lab_name(lab), "", get_pnet_base_dir(), cookie, xsrf,
-                           instance.user.username)
-                create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), cookie, xsrf,
-                                                    instance.user.username)
-                logout(url)
+        
+        def _create_operation(session_manager):
+            session_manager.create_lab_for_user(lab, instance.user.username)
+            session_manager.create_lab_nodes_and_connectors(lab, instance.user.username)
+        
+        execute_pnet_operation_if_needed(lab, _create_operation)
 
 
 class TeamCompetition(Competition):
@@ -441,41 +435,33 @@ class TeamCompetition2Team(models.Model):
         if not created:
             return
         lab = instance.competition.lab
-        if lab.get_platform() == "PN":
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            url = get_pnet_url()
-            if url:
-                cookie, xsrf = pf_login(url, Login, Pass)
-                create_lab(url, lab.slug, "", get_pnet_base_dir(), cookie, xsrf,
-                            instance.team.slug)
-                create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), cookie, xsrf,
-                                                    instance.team.slug)
-                logging.debug(f'competition created for team {instance.team.slug}')
-                for user in instance.team.users.all():
-                    logging.debug(f'change workspace for {user.pnet_login} to {get_user_workspace_relative_path()}/{instance.team.slug}')
-                    change_user_workspace(
-                        url, cookie, xsrf, user.pnet_login, f'{get_user_workspace_relative_path()}/{instance.team.slug}'
-                    )
+        
+        def _create_operation(session_manager):
+            session_manager.create_lab_for_user(lab, instance.team.slug)
+            session_manager.create_lab_nodes_and_connectors(lab, instance.team.slug)
 
-                logout(url)
+            relative_path = f'{get_user_workspace_relative_path()}/{instance.team.slug}'
+            logger.debug(f'competition created for team {instance.team.slug}')
+            for user in instance.team.users.all():
+                logger.debug(f'change workspace for {user.pnet_login} to {relative_path}')
+                session_manager.change_user_workspace(
+                    user.pnet_login, relative_path
+                )
+        
+        execute_pnet_operation_if_needed(lab, _create_operation)
 
     def delete_from_platform(self, final=False):
         if self.deleted and not final:
             return
-        if self.competition.lab.get_platform() == "PN":
-            url = get_pnet_url()
-            if url:
-                Login = 'pnet_scripts'
-                Pass = 'eve'
-                cookie, xsrf = pf_login(url, Login, Pass)
-                delete_lab_with_session_destroy(url, self.competition.lab.slug + '_' + self.competition.lab.lab_type.lower(), get_pnet_base_dir(), cookie, xsrf,
-                                                self.team.slug)
-                for user in self.team.users.all():
-                    change_user_workspace(
-                        url, cookie, xsrf, user.pnet_login, f'{get_user_workspace_relative_path()}/{user.pnet_login}'
-                    )
-                logout(url)
+        
+        def _delete_operation(session_manager):
+            session_manager.delete_lab_for_team(self.competition.lab, self.team.slug)
+            for user in self.team.users.all():
+                session_manager.change_user_workspace(
+                    user.pnet_login, f'{get_user_workspace_relative_path()}/{user.pnet_login}'
+                )
+        
+        execute_pnet_operation_if_needed(self.competition.lab, _delete_operation)
 
         self.deleted = True
         if not final:

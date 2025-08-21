@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from unittest.mock import patch
 from datetime import timedelta
@@ -9,7 +9,14 @@ from interface.models import (
 )
 
 
-class CompetitionFormTest(TestCase):
+class CompetitionFormTest(TransactionTestCase):
+    """
+    Используем TransactionTestCase, так как не создает одну транзакцию на весь тест,
+    а позволяет операциям выполниться в своей транзакции, как в реальной ситуации, 
+    что не приводит к блокировке БД на SQLite при выполнении операций в соседнем потоке.
+
+    см. https://stackoverflow.com/questions/44450533/difference-between-testcase-and-transactiontestcase-classes-in-django-test
+    """
     def setUp(self):
         # Create a Lab that uses "PN" platform to trigger external calls
         self.lab = Lab.objects.create(
@@ -73,11 +80,11 @@ class CompetitionFormTest(TestCase):
             "tasks": [self.task1.pk, self.task2.pk]
         }
 
-    @patch("interface.models.delete_lab_with_session_destroy", return_value=None)
-    @patch("interface.models.logout", return_value=None)
-    @patch("interface.models.create_all_lab_nodes_and_connectors", return_value=None)
-    @patch("interface.models.create_lab", return_value=None)
-    @patch("interface.models.pf_login", return_value=("mock_cookie", "mock_xsrf"))
+    @patch("interface.pnet_session_manager.PNetSessionManager.delete_lab_for_user")
+    @patch("interface.pnet_session_manager.PNetSessionManager.logout")
+    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_nodes_and_connectors")
+    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_for_user")
+    @patch("interface.pnet_session_manager.PNetSessionManager.login")
     def test_competition_form_creation_and_deletion(
         self,
         mock_pf_login_models,  # 8th decorator is 1st argument
@@ -140,7 +147,7 @@ class CompetitionFormTest(TestCase):
 
         self.assertEqual(
             mock_delete_lab.call_count,
-            2 * len(self.non_platoon_users) + 2 * len(self.users_in_platoon),
+            len(self.non_platoon_users) + len(self.users_in_platoon),
             "Expected `delete_lab_with_session_destroy` to be called once for each user."
         )
 
@@ -151,11 +158,11 @@ class CompetitionFormTest(TestCase):
                 f"IssuedLabs with pk={pk} should have been deleted after competition deletion."
             )
 
-    @patch("interface.models.delete_lab_with_session_destroy", return_value=None)
-    @patch("interface.models.logout", return_value=None)
-    @patch("interface.models.create_all_lab_nodes_and_connectors", return_value=None)
-    @patch("interface.models.create_lab", return_value=None)
-    @patch("interface.models.pf_login", return_value=("mock_cookie", "mock_xsrf"))
+    @patch("interface.pnet_session_manager.PNetSessionManager.delete_lab_for_user", return_value=None)
+    @patch("interface.pnet_session_manager.PNetSessionManager.logout", return_value=None)
+    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_nodes_and_connectors", return_value=None)
+    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_for_user", return_value=None)
+    @patch("interface.pnet_session_manager.PNetSessionManager.login", return_value=("mock_cookie", "mock_xsrf"))
     def test_competition_form_update(
             self,
             mock_pf_login_models,

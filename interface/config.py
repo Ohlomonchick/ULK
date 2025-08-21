@@ -4,7 +4,7 @@ import time
 from functools import wraps
 from django.conf import settings
 
-if 'makemigrations' not in sys.argv and 'migrate' not in sys.argv:
+if 'makemigrations' not in sys.argv and 'migrate' and 'loaddata' not in sys.argv:
     from dynamic_config.utils import get_config
 else:
     def get_config(key, default):

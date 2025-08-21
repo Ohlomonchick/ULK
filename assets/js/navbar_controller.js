@@ -10,7 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const currentPath = window.location.pathname;
         const urlParams = new URLSearchParams(window.location.search);
         const utmSource = urlParams.get('utm_source');
-        const navbarItems = document.querySelectorAll('.navbar-item');
+        // Изменяем селектор чтобы выбирать только прямые ссылки навигации, исключая контейнеры с кнопками
+        const navbarItems = document.querySelectorAll('.navbar-item:not(.no-hover)');
         
         // Маппинг текста ссылки к путям и utm_source
         const pageMapping = {
@@ -33,10 +34,6 @@ document.addEventListener('DOMContentLoaded', function() {
             'взвод': {
                 paths: [window.navbarUrls['platoon-list'] || ''],
                 utm_sources: ['platoons']
-            },
-            'войти': {
-                paths: [window.navbarUrls['reg'] || '', window.navbarUrls['login'] || ''],
-                utm_sources: ['reg', 'login']
             }
         };
         
@@ -69,7 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
     highlightCurrentPage();
     
     // Дополнительная анимация при наведении
-    $('.navbar-item').hover(
+    $('.navbar-item:not(.no-hover)').hover(
         function() {
             $(this).addClass('hover-effect');
         },
