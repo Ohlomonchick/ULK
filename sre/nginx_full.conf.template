@@ -114,6 +114,13 @@ http {
             sub_filter 'href="//{{ pnet_ip }}/' 'href="/';
 
             # Не добавляй сюда CORS — он не нужен при same-origin
+
+            # Кэш-хедеры для статических файлов (после sub_filter)
+            if ($request_uri ~* \.(css|js|html|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$) {
+                add_header Cache-Control "public, max-age=84600" always;  # 24 часа
+                add_header ETag $upstream_http_etag;
+                add_header Last-Modified $upstream_http_last_modified;
+            }
         }
 
         # Всё, что PNETLab реально вызывает с корня: /store, /api и т.д.
@@ -141,6 +148,13 @@ http {
             sub_filter_types text/html text/css application/javascript application/json;
             sub_filter 'http://{{ pnet_ip }}/'  '/';
             sub_filter 'https://{{ pnet_ip }}/' '/';
+
+            # Кэш-хедеры для статических файлов (после sub_filter)
+            if ($request_uri ~* \.(css|js|html|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$) {
+                add_header Cache-Control "public, max-age=84600" always;  # 24 часа
+                add_header ETag $upstream_http_etag;
+                add_header Last-Modified $upstream_http_last_modified;
+            }
         }
 
         # Статические файлы Django
