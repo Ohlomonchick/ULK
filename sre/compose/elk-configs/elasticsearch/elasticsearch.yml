@@ -1,0 +1,34 @@
+# Elasticsearch Configuration for v9.1.1 (Simplified without SSL)
+cluster.name: cyberpolygon-cluster
+node.name: cyberpolygon-node-1
+node.roles: [ master, data, ingest ]
+
+# Network settings
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Discovery settings
+discovery.type: single-node
+discovery.seed_hosts: []
+
+# Security settings (disabled for simplicity)
+xpack.security.enabled: false
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Path settings
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+# Performance settings
+indices.memory.index_buffer_size: 30%
+indices.queries.cache.size: 20%
+indices.fielddata.cache.size: 20%
+
+# Monitoring
+xpack.monitoring.collection.enabled: true
+
+# Logging
+logger.level: INFO
