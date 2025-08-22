@@ -1,0 +1,13 @@
+# Kibana Configuration for v9.1.1 (Maximal Minimal)
+server.name: kibana
+server.host: "0.0.0.0"
+server.port: 5601
+
+# Elasticsearch connection (without SSL)
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+
+# Localization
+i18n.locale: "en"
+
+# Telemetry
+telemetry.enabled: false
