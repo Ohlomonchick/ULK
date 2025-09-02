@@ -14,8 +14,7 @@
 </head>
 
 
-
-<body oncontextmenu="return false;" onselectstart="return false;">
+<body {% if not allow_copy %} oncopy="return false;" oncontextmenu="return false;" onselectstart="return false;" {% endif %}>
     <div class="flex-wrapper">
         <nav class="navbar is-black" role="navigation" aria-label="main navigation">
           <div class="navbar-brand">

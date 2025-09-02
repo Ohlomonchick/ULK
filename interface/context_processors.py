@@ -1,5 +1,6 @@
 from slugify import slugify
 from interface.config import get_pnet_url
+from dynamic_config.utils import get_bool_config
 
 
 def pnet_username(request):
@@ -12,3 +13,9 @@ def pnet_username(request):
         username = request.user.pnet_login
         return {'pnet_username': username, 'pnet_url': get_pnet_url}
     return {}
+
+
+def global_flags(request):
+    return {
+        "allow_copy": get_bool_config("ALLOW_COPY", default=False),
+    }
