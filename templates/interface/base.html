@@ -99,6 +99,15 @@
         </section>
 
         <footer class="footer {% block footer_class %} {% endblock %} mt-auto">
+          {% if request.resolver_match.url_name == "team-competition-detail" or request.resolver_match.url_name == "lab-list" or request.resolver_match.url_name == "competition-detail" %}
+            <div style="position: fixed; bottom: 1rem; right: 1rem; ">
+                <a class="button is-info is-small"
+                   href="{% url 'interface:help-page' %}?next={{ request.get_full_path|urlencode }}">
+                    Помощь
+                </a>
+            </div>
+          {% endif %}
+
           <div class="content has-text-centered">
             <p>
               Разработано в <strong>ВУЦ НИУ ВШЭ</strong>
