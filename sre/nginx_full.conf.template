@@ -74,7 +74,7 @@ http {
 
         location ^~ /api/ {
             proxy_pass         http://$api_backend;       # <- переменная из map
-            proxy_set_header   Host              $host:{{ prod_port }};
+            proxy_set_header   Host              {{ prod_ip }}:{{ prod_port }};
             proxy_set_header   X-Real-IP         $remote_addr;
             proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header   X-Forwarded-Proto $scheme;
@@ -86,8 +86,8 @@ http {
             proxy_pass http://pnetlab/;
 
             proxy_http_version 1.1;
-            proxy_set_header Host              $host:{{ prod_port }};
-            proxy_set_header X-Forwarded-Host  $host:{{ prod_port }};
+            proxy_set_header Host              {{ prod_ip }}:{{ prod_port }};
+            proxy_set_header X-Forwarded-Host  {{ prod_ip }}:{{ prod_port }};
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade           $http_upgrade;
@@ -128,8 +128,8 @@ http {
             proxy_pass http://pnetlab;
 
             proxy_http_version 1.1;
-            proxy_set_header Host              $host:{{ prod_port }};
-            proxy_set_header X-Forwarded-Host  $host:{{ prod_port }};
+            proxy_set_header Host              {{ prod_ip }}:{{ prod_port }};
+            proxy_set_header X-Forwarded-Host  {{ prod_ip }}:{{ prod_port }};
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade           $http_upgrade;
@@ -168,7 +168,7 @@ http {
 
         location / {
             proxy_pass http://127.0.0.1:{{ proxy_port }};
-            proxy_set_header Host $host:{{ prod_port }};
+            proxy_set_header Host {{ prod_ip }}:{{ prod_port }};
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
