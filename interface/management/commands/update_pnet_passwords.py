@@ -42,9 +42,9 @@ class Command(BaseCommand):
             # Генерируем случайный пароль
             random_password = self.generate_random_password(password_length)
             if user.pnet_login == 'admin':
-                pnet_password = 'pnet'
-            else:
-                pnet_password = get_pnet_password(random_password)
+                return True
+
+            pnet_password = get_pnet_password(random_password)
             
             self.stdout.write(
                 self.style.SUCCESS(

@@ -1,10 +1,10 @@
 from django.core.management.base import BaseCommand
 from django.db.models.signals import post_save, post_delete
-from interface.models import Competition, TeamCompetition, Competition2User, TeamCompetition2Team
+from interface.models import Competition, TeamCompetition, Competition2User, TeamCompetition2Team, LabTask, LabLevel, KkzLab, Answers
 
 
 class Command(BaseCommand):
-    help = 'Удаляет все competitions и teamCompetitions из базы данных'
+    help = 'Удаляет все competitions, teamCompetitions, LabTask, LabLevel, KkzLab и Answers из базы данных'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -32,6 +32,10 @@ class Command(BaseCommand):
         team_competitions_count = TeamCompetition.objects.count()
         competition_users_count = Competition2User.objects.count()
         team_competition_teams_count = TeamCompetition2Team.objects.count()
+        lab_tasks_count = LabTask.objects.count()
+        lab_levels_count = LabLevel.objects.count()
+        kkz_labs_count = KkzLab.objects.count()
+        answers_count = Answers.objects.count()
 
         self.stdout.write(
             self.style.WARNING(
@@ -40,7 +44,11 @@ class Command(BaseCommand):
                 f'- TeamCompetitions: {team_competitions_count}\n'
                 f'- Competition2User: {competition_users_count}\n'
                 f'- TeamCompetition2Team: {team_competition_teams_count}\n'
-                f'Всего: {competitions_count + team_competitions_count + competition_users_count + team_competition_teams_count}'
+                f'- LabTasks: {lab_tasks_count}\n'
+                f'- LabLevels: {lab_levels_count}\n'
+                f'- KkzLabs: {kkz_labs_count}\n'
+                f'- Answers: {answers_count}\n'
+                f'Всего: {competitions_count + team_competitions_count + competition_users_count + team_competition_teams_count + lab_tasks_count + lab_levels_count + kkz_labs_count + answers_count}'
             )
         )
 
@@ -60,6 +68,23 @@ class Command(BaseCommand):
             TeamCompetition2Team.objects.all().delete()
             self.stdout.write(self.style.SUCCESS(f'Удалено {team_competition_teams_count} записей TeamCompetition2Team'))
 
+            # Удаляем LabTask, LabLevel, KkzLab и Answers
+            self.stdout.write('Удаление LabTask...')
+            LabTask.objects.all().delete()
+            self.stdout.write(self.style.SUCCESS(f'Удалено {lab_tasks_count} записей LabTask'))
+
+            self.stdout.write('Удаление LabLevel...')
+            LabLevel.objects.all().delete()
+            self.stdout.write(self.style.SUCCESS(f'Удалено {lab_levels_count} записей LabLevel'))
+
+            self.stdout.write('Удаление KkzLab...')
+            KkzLab.objects.all().delete()
+            self.stdout.write(self.style.SUCCESS(f'Удалено {kkz_labs_count} записей KkzLab'))
+
+            self.stdout.write('Удаление Answers...')
+            Answers.objects.all().delete()
+            self.stdout.write(self.style.SUCCESS(f'Удалено {answers_count} записей Answers'))
+
             # Удаляем основные модели
             self.stdout.write('Удаление TeamCompetition...')
             TeamCompetition.objects.all().delete()
@@ -71,7 +96,7 @@ class Command(BaseCommand):
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    'Все competitions и teamCompetitions успешно удалены из базы данных!'
+                    'Все competitions, teamCompetitions, LabTask, LabLevel, KkzLab и Answers успешно удалены из базы данных!'
                 )
             )
 

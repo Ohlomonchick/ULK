@@ -54,6 +54,7 @@ def get_pnet_base_dir():
 
 @cache_for_minutes(1)
 def get_student_workspace():
+    """Возвращает путь к рабочему пространству студента"""
     return get_config('STUDENT_WORKSPACE', 'Practice work/Test_Labs')
 
 

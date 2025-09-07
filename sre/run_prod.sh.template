@@ -3,4 +3,13 @@ export PROD=True
 export USE_POSTGRES={{ use_postgres }}
 export DB_HOST={{ db_host }}
 
+# Initialize pyenv
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+
+# Set pyenv global version
+pyenv global 3.11.13
+
 gunicorn Cyberpolygon.wsgi:application -c {{ gunicorn_conf }}

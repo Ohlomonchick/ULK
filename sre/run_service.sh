@@ -7,7 +7,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-dos2unix -r "$SCRIPT_DIR"
+find "$SCRIPT_DIR" -type f -name "*.sh" -exec dos2unix {} \;
 cd "$SCRIPT_DIR"
 
 export PROD=True
@@ -18,8 +18,7 @@ export NGINX_IP=192.168.100.10
 # export PNET_IP=192.168.1.10
 export PNET_IP=172.18.4.160
 export WORKDIR="$PROJECT_ROOT"
-
-sudo -E python3 deploy.py
+python3 deploy.py
 chmod 755 run_prod.sh
 chmod 755 run_scheduler.sh
 
