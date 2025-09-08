@@ -16,5 +16,4 @@ urlpatterns = [
     path("team_competitions/", TeamCompetitionListView.as_view(), name="team-competition-list"),
     path("kibana_dashboard/", lambda request: render(request, "interface/kibana_dashboard.html"), name="kibana-dashboard"),
     path("help_page/", lambda request: render(request, "interface/help_page.html"), name="help-page"),
-
 ]
