@@ -495,7 +495,10 @@ def create_pnet_lab_session(request):
         )
         
         if create_session_response.status_code != 200:
+            logger = logging.getLogger(__name__)
             logger.error(f"Failed to create lab session: {create_session_response.text}")
+            print(f"Failed to create lab session: {create_session_response.text}")
+            logger.info(f"Failed to create lab session: {create_session_response.json()}")
             return JsonResponse({'error': 'Failed to create lab session'}, status=500)
         
         return JsonResponse({
