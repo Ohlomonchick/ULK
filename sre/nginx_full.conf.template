@@ -56,10 +56,10 @@ http {
 
         # если пришёл запрос со страниц PNETLab —
         # проксируем на pnetlab
-        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/legacy/topology"  pnetlab;
-        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/images/"          pnetlab;
-        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/html5/"           pnetlab;
-        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/store/"           pnetlab;
+        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/legacy/topology"  pnetlab;
+        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/images/"          pnetlab;
+        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/html5/"           pnetlab;
+        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/store/"           pnetlab;
         # можно добавить другие паттерны...
     }
 
@@ -74,7 +74,7 @@ http {
 
         location ^~ /api/ {
             proxy_pass         http://$api_backend;       # <- переменная из map
-            proxy_set_header   Host              $host;
+            proxy_set_header   Host              {{ prod_ip }}:{{ prod_port }};
             proxy_set_header   X-Real-IP         $remote_addr;
             proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header   X-Forwarded-Proto $scheme;
@@ -86,8 +86,8 @@ http {
             proxy_pass http://pnetlab/;
 
             proxy_http_version 1.1;
-            proxy_set_header Host              $host;
-            proxy_set_header X-Forwarded-Host  $host;
+            proxy_set_header Host              {{ prod_ip }}:{{ prod_port }};
+            proxy_set_header X-Forwarded-Host  {{ prod_ip }}:{{ prod_port }};
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade           $http_upgrade;
@@ -107,11 +107,11 @@ http {
             sub_filter_once off;
             sub_filter_types text/html text/css application/javascript application/json;
 
-            # Сносим абсолюты на IP -> делаем относительными
-            sub_filter 'http://{{ pnet_ip }}/'  '/';
-            sub_filter 'https://{{ pnet_ip }}/' '/';
-            sub_filter 'src="//{{ pnet_ip }}/'  'src="/';
-            sub_filter 'href="//{{ pnet_ip }}/' 'href="/';
+            # Сносим абсолюты на IP -> делаем относительными с портом
+            sub_filter 'http://{{ pnet_ip }}/'  'http://{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'https://{{ pnet_ip }}/' 'http://{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'src="//{{ pnet_ip }}/'  'src="//{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'href="//{{ pnet_ip }}/' 'href="//{{ prod_ip }}:{{ prod_port }}/';
 
             # Не добавляй сюда CORS — он не нужен при same-origin
 
@@ -128,8 +128,8 @@ http {
             proxy_pass http://pnetlab;
 
             proxy_http_version 1.1;
-            proxy_set_header Host              $host;
-            proxy_set_header X-Forwarded-Host  $host;
+            proxy_set_header Host              {{ prod_ip }}:{{ prod_port }};
+            proxy_set_header X-Forwarded-Host  {{ prod_ip }}:{{ prod_port }};
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade           $http_upgrade;
@@ -146,8 +146,8 @@ http {
 
             sub_filter_once off;
             sub_filter_types text/html text/css application/javascript application/json;
-            sub_filter 'http://{{ pnet_ip }}/'  '/';
-            sub_filter 'https://{{ pnet_ip }}/' '/';
+            sub_filter 'http://{{ pnet_ip }}/'  'http://{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'https://{{ pnet_ip }}/' 'http://{{ prod_ip }}:{{ prod_port }}/';
 
             # Кэш-хедеры для статических файлов (после sub_filter)
             if ($request_uri ~* \.(css|js|html|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$) {
@@ -168,7 +168,7 @@ http {
 
         location / {
             proxy_pass http://127.0.0.1:{{ proxy_port }};
-            proxy_set_header Host $host;
+            proxy_set_header Host {{ prod_ip }}:{{ prod_port }};
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
