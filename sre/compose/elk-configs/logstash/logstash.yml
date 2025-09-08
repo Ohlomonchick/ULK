@@ -1,0 +1,3 @@
+# Logstash Configuration for v9.1.1 (Simplified without SSL)
+# Logging
+log.level: info
