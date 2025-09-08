@@ -1,4 +1,4 @@
-# Elasticsearch Configuration for v9.1.1 (Simplified without SSL)
+# Elasticsearch Configuration for v9.1.1 (Default with SSL)
 cluster.name: cyberpolygon-cluster
 node.name: cyberpolygon-node-1
 node.roles: [ master, data, ingest ]
@@ -12,8 +12,18 @@ transport.port: 9300
 discovery.type: single-node
 discovery.seed_hosts: []
 
-# Security settings (disabled for simplicity)
-xpack.security.enabled: false
+# Security settings (default - SSL enabled automatically)
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+xpack.security.http.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.http.ssl.verification_mode: certificate
+xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certs/elasticsearch.key
+xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certs/elasticsearch.crt
+xpack.security.transport.ssl.certificate_authorities: ["/usr/share/elasticsearch/config/certs/ca.crt"]
+xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certs/elasticsearch.key
+xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certs/elasticsearch.crt
+xpack.security.http.ssl.certificate_authorities: ["/usr/share/elasticsearch/config/certs/ca.crt"]
 
 # Memory settings
 bootstrap.memory_lock: true

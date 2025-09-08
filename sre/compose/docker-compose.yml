@@ -49,13 +49,14 @@ services:
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-elastic}
-      - xpack.security.enabled=false
+      - xpack.security.enabled=true
     ulimits:
       memlock:
         soft: -1
         hard: -1
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
+      - ./certs:/usr/share/elasticsearch/config/certs:ro
       - ./elk-configs/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
     ports:
       - "9200:9200"
@@ -89,6 +90,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./elk-configs/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - ./certs:/usr/share/kibana/config/certs:ro
     ports:
       - "5601:5601"
     networks:

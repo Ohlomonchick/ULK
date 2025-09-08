@@ -3,11 +3,17 @@ server.name: kibana
 server.host: "0.0.0.0"
 server.port: 5601
 
-# Elasticsearch connection (without SSL)
-elasticsearch.hosts: ["http://elasticsearch:9200"]
+# Elasticsearch connection (with SSL)
+elasticsearch.hosts: ["https://elasticsearch:9200"]
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "elastic"
+elasticsearch.ssl.certificateAuthorities: ["/usr/share/kibana/config/certs/ca.crt"]
+elasticsearch.ssl.verificationMode: certificate
 
 # Localization
 i18n.locale: "en"
 
 # Telemetry
 telemetry.enabled: false
+
+
