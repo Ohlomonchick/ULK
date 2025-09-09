@@ -88,9 +88,10 @@ services:
     image: kibana:9.1.1
     container_name: cyberpolygon_kibana
     restart: unless-stopped
+    user: "1000:1000"  # Kibana user
     volumes:
       - ./elk-configs/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
-      - ./certs:/usr/share/kibana/config/certs:ro
+      - ./certs:/usr/share/kibana/config/certs:rw
     ports:
       - "5601:5601"
     networks:

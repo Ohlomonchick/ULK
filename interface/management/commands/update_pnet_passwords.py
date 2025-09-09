@@ -75,7 +75,7 @@ class Command(BaseCommand):
                 create_directory(url, get_pnet_base_dir(), user.username, cookie)
                 
                 # Создаем пользователя
-                create_user(url, user.username, pnet_password, '1', cookie)
+                create_user(url, user.pnet_login, pnet_password, '1', cookie)
                 
                 self.stdout.write(
                     self.style.SUCCESS(f"Пользователь {user.pnet_login} успешно создан в PNETLab")

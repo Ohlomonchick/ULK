@@ -7,6 +7,7 @@ from durationwidget.widgets import TimeDurationWidget
 from django.utils import timezone
 
 from interface.utils import get_pnet_password
+from interface.elastic_utils import create_elastic_user
 from .models import (
     LabType,
     User,
@@ -138,8 +139,26 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
             create_directory(url, get_pnet_base_dir(), user.username, cookie)
-            create_user(url, user.username, user.pnet_password, '1', cookie)
+            create_user(url, user.pnet_login, user.pnet_password, '1', cookie)
             logout(url)
+
+        # Создаем пользователя в Elasticsearch
+        try:
+            elastic_result = create_elastic_user(
+                username=user.pnet_login,  # pnet_login
+                password=user.pnet_password,  # pnet_password
+                index="suricata-*"  # Можно настроить через конфигурацию
+            )
+            if elastic_result != 'created':
+                # Логируем ошибку, но не прерываем создание пользователя
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to create Elasticsearch user {user.username}: {elastic_result}")
+        except Exception as e:
+            # Логируем ошибку, но не прерываем создание пользователя
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Exception while creating Elasticsearch user {user.username}: {e}")
 
         return user
 
