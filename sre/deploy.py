@@ -12,6 +12,8 @@ context = {
     'use_postgres': os.environ.get('USE_POSTGRES', 'yes'),
     'db_host': os.environ.get('DB_HOST', '192.168.100.5'),
     'pnet_ip': os.environ.get('PNET_IP', '192.168.100.10'),
+    'prod_ip': os.environ.get('PROD_IP', '172.18.4.200'),
+    'prod_port': os.environ.get('PROD_PORT', '8080'),
     'user': 'root',
     'group': 'root',
     'log_dir': '/var/log',

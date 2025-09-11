@@ -1,0 +1,43 @@
+# Filebeat Configuration for v9.1.1
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/*.log
+    - /var/log/syslog
+    - /var/log/messages
+  fields:
+    log_type: syslog
+  fields_under_root: true
+
+- type: log
+  enabled: true
+  paths:
+    - /app/logs/*.log
+  fields:
+    log_type: application
+  fields_under_root: true
+  json.keys_under_root: true
+  json.add_error_key: true
+
+# Processors
+processors:
+- add_host_metadata:
+    when.not.contains.tags: forwarded
+- add_cloud_metadata: ~
+- add_docker_metadata: ~
+- add_kubernetes_metadata: ~
+
+# Output to Logstash
+output.logstash:
+  hosts: ["logstash:5044"]
+
+# Monitoring
+monitoring.enabled: true
+monitoring.metrics.enabled: true
+
+# Logging
+logging.level: info
+logging.to_files: false
+logging.to_syslog: false
+logging.json: true

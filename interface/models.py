@@ -56,7 +56,7 @@ class LabTasksType(models.TextChoices):
 
 
 class Lab(models.Model):
-    id = models.AutoField(primary_key=True)
+    id = models.AutoField(primary_key=True, serialize=False)
     name = models.CharField('Имя', max_length=255)
     description = models.TextField('Описание')
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)

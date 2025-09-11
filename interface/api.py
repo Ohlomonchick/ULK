@@ -1,7 +1,7 @@
 import json
 import requests
 import urllib3
-
+import logging
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -418,7 +418,6 @@ def get_pnet_auth(request):
         response = JsonResponse({'success': True, 'cookies': cookies_dict, 'xsrf_token': xsrf_token})
         
         # Устанавливаем cookies в HTTP-ответе для автоматической синхронизации
-        import logging
         logger = logging.getLogger(__name__)
         
         for cookie in session.cookies:
@@ -496,6 +495,8 @@ def create_pnet_lab_session(request):
         )
         
         if create_session_response.status_code != 200:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create lab session: {create_session_response.text}\n{create_session_response.json()}")
             return JsonResponse({'error': 'Failed to create lab session'}, status=500)
         
         return JsonResponse({

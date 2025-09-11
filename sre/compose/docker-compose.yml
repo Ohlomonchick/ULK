@@ -37,8 +37,87 @@ services:
       -c max_parallel_workers=2
       -c max_parallel_maintenance_workers=1
 
+  # ELK Stack 9.1.1 (Simplified without SSL)
+  elasticsearch:
+    image: elasticsearch:9.1.1
+    container_name: cyberpolygon_elasticsearch
+    restart: unless-stopped
+    environment:
+      - node.name=cyberpolygon-es-node
+      - cluster.name=cyberpolygon-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-elastic}
+      - xpack.security.enabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+      - ./certs:/usr/share/elasticsearch/config/certs:ro
+      - ./elk-configs/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - cyberpolygon_network
+    depends_on:
+      - postgres
+
+  logstash:
+    image: logstash:9.1.1
+    container_name: cyberpolygon_logstash
+    restart: unless-stopped
+    environment:
+      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+    volumes:
+      - ./elk-configs/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./elk-configs/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      - ./elk-configs/logstash/pipelines:/usr/share/logstash/config/pipelines:ro
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    networks:
+      - cyberpolygon_network
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: kibana:9.1.1
+    container_name: cyberpolygon_kibana
+    restart: unless-stopped
+    volumes:
+      - ./elk-configs/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - ./certs:/usr/share/kibana/config/certs:ro
+    ports:
+      - "5601:5601"
+    networks:
+      - cyberpolygon_network
+    depends_on:
+      - elasticsearch
+
+  filebeat:
+    image: elastic/filebeat:9.1.1
+    container_name: cyberpolygon_filebeat
+    restart: unless-stopped
+    user: root
+    volumes:
+      - ./elk-configs/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log/docker:/var/log/docker:ro
+      - /var/log/syslog:/var/log/syslog:ro
+      - /var/log/messages:/var/log/messages:ro
+    networks:
+      - cyberpolygon_network
+    depends_on:
+      - logstash
+
 volumes:
   postgres_data:
+    driver: local
+  elasticsearch_data:
     driver: local
 
 networks:

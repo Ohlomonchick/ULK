@@ -1,0 +1,44 @@
+# Elasticsearch Configuration for v9.1.1 (Default with SSL)
+cluster.name: cyberpolygon-cluster
+node.name: cyberpolygon-node-1
+node.roles: [ master, data, ingest ]
+
+# Network settings
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Discovery settings
+discovery.type: single-node
+discovery.seed_hosts: []
+
+# Security settings (default - SSL enabled automatically)
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+xpack.security.http.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.http.ssl.verification_mode: certificate
+xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certs/elasticsearch.key
+xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certs/elasticsearch.crt
+xpack.security.transport.ssl.certificate_authorities: ["/usr/share/elasticsearch/config/certs/ca.crt"]
+xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certs/elasticsearch.key
+xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certs/elasticsearch.crt
+xpack.security.http.ssl.certificate_authorities: ["/usr/share/elasticsearch/config/certs/ca.crt"]
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Path settings
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+# Performance settings
+indices.memory.index_buffer_size: 30%
+indices.queries.cache.size: 20%
+indices.fielddata.cache.size: 20%
+
+# Monitoring
+xpack.monitoring.collection.enabled: true
+
+# Logging
+logger.level: INFO
