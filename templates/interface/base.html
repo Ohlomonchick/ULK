@@ -103,7 +103,7 @@
             <div style="position: fixed; bottom: 1rem; right: 1rem; ">
                 <a class="button is-info is-small"
                    href="{% url 'interface:help-page' %}?next={{ request.get_full_path|urlencode }}">
-                    Помощь
+                    <span class="icon is-small"><i class="fas fa-question"></i></span> &nbsp; Помощь
                 </a>
             </div>
           {% endif %}
