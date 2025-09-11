@@ -11,12 +11,12 @@ $(document).ready(function() {
             const $labSelect = $(this);
             const tasksId = $labSelect.attr('id').replace('-lab', '-tasks');
 
-            $labSelect.off('change.lab').on('change.lab', function() {
+            $labSelect.off('change.lab').on('change.lab', function(event, setNumTasks = true) {
                 const labSlug = $(this).find('option:selected').text();
                 if (labSlug && labSlug !== "---------") {
-                    loadTasks(labSlug, '#' + tasksId);
+                    loadTasks(labSlug, '#' + tasksId, setNumTasks);
                 }
-            }).trigger('change.lab');
+            }).trigger('change.lab', [false]);
         });
     }
 
@@ -41,12 +41,14 @@ $(document).ready(function() {
                     mutations.forEach(mutation => {
                         if (mutation.attributeName === "title") {
                             const labSlug = $rendered.attr("title");
-                            handleLabChange(labSlug, "#id_level", "#id_tasks");
+                            handleLabChange(labSlug, "#id_level", "#id_tasks", true);
                         }
                     });
                 });
                 observer.observe($rendered[0], { attributes: true });
             }
+            const initialLabSlug = $rendered.attr("title");
+            handleLabChange(initialLabSlug, "#id_level", "#id_tasks", false);
         }
     }
 
@@ -64,24 +66,23 @@ $(document).ready(function() {
             mutations.forEach(mutation => {
                 if (mutation.attributeName === "title") {
                     const labSlug = $rendered.attr("title");
-                    handleLabChange(labSlug, null, tasksSelector);
+                    handleLabChange(labSlug, null, tasksSelector, true);
                 }
             });
         });
         observer.observe($rendered[0], { attributes: true });
 
-        // Инициализация начального значения
         const initialLabSlug = $rendered.attr("title");
         if (initialLabSlug && initialLabSlug !== "---------") {
-            loadTasks(initialLabSlug, tasksSelector);
+            handleLabChange(initialLabSlug, null, tasksSelector, false);
         }
     }
 
     // Общая обработка изменений
-    function handleLabChange(labSlug, levelsSelector, tasksSelector) {
+    function handleLabChange(labSlug, levelsSelector, tasksSelector, setNumTasks = true) {
         if (labSlug && labSlug !== "---------") {
             if (levelsSelector) loadLevels(labSlug, levelsSelector);
-            if (tasksSelector) loadTasks(labSlug, tasksSelector);
+            if (tasksSelector) loadTasks(labSlug, tasksSelector, setNumTasks);
         }
     }
 
@@ -115,16 +116,14 @@ $(document).ready(function() {
         });
     }
 
-    function loadTasks(labSlug, tasksSelector) {
+    function loadTasks(labSlug, tasksSelector, setNumTasks = true) {
         const $tasksField = $(tasksSelector);
-        // Сохраняем ранее выбранные задачи
         const selectedTasks = $tasksField.val() || [];
 
         $.ajax({
             url: `/api/lab_tasks/${encodeURIComponent(labSlug)}/`,
             type: 'GET',
             success: function(response) {
-                // Очищаем перед добавлением, чтобы не было дублей
                 $tasksField.html('');
                 const uniqueTasks = new Map();
                 response.forEach(task => {
@@ -141,6 +140,14 @@ $(document).ready(function() {
                     $tasksField.append($option);
                 });
                 $tasksField.trigger('change.select2');
+
+                if (setNumTasks) {
+                    const numTasksSelector = tasksSelector.replace(/-tasks$/, '-num_tasks');
+                    const $numTasks = $(numTasksSelector);
+                    if ($numTasks.length) {
+                        $numTasks.val(uniqueTasks.size);
+                    }
+                }
             },
             error: function(xhr) {
                 console.error('Ошибка загрузки задач:', xhr.responseText);
