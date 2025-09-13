@@ -1,5 +1,6 @@
 import random
 import concurrent.futures
+from time import sleep
 from typing import List
 
 from django import forms
@@ -138,7 +139,7 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
             Pass = 'eve'
             cookie, xsrf = pf_login(url, Login, Pass)
             create_directory(url, get_pnet_base_dir(), user.username, cookie)
-            create_user(url, user.username, user.pnet_password, '1', cookie)
+            create_user(url, user.pnet_login, user.pnet_password, '1', cookie)
             logout(url)
 
         return user
@@ -431,6 +432,13 @@ class SimpleCompetitionForm(forms.Form):
         required=False,
         widget=forms.CheckboxSelectMultiple()
     )
+    level = forms.ModelChoiceField(
+        label="Вариант",
+        queryset=LabLevel.objects.none(),
+        required=False,
+        empty_label=None,
+        widget=forms.RadioSelect()
+    )
 
     def __init__(self, *args, **kwargs):
         self.lab = kwargs.pop("lab", None)
@@ -440,6 +448,7 @@ class SimpleCompetitionForm(forms.Form):
             return
             
         self._setup_tasks_field()
+        self._setup_level_field()
         self._setup_duration_field()
         
         if self.lab.lab_type == LabType.COMPETITION:
@@ -450,6 +459,14 @@ class SimpleCompetitionForm(forms.Form):
         qs = LabTask.objects.filter(lab=self.lab)
         self.fields["tasks"].queryset = qs
         self.fields["tasks"].initial = list(qs.values_list("pk", flat=True))
+    
+    def _setup_level_field(self):
+        """Configure level field for the current lab"""
+        qs = LabLevel.objects.filter(lab=self.lab)
+        self.fields["level"].queryset = qs
+        # Если есть уровни, выбираем первый по умолчанию
+        if qs.exists():
+            self.fields["level"].initial = qs.first()
     
     def _setup_duration_field(self):
         """Configure duration field with lab's default"""
@@ -490,8 +507,9 @@ class SimpleCompetitionForm(forms.Form):
     def _build_base_competition_data(self, selected_tasks):
         """Build common competition data"""
         platoon_ids = self._get_target_platoon_ids()
+        selected_level = self.cleaned_data.get("level")
         
-        return {
+        data = {
             "lab": str(self.lab.pk),
             "start": timezone.now(),
             "finish": timezone.now() + self.cleaned_data["duration"],
@@ -499,6 +517,12 @@ class SimpleCompetitionForm(forms.Form):
             "platoons": [str(pk) for pk in platoon_ids],
             "tasks": [str(task.pk) for task in selected_tasks],
         }
+        
+        # Добавляем уровень, если он выбран
+        if selected_level:
+            data["level"] = str(selected_level.pk)
+            
+        return data
     
     def _get_target_platoon_ids(self):
         """Get platoon IDs filtered by learning years"""

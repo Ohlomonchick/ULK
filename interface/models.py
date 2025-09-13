@@ -90,16 +90,10 @@ class Lab(models.Model):
 
     def save(self, *args, **kwargs):
         # Генерируем slug на основе имени
-        base_slug = slugify(self.name)
-        
-        # Проверяем уникальность slug
-        counter = 1
-        original_slug = base_slug
-        while Lab.objects.filter(slug=base_slug).exclude(pk=self.pk).exists():
-            base_slug = f"{original_slug}-{counter}"
-            counter += 1
-        
-        self.slug = base_slug
+
+        if self._state.adding:
+            base_slug = slugify(self.name)
+            self.slug = base_slug
         
         super(Lab, self).save(*args, **kwargs)
 
