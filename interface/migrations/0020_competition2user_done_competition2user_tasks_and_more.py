@@ -17,49 +17,9 @@ class Migration(migrations.Migration):
             name='done',
             field=models.BooleanField(default=False, verbose_name='Завершено'),
         ),
-        migrations.AddField(
-            model_name='competition2user',
-            name='tasks',
-            field=models.ManyToManyField(blank=True, related_name='assigned_tasks', to='interface.labtask', verbose_name='Задания'),
-        ),
         migrations.AlterField(
             model_name='competition2user',
             name='competition',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='competition_users', to='interface.competition'),
-        ),
-        migrations.CreateModel(
-            name='Kkz',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255, null=True, verbose_name='Название ККЗ')),
-                ('start', models.DateTimeField(verbose_name='Начало')),
-                ('finish', models.DateTimeField(verbose_name='Окончание')),
-                ('unified_tasks', models.BooleanField(default=False, verbose_name='Единые задания для всех')),
-                ('non_platoon_users', models.ManyToManyField(blank=True, to=settings.AUTH_USER_MODEL, verbose_name='Студенты')),
-                ('platoons', models.ManyToManyField(blank=True, to='interface.platoon', verbose_name='Взвода')),
-            ],
-            options={
-                'verbose_name': 'ККЗ',
-                'verbose_name_plural': 'ККЗ',
-            },
-        ),
-        migrations.AddField(
-            model_name='competition',
-            name='kkz',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='competitions', to='interface.kkz', verbose_name='ККЗ'),
-        ),
-        migrations.CreateModel(
-            name='KkzLab',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('num_tasks', models.PositiveIntegerField(default=1, verbose_name='Количество заданий для распределения')),
-                ('kkz', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='kkz_labs', to='interface.kkz')),
-                ('lab', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='interface.lab', verbose_name='Лабораторная работа')),
-                ('tasks', models.ManyToManyField(blank=True, to='interface.labtask', verbose_name='Задания')),
-            ],
-            options={
-                'verbose_name': 'Лабораторная работа в ККЗ',
-                'verbose_name_plural': 'Лабораторные работы в ККЗ',
-            },
         ),
     ]

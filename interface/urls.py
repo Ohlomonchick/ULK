@@ -9,11 +9,11 @@ urlpatterns = [
     path("labs/<slug:slug>/<str:lab_type>/", LabDetailView.as_view(), name="lab-detail"),
     path("lab_menu/", lambda request: render(request, "interface/lab_menu.html"), name="lab-menu"),  # for /labs
     path("labs/", LabListView.as_view(), name="lab-list"),  # for /labs/?...
+    path("competitions/<slug:slug>/kibana_dashboard/", lambda request, slug: render(request, "interface/kibana_dashboard.html", {"slug": slug}), name="kibana-dashboard"),
     path("competitions/<slug:slug>/", CompetitionDetailView.as_view(), name="competition-detail"),
     path("team_competitions/<slug:slug>/", TeamCompetitionDetailView.as_view(), name="team-competition-detail"),
     path("competitions/", CompetitionListView.as_view(), name="competition-list"),
     path("competition_history/", CompetitionHistoryListView.as_view(), name="competition-history-list"),
     path("team_competitions/", TeamCompetitionListView.as_view(), name="team-competition-list"),
-    path("kibana_dashboard/", lambda request: render(request, "interface/kibana_dashboard.html"), name="kibana-dashboard"),
     path("help_page/", lambda request: render(request, "interface/help_page.html"), name="help-page"),
 ]

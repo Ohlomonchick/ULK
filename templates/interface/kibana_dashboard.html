@@ -8,17 +8,33 @@
         .hero-body-style {
             padding: 0 !important;
         }
-        
+
         /* Specifically target the media query styles */
         @media screen and (min-width: 769px), print {
             .hero-body-style {
                 padding: 0 !important;
             }
         }
-        
+
         /* Additional fallback for any hero-body within this page */
         .hero-body {
             padding: 0 !important;
+        }
+
+        /* Fixed back button styles */
+        .fixed-back-button {
+            position: fixed;
+            bottom: 2vh;
+            left: 1vw;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .fixed-back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
         }
     </style>
 {% endblock %}
@@ -27,15 +43,16 @@
 {% block container_class %}container-full-width{% endblock %}
 
 {% block content %}
-<iframe 
+<iframe
     id="kibanaFrame"
     style="aspect-ratio: 16/9;"
-    src="/kibana/" 
+    src="/kibana/"
     width="100%"
     class="mb-5"
     height="100%"
     frameborder="0">
 </iframe>
 
+<a class="button is-dark is-medium fixed-back-button" href="{% url 'interface:competition-detail' slug=slug %}">⬅ Вернуться к работе</a>
 <script src="{% static 'js/kibana_controller.js' %}"></script>
 {% endblock %}

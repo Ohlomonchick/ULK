@@ -18,6 +18,7 @@ from interface.eveFunctions import pf_login, logout, create_directory, get_user_
 from interface.config import get_pnet_url, get_pnet_base_dir
 from .validators import validate_top_level_array, validate_lab_task_json_config
 from .pnet_session_manager import execute_pnet_operation_if_needed
+from .elastic_utils import delete_elastic_user
 logger = logging.getLogger(__name__)
 
 
@@ -67,10 +68,11 @@ class Lab(models.Model):
     learning_years = models.JSONField('Годы обучения', default=list, null=True, blank=True)
     default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=7))
     tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
+    need_kibana = models.BooleanField('Показывать дашборд в Kibana', default=False)
 
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
-    
+
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
     ConnectorsData = models.JSONField('Коннекторы', default=default_json, validators=[validate_top_level_array])
     Connectors2CloudData = models.JSONField(
@@ -91,16 +93,16 @@ class Lab(models.Model):
     def save(self, *args, **kwargs):
         # Генерируем slug на основе имени
         base_slug = slugify(self.name)
-        
+
         # Проверяем уникальность slug
         counter = 1
         original_slug = base_slug
         while Lab.objects.filter(slug=base_slug).exclude(pk=self.pk).exists():
             base_slug = f"{original_slug}-{counter}"
             counter += 1
-        
+
         self.slug = base_slug
-        
+
         super(Lab, self).save(*args, **kwargs)
 
     def get_platform(self):
@@ -132,8 +134,8 @@ class LabTask(models.Model):
     task_id = models.CharField("Идентификатор задания", max_length=255, null=True)
     description = models.TextField("Описание задания", blank=True, null=True)
     json_config = models.JSONField(
-        "Конфигурация задания", 
-        blank=True, 
+        "Конфигурация задания",
+        blank=True,
         null=True,
         default=dict,
         validators=[validate_lab_task_json_config],
@@ -189,6 +191,23 @@ class User(AbstractUser):
         self.pnet_login = slugify(self.username)
 
         super(User, self).save(*args, **kwargs)
+
+    @classmethod
+    def delete_from_elasticsearch(cls, sender, instance, **kwargs):
+        """
+        Удалить пользователя из Elasticsearch при удалении из базы данных
+        """
+        if hasattr(instance, 'pnet_login') and instance.pnet_login and instance.pnet_login.strip():
+            try:
+                elastic_result = delete_elastic_user(instance.pnet_login)
+                if elastic_result == 'deleted':
+                    logger.info(f"Successfully deleted Elasticsearch user: {instance.pnet_login}")
+                elif elastic_result == 'connection failed':
+                    logger.warning(f"Failed to connect to Elasticsearch when deleting user: {instance.pnet_login}")
+                else:
+                    logger.warning(f"Failed to delete Elasticsearch user {instance.pnet_login}: {elastic_result}")
+            except Exception as e:
+                logger.error(f"Exception while deleting Elasticsearch user {instance.pnet_login}: {e}")
 
     class Meta:
         verbose_name = 'Пользователь'
@@ -365,9 +384,9 @@ class Competition2User(models.Model):
     def delete_from_platform(self, final=False):
         if self.deleted:
             return
-        
+
         execute_pnet_operation_if_needed(
-            self.competition.lab, 
+            self.competition.lab,
             lambda session_manager: session_manager.delete_lab_for_user(self.competition.lab, self.user.username)
         )
 
@@ -388,11 +407,11 @@ class Competition2User(models.Model):
         if not created:
             return
         lab = instance.competition.lab
-        
+
         def _create_operation(session_manager):
             session_manager.create_lab_for_user(lab, instance.user.username)
             session_manager.create_lab_nodes_and_connectors(lab, instance.user.username)
-        
+
         execute_pnet_operation_if_needed(lab, _create_operation)
 
 
@@ -435,7 +454,7 @@ class TeamCompetition2Team(models.Model):
         if not created:
             return
         lab = instance.competition.lab
-        
+
         def _create_operation(session_manager):
             session_manager.create_lab_for_user(lab, instance.team.slug)
             session_manager.create_lab_nodes_and_connectors(lab, instance.team.slug)
@@ -447,20 +466,20 @@ class TeamCompetition2Team(models.Model):
                 session_manager.change_user_workspace(
                     user.pnet_login, relative_path
                 )
-        
+
         execute_pnet_operation_if_needed(lab, _create_operation)
 
     def delete_from_platform(self, final=False):
         if self.deleted and not final:
             return
-        
+
         def _delete_operation(session_manager):
             session_manager.delete_lab_for_team(self.competition.lab, self.team.slug)
             for user in self.team.users.all():
                 session_manager.change_user_workspace(
                     user.pnet_login, f'{get_user_workspace_relative_path()}/{user.pnet_login}'
                 )
-        
+
         execute_pnet_operation_if_needed(self.competition.lab, _delete_operation)
 
         self.deleted = True
@@ -473,6 +492,10 @@ class TeamCompetition2Team(models.Model):
         instance.delete_from_platform(final=True)
 
 
+
+
+
 post_save.connect(Competition2User.post_create, sender=Competition2User)
 post_save.connect(TeamCompetition2Team.post_create, sender=TeamCompetition2Team)
 post_delete.connect(TeamCompetition2Team.on_through_delete, sender=TeamCompetition2Team)
+post_delete.connect(User.delete_from_elasticsearch, sender=User)

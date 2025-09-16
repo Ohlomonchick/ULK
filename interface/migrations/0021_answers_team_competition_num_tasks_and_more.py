@@ -13,11 +13,6 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name='answers',
-            name='team',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='interface.team'),
-        ),
-        migrations.AddField(
             model_name='competition',
             name='num_tasks',
             field=models.PositiveIntegerField(default=1, verbose_name='Количество заданий для распределения'),
