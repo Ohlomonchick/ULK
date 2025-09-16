@@ -46,13 +46,14 @@
 <iframe
     id="kibanaFrame"
     style="aspect-ratio: 16/9;"
-    src="/kibana/"
+    data-src="/kibana/"
     width="100%"
     class="mb-5"
     height="100%"
     frameborder="0">
 </iframe>
 
-<a class="button is-dark is-medium fixed-back-button" href="{% url 'interface:competition-detail' slug=slug %}">⬅ Вернуться к работе</a>
+<script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
+<a class="button is-dark is-medium fixed-back-button" href="{% url 'interface:competition-detail' slug=slug %}"><i class="fas fa-arrow-left mr-1"></i>Вернуться к работе</a>
 <script src="{% static 'js/kibana_controller.js' %}"></script>
 {% endblock %}

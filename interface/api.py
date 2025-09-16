@@ -246,7 +246,7 @@ def press_button(request, action):  # pragma: no cover
         if action == "start":
             competition.start = timezone.now()
             competition.save()
-            cache.set("competitions_update", True, timeout=60)            
+            cache.set("competitions_update", True, timeout=60)
             return JsonResponse({"redirect_url": competition_url}, status=200)
         elif action == "end":
             competition.finish = timezone.now()
@@ -373,38 +373,38 @@ def get_pnet_auth(request):
     """Аутентифицирует пользователя в PNET и возвращает cookies"""
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'User not authenticated'}, status=401)
-    
+
     user = request.user
     if not user.pnet_login or not user.pnet_password:
         return JsonResponse({'error': 'User PNET credentials not configured'}, status=400)
-    
+
     try:
         pnet_url = f"{get_web_url()}/pnetlab"
         session = requests.Session()
         session.verify = False
-        
+
         # Получаем XSRF-TOKEN
         preflight_response = session.get(f"{pnet_url}/store/public/auth/login/login", timeout=10)
         if preflight_response.status_code not in [200, 202]:
             return JsonResponse({'error': 'Failed to connect to PNET'}, status=500)
-        
+
         xsrf_token = session.cookies.get('XSRF-TOKEN', '')
-        
+
         # Аутентификация
         headers = {'Content-Type': 'application/json;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest'}
         if xsrf_token:
             headers['X-XSRF-TOKEN'] = xsrf_token
-            
+
         login_response = session.post(
             f"{pnet_url}/store/public/auth/login/login",
             headers=headers,
             json={'username': user.pnet_login, 'password': user.pnet_password, 'html': '1', 'captcha': ''},
             timeout=10
         )
-        
+
         if login_response.status_code not in [200, 201, 202]:
             return JsonResponse({'error': 'PNET authentication failed'}, status=401)
-        
+
         # Проверка JSON ответа для статуса 202
         if login_response.status_code == 202:
             try:
@@ -412,14 +412,14 @@ def get_pnet_auth(request):
                     return JsonResponse({'error': 'PNET authentication failed'}, status=401)
             except (ValueError, KeyError):
                 pass  # Продолжаем, возможно cookies установлены
-        
+
         # Возвращаем cookies и устанавливаем их в ответе
         cookies_dict = {cookie.name: cookie.value for cookie in session.cookies}
         response = JsonResponse({'success': True, 'cookies': cookies_dict, 'xsrf_token': xsrf_token})
-        
+
         # Устанавливаем cookies в HTTP-ответе для автоматической синхронизации
         logger = logging.getLogger(__name__)
-        
+
         for cookie in session.cookies:
             logger.info(f"Setting cookie {cookie.name}={cookie.value} domain={cookie.domain} path={cookie.path}")
             response.set_cookie(
@@ -430,9 +430,9 @@ def get_pnet_auth(request):
                 httponly=False,  # Разрешаем JavaScript доступ
                 samesite='Lax'
             )
-        
+
         return response
-        
+
     except requests.exceptions.Timeout:
         return JsonResponse({'error': 'PNET request timeout'}, status=500)
     except requests.exceptions.ConnectionError:
@@ -441,6 +441,150 @@ def get_pnet_auth(request):
         return JsonResponse({'error': f'Authentication error: {str(e)}'}, status=500)
 
 
+@api_view(['GET'])
+def check_kibana_auth_status(request):
+    """Проверяет статус аутентификации пользователя в Kibana"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'authenticated': False, 'error': 'User not authenticated'}, status=401)
+
+    user = request.user
+    if not user.pnet_login or not user.pnet_password:
+        return JsonResponse({'authenticated': False, 'error': 'User credentials not configured'}, status=400)
+
+    try:
+        kibana_url = f"{get_web_url()}/kibana"
+        session = requests.Session()
+        session.verify = False
+
+        # Проверяем статус аутентификации через API Kibana
+        headers = {
+            'Accept': 'application/json',
+            'kbn-version': '9.1.1',
+            'x-elastic-internal-origin': 'Kibana'
+        }
+
+        # Пробуем получить информацию о текущем пользователе
+        status_response = session.get(
+            f"{kibana_url}/internal/security/me",
+            headers=headers,
+            timeout=5
+        )
+
+        # Если получили 200 - пользователь аутентифицирован
+        if status_response.status_code == 200:
+            try:
+                user_info = status_response.json()
+                return JsonResponse({
+                    'authenticated': True,
+                    'username': user_info.get('username', user.pnet_login)
+                })
+            except (ValueError, KeyError):
+                pass
+
+        # Если получили 401/403 - пользователь не аутентифицирован
+        return JsonResponse({'authenticated': False})
+
+    except requests.exceptions.Timeout:
+        return JsonResponse({'authenticated': False, 'error': 'Kibana request timeout'}, status=500)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({'authenticated': False, 'error': 'Failed to connect to Kibana'}, status=500)
+    except Exception as e:
+        return JsonResponse({'authenticated': False, 'error': f'Check error: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+@api_view(['POST'])
+def get_kibana_auth(request):
+    """Аутентифицирует пользователя в Kibana и возвращает cookies"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+
+    user = request.user
+    if not user.pnet_login or not user.pnet_password:
+        return JsonResponse({'error': 'User credentials not configured'}, status=400)
+
+    try:
+        kibana_url = f"{get_web_url()}/kibana"
+        session = requests.Session()
+        session.verify = False
+
+        # Получаем главную страницу Kibana для получения версии
+        main_page_response = session.get(f"{kibana_url}/", timeout=10)
+        if main_page_response.status_code not in [200, 401, 403]:
+            return JsonResponse({'error': 'Failed to connect to Kibana'}, status=500)
+
+        # Извлекаем версию Kibana из заголовков
+        kbn_version = main_page_response.headers.get('kbn-version', '9.1.1')
+
+        # Аутентификация через внутренний API Kibana
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'ru,en;q=0.9',
+            'Connection': 'keep-alive',
+            'Origin': kibana_url,
+            'Referer': f"{kibana_url}/login?msg=LOGGED_OUT",
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 YaBrowser/25.8.0.0 Safari/537.36',
+            'kbn-build-number': '88427',
+            'kbn-version': kbn_version,
+            'x-elastic-internal-origin': 'Kibana'
+        }
+
+        login_data = {
+            'providerType': 'basic',
+            'providerName': 'basic',
+            'currentURL': f"{kibana_url}/login?msg=LOGGED_OUT",
+            'params': {
+                'username': user.pnet_login,
+                'password': user.pnet_password
+            }
+        }
+
+        login_response = session.post(
+            f"{kibana_url}/internal/security/login",
+            headers=headers,
+            json=login_data,
+            timeout=10
+        )
+
+        if login_response.status_code not in [200, 201, 202]:
+            return JsonResponse({'error': 'Kibana authentication failed'}, status=401)
+
+        # Проверяем успешность аутентификации
+        try:
+            login_result = login_response.json()
+            if not login_result.get('success', True):
+                return JsonResponse({'error': 'Kibana authentication failed'}, status=401)
+        except (ValueError, KeyError):
+            pass  # Продолжаем, возможно cookies установлены
+
+        # Возвращаем cookies и устанавливаем их в ответе
+        cookies_dict = {cookie.name: cookie.value for cookie in session.cookies}
+        response = JsonResponse({'success': True, 'cookies': cookies_dict})
+
+        # Устанавливаем cookies в HTTP-ответе для автоматической синхронизации
+        for cookie in session.cookies:
+            response.set_cookie(
+                cookie.name,
+                cookie.value,
+                path='/',
+                secure=False,
+                httponly=False,
+                samesite='Lax'
+            )
+
+        return response
+
+    except requests.exceptions.Timeout:
+        return JsonResponse({'error': 'Kibana request timeout'}, status=500)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({'error': 'Failed to connect to Kibana'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Kibana authentication error: {str(e)}'}, status=500)
 
 
 @csrf_exempt
@@ -449,39 +593,39 @@ def create_pnet_lab_session(request):
     """Создает сессию лабы в PNET после аутентификации"""
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'User not authenticated'}, status=401)
-    
+
     slug = request.data.get('slug')
     if not slug:
         return JsonResponse({'error': 'Competition slug required'}, status=400)
-    
+
     try:
         competition = Competition.objects.get(slug=slug)
         user = request.user
-        
+
         if not user.pnet_login:
             return JsonResponse({'error': 'User PNET login not configured'}, status=400)
-        
+
         # Получаем путь до лабы пользователя
         from .utils import get_pnet_lab_name
-        
+
         base_path = get_pnet_base_dir()
         lab_name = get_pnet_lab_name(competition.lab)
         lab_file_name = lab_name + '.unl'
         lab_path = f"/{base_path.rstrip('/').lstrip('/')}/{user.pnet_login}/{lab_file_name}"
-        
+
         # Отправляем запрос на создание сессии лабы
         pnet_url = f"{get_web_url()}/pnetlab"
         session = requests.Session()
         session.verify = False
-        
+
         # Копируем cookies из запроса (должны быть установлены после аутентификации)
         for cookie_name, cookie_value in request.COOKIES.items():
             session.cookies.set(cookie_name, cookie_value)
-        
+
         # Создаем сессию лабы
         full_url = f"{pnet_url}/api/labs/session/factory/create"
         payload = {'path': lab_path}
-        
+
         create_session_response = session.post(
             full_url,
             headers={
@@ -493,18 +637,18 @@ def create_pnet_lab_session(request):
             json=payload,
             timeout=10
         )
-        
+
         if create_session_response.status_code != 200:
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to create lab session: {create_session_response.text}\n{create_session_response.json()}")
             return JsonResponse({'error': 'Failed to create lab session'}, status=500)
-        
+
         return JsonResponse({
             'success': True,
             'lab_path': lab_path,
             'redirect_url': '/legacy/topology'
         })
-        
+
     except Competition.DoesNotExist:
         return JsonResponse({'error': 'Competition not found'}, status=404)
     except requests.exceptions.Timeout:

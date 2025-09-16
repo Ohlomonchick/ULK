@@ -100,7 +100,7 @@
 
         </div>
         <div class="column is-one-quarter">
-            <div id="timer" class="message is-dark" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09); border: 1px solid rgba(0, 0, 0, 0.1)">
+            <div id="timer" class="message is-dark mb-3" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09); border: 1px solid rgba(0, 0, 0, 0.1)">
                 <div class="message-body">
                     <h2 class="has-text-weight-bold">Оставшееся время:</h2>
 
@@ -117,7 +117,7 @@
             {% endif %}
 
             {% if object.lab.need_kibana %}
-                <a href="{% url 'interface:kibana-dashboard' slug=object.slug %}" class="button is-dark is-medium">
+                <a href="{% url 'interface:kibana-dashboard' slug=object.slug %}" class="button is-dark is-medium mb-3 mt-0">
                     <img src="{% static 'icons/kibana-dark-logo.svg' %}" style="width: 20px; height: 20px; filter: invert(1); margin-right: 8px;" alt="Kibana">
                     Перейтив в ELK
                 </a>
