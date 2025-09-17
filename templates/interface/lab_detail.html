@@ -134,6 +134,34 @@
                 </div>
             {% endif %}
 
+            {% if simple_form.fields.level.queryset %}
+                <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1);">
+                    <h3 class="title is-4 mb-1">{{ simple_form.level.label }}</h3>
+                    <p class="help mb-2">Выберите вариант для работы.</p>
+                    {% for level in simple_form.fields.level.queryset %}
+                        <article class="media" style="margin-bottom: 1rem;">
+                            <div class="media-left" style="margin-right: 0.75rem; display: flex; align-items: start;">
+                                <label class="radio">
+                                    <input type="radio" name="level" value="{{ level.pk }}" 
+                                           {% if forloop.first %}checked{% endif %}>
+                                </label>
+                            </div>
+                            <div class="media-content">
+                                <div class="content">
+                                    <p>
+                                        <strong class="title is-6">Вариант {{ level.level_number }}</strong>
+                                        <div class="mt-1">{{ level.description }}</div>
+                                    </p>
+                                </div>
+                            </div>
+                        </article>
+                    {% endfor %}
+                    {% if simple_form.level.errors %}
+                        <p class="help is-danger">{{ simple_form.level.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+
         </div>
     </div>
 </form>

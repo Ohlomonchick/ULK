@@ -63,8 +63,8 @@ class Lab(models.Model):
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)
     slug = models.SlugField('Название в адресной строке', max_length=255)
     platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
-    program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices, default=LabProgram.INFOBOR)
-    lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices, default=LabType.HW)
+    program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices)
+    lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices)
     learning_years = models.JSONField('Годы обучения', default=list, null=True, blank=True)
     default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=7))
     tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
@@ -92,17 +92,11 @@ class Lab(models.Model):
 
     def save(self, *args, **kwargs):
         # Генерируем slug на основе имени
-        base_slug = slugify(self.name)
 
-        # Проверяем уникальность slug
-        counter = 1
-        original_slug = base_slug
-        while Lab.objects.filter(slug=base_slug).exclude(pk=self.pk).exists():
-            base_slug = f"{original_slug}-{counter}"
-            counter += 1
-
-        self.slug = base_slug
-
+        if self._state.adding:
+            base_slug = slugify(self.name)
+            self.slug = base_slug
+            
         super(Lab, self).save(*args, **kwargs)
 
     def get_platform(self):

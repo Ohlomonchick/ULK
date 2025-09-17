@@ -46,7 +46,7 @@
     </div>
     {% endif %}
 
-     {% if user.is_superuser %}
+    {% if user.is_superuser and "competition" in request.GET.next %}
         <div class="content mt-4">
         <h2 class="subtitle is-5" style="background-color: #f0f0f0; padding: 0.5rem; border-radius: 4px;">
         1. Общая информация
@@ -56,7 +56,31 @@
         </p>
 
         <h2 class="subtitle is-5" style="background-color: #f0f0f0; padding: 0.5rem; border-radius: 4px;">
-        2. Шаги создания
+        2. Шаги создания экзамена
+        </h2>
+        <ol>
+        <li>Откройте страницу "Лабораторные работы".</li>
+        <li>Выберите программу.</li>
+        <li>Выберите экзамен.</li>
+        <li>Выберите задания, которые будут выданы студентам (по умолчанию выбраны все).</li>
+        <li>Выделите время на экзамен (по умолчанию - неделя) и создайте.</li>
+        <li>Вас перебросит на страницу экзамена, где можно наблюдать за прогрессом участников.</li>
+        </ol>
+
+    </div>
+     {% endif %}
+
+    {% if user.is_superuser and "lab" in request.GET.next %}
+        <div class="content mt-4">
+        <h2 class="subtitle is-5" style="background-color: #f0f0f0; padding: 0.5rem; border-radius: 4px;">
+        1. Общая информация
+        </h2>
+        <p>
+        Здесь описывается общая информация о работе с интерфейсом. Старайтесь следовать инструкциям точно.
+        </p>
+
+        <h2 class="subtitle is-5" style="background-color: #f0f0f0; padding: 0.5rem; border-radius: 4px;">
+        2. Шаги создания лабораторной работы
         </h2>
         <ol>
         <li>Откройте страницу "Лабораторные работы".</li>
@@ -69,6 +93,7 @@
 
     </div>
      {% endif %}
+
   </div>
 </section>
 

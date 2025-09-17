@@ -80,7 +80,7 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         for lab in labs:
             slug = lab.slug
             if slug not in bundle_dict:
-                bundle_dict[slug] = {LabType.HW: None, LabType.PZ: None, LabType.EXAM: None}
+                bundle_dict[slug] = {LabType.HW: None, LabType.EXAM: None, LabType.PZ: None}
             bundle_dict[slug][lab.lab_type] = lab
         for slug, labs_by_type in bundle_dict.items():
             lab_bundles.append({

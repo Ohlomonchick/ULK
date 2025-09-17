@@ -96,10 +96,13 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
             'widget': CustomJSONEditorWidget(width="50%", height="30vh")
         },
         DurationField: {
-            'widget': TimeDurationWidget(show_days=True, show_hours=True, show_minutes=True, show_seconds=False)
+            'widget': TimeDurationWidget(show_days=True, show_hours=True, show_minutes=True, show_seconds=False, attrs={'style': 'width:5em;'})
         }
     }
     inlines = [LabLevelInline, LabTaskInline]
+
+    class Media:
+        js = ('admin/js/jquery-3.7.1.min.js', "admin/js/load_lab_type.js")
 
     def get_learning_years(self, obj):
         return ", ".join(str(year) for year in obj.learning_years)
