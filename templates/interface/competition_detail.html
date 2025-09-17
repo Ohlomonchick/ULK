@@ -33,7 +33,7 @@
                                     <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
                                 </video>
                             </div>
-                        </div>  
+                        </div>
                     {% endif %}
 
                     <div id="competition-slug" data-slug="{{ object.slug }}">
@@ -83,7 +83,7 @@
                     <button class="iframe-toggle-slider" id="expandIframeBtn">
                         <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
                     </button>
-                    <iframe 
+                    <iframe
                         id="pnetFrame"
                         style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
                         data-src="/pnetlab/"
@@ -100,7 +100,7 @@
 
         </div>
         <div class="column is-one-quarter">
-            <div id="timer" class="message is-dark" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09); border: 1px solid rgba(0, 0, 0, 0.1)">
+            <div id="timer" class="message is-dark mb-3" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09); border: 1px solid rgba(0, 0, 0, 0.1)">
                 <div class="message-body">
                     <h2 class="has-text-weight-bold">Оставшееся время:</h2>
 
@@ -115,7 +115,14 @@
             {% if not user.is_superuser and object.level %}
                 <span class="tag is-medium "><h5 class="title is-5">Ваш вариант: {{ object.level.level_number }}</h5></span>
             {% endif %}
-            
+
+            {% if object.lab.need_kibana %}
+                <a href="{% url 'interface:kibana-dashboard' slug=object.slug %}" class="button is-dark is-medium mb-3 mt-0">
+                    <img src="{% static 'icons/kibana-dark-logo.svg' %}" style="width: 20px; height: 20px; filter: invert(1); margin-right: 8px;" alt="Kibana">
+                    Перейтив в ELK
+                </a>
+            {% endif %}
+
             {% if user.is_superuser %}
                 {% if assigned_tasks %}
                     {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Задания" %}
@@ -126,7 +133,7 @@
                 {% endif %}
             {% endif %}
 
-            
+
             {% if not user.is_superuser and object.lab.answer_flag %}
                 <div id="answer-form" class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
                     {% if submitted %}
@@ -149,7 +156,7 @@
                     {% endif %}
                 </div>
             {% endif %}
-                
+
 
         </div>
     </div>
@@ -260,7 +267,7 @@
 
     <script>
         let end = false;
-        
+
         function updateTimer() {
             const countdownElem = document.getElementById('countdown');
             const text = countdownElem.textContent.trim();
@@ -357,7 +364,7 @@
     {% endif %}
 
 
-    
+
     {% if object.lab.platform == "PN" and not user.is_superuser %}
         <script src="{% static 'js/pnet_controller.js' %}"></script>
 

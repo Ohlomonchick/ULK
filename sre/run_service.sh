@@ -17,6 +17,7 @@ export NGINX_IP=192.168.100.10
 # export NGINX_IP=127.0.0.1
 # export PNET_IP=192.168.1.10
 export PNET_IP=172.18.4.160
+export KIBANA_IP=192.168.100.11
 export WORKDIR="$PROJECT_ROOT"
 python3 deploy.py
 chmod 755 run_prod.sh

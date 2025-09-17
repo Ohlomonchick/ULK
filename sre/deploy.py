@@ -12,6 +12,7 @@ context = {
     'use_postgres': os.environ.get('USE_POSTGRES', 'yes'),
     'db_host': os.environ.get('DB_HOST', '192.168.100.5'),
     'pnet_ip': os.environ.get('PNET_IP', '192.168.100.10'),
+    'kibana_ip': os.environ.get('KIBANA_IP', '192.168.100.11'),
     'prod_ip': os.environ.get('PROD_IP', '172.18.4.200'),
     'prod_port': os.environ.get('PROD_PORT', '8080'),
     'user': 'root',
@@ -30,12 +31,12 @@ def render_template(template_path, output_path):
     """Render a Jinja2 template and write to output file"""
     with open(template_path, 'r', encoding='utf-8') as f:
         template = Template(f.read())
-    
+
     rendered = template.render(**context)
-    
+
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(rendered)
-    
+
     print(f"Generated: {output_path}")
 
 # Список шаблонов для обработки
@@ -64,11 +65,11 @@ try:
     if os.path.exists('/etc/nginx/nginx.conf'):
         shutil.copy2('/etc/nginx/nginx.conf', '/etc/nginx/nginx.conf.backup')
         print("Backed up existing nginx.conf")
-    
+
     # Copy our generated nginx config
     shutil.copy2('nginx.conf', '/etc/nginx/nginx.conf')
     print("Copied nginx.conf to /etc/nginx/nginx.conf")
-    
+
     # Test nginx configuration
     result = subprocess.run(['nginx', '-t'], capture_output=True, text=True)
     if result.returncode == 0:
@@ -78,7 +79,7 @@ try:
         print("Nginx reloaded successfully")
     else:
         print(f"Nginx configuration test failed: {result.stderr}")
-        
+
 except Exception as e:
     print(f"Error configuring nginx: {e}")
 

@@ -12,17 +12,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='TeamCompetition',
-            fields=[
-                ('competition_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='interface.competition')),
-            ],
-            options={
-                'verbose_name': 'Соревнование',
-                'verbose_name_plural': 'Соревнования',
-            },
-            bases=('interface.competition',),
-        ),
         migrations.AlterModelOptions(
             name='competition2user',
             options={'verbose_name': 'Задание участника', 'verbose_name_plural': 'Задания участников'},
@@ -31,29 +20,6 @@ class Migration(migrations.Migration):
             model_name='platoon',
             name='number',
             field=models.IntegerField(unique=True, verbose_name='Номер взвода'),
-        ),
-        migrations.CreateModel(
-            name='Team',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255, verbose_name='Имя')),
-                ('slug', models.SlugField(max_length=255, unique=True, verbose_name='Название в адресной строке')),
-                ('users', models.ManyToManyField(blank=True, to=settings.AUTH_USER_MODEL, verbose_name='Участники')),
-            ],
-            options={
-                'verbose_name': 'Команда',
-                'verbose_name_plural': 'Команды',
-            },
-        ),
-        migrations.CreateModel(
-            name='TeamCompetition2Team',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('deleted', models.BooleanField(default=False)),
-                ('competition', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='competition_teams', to='interface.teamcompetition')),
-                ('tasks', models.ManyToManyField(blank=True, to='interface.labtask', verbose_name='Задания')),
-                ('team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='team_competitions', to='interface.team')),
-            ],
         ),
         migrations.AddField(
             model_name='teamcompetition',

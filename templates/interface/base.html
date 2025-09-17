@@ -90,7 +90,7 @@
         {% endblock %}
 
         <section class="hero is-flex-grow-1">
-            <div class="hero-body is-flex-grow-1 is-flex is-align-items-center">
+            <div class="hero-body is-flex-grow-1 is-flex is-align-items-center {% block hero_class %}{% endblock %}">
                 <div class="container is-flex-grow-1 {% block container_class %}{% endblock %}">
                     {% block content %}
                     {% endblock %}
@@ -116,10 +116,10 @@
         </footer>
 
     </div>
-    
+
     <!-- jQuery для анимаций -->
     <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
-    
+
     <!-- Передача URL из Django в JavaScript -->
     <script>
         window.navbarUrls = {
@@ -133,6 +133,6 @@
             'login': "{% url 'login' %}"
         };
     </script>
-    
+
     <script src="{% static 'js/navbar_controller.js' %}"></script>
 </body>

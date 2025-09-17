@@ -40,7 +40,6 @@ def pf_login(url, name, password):
 
 
 def create_user(url, username, password, user_role, cookie):
-    username = slugify(username)
     relative_path = get_user_workspace_relative_path()
     user_params = {
         "data": [

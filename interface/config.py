@@ -39,7 +39,10 @@ def cache_for_minutes(minutes):
 
 @cache_for_minutes(1)
 def get_pnet_url():
-    return get_config('PNET_URL', 'http://172.18.4.160')
+    config = get_config('PNET_URL', 'http://172.18.4.160')
+    if 'http' not in config:
+        return None
+    return config
 
 
 @cache_for_minutes(1)
