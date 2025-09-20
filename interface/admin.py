@@ -111,12 +111,25 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     def get_fieldsets(self, request, obj=None):
         base_fields = ('name', 'slug', 'description', 'platform', 'program', 'lab_type', 'learning_years', 'default_duration', 'tasks_type', 'cover', 'answer_flag', 'need_kibana')
         pnet_fields = ('NodesData', 'ConnectorsData', 'Connectors2CloudData', 'NetworksData')
+        ssh_fields = ('PnetSSHNodeName',)
 
         if obj and obj.platform == "PN":
             return (
                 (None, {'fields': base_fields}),
                 ('PNETLab Конфигурация', {
                     'fields': pnet_fields,
+                    'classes': ('collapse',)
+                })
+            )
+        elif obj and obj.platform == "CMD":
+            return (
+                (None, {'fields': base_fields}),
+                ('PNETLab Конфигурация', {
+                    'fields': pnet_fields,
+                    'classes': ('collapse',)
+                }),
+                ('Конфигурация консоли', {
+                    'fields': ssh_fields,
                     'classes': ('collapse',)
                 })
             )

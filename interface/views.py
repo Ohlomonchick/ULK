@@ -465,3 +465,21 @@ def change_password(request):  # pragma: no cover
 class AnswerAPIView(viewsets.ModelViewSet):
     queryset = Answers.objects.all()
     serializer_class = AnswerSerializer
+
+def utils_console(request, slug, node_name):
+    # Получаем username из параметра запроса, если не передан - используем текущего пользователя
+    username = request.GET.get('username', request.user.username)
+    
+    data = {
+        'lab_slug': slug,
+        'username': username,
+    }
+    issue, error_response = get_issue(
+        data,
+        {'competition__finish__gt': timezone.now()}
+    )
+    
+    if error_response:
+        return error_response
+    
+    return render(request, 'interface/utils_console.html', {'competition': issue.competition, 'node_name': node_name, 'username': username})

@@ -80,6 +80,8 @@ class Lab(models.Model):
     )
     NetworksData = models.JSONField('Сети', default=default_json, validators=[validate_top_level_array])
 
+    PnetSSHNodeName = models.CharField('Имя ноды в Pnet для открытия консоли', max_length=255, blank=True, null=True)
+
     def __str__(self):
         return str(self.name)
 

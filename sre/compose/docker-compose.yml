@@ -66,23 +66,23 @@ services:
     depends_on:
       - postgres
 
-  logstash:
-    image: logstash:9.1.1
-    container_name: cyberpolygon_logstash
-    restart: unless-stopped
-    environment:
-      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
-    volumes:
-      - ./elk-configs/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
-      - ./elk-configs/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
-      - ./elk-configs/logstash/pipelines:/usr/share/logstash/config/pipelines:ro
-    ports:
-      - "5044:5044"
-      - "9600:9600"
-    networks:
-      - cyberpolygon_network
-    depends_on:
-      - elasticsearch
+  # logstash:
+  #   image: logstash:9.1.1
+  #   container_name: cyberpolygon_logstash
+  #   restart: unless-stopped
+  #   environment:
+  #     - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+  #   volumes:
+  #     - ./elk-configs/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+  #     - ./elk-configs/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+  #     - ./elk-configs/logstash/pipelines:/usr/share/logstash/config/pipelines:ro
+  #   ports:
+  #     - "5044:5044"
+  #     - "9600:9600"
+  #   networks:
+  #     - cyberpolygon_network
+  #   depends_on:
+  #     - elasticsearch
 
   kibana:
     image: kibana:9.1.1
@@ -99,21 +99,23 @@ services:
     depends_on:
       - elasticsearch
 
-  filebeat:
-    image: elastic/filebeat:9.1.1
-    container_name: cyberpolygon_filebeat
-    restart: unless-stopped
-    user: root
-    volumes:
-      - ./elk-configs/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/log/docker:/var/log/docker:ro
-      - /var/log/syslog:/var/log/syslog:ro
-      - /var/log/messages:/var/log/messages:ro
-    networks:
-      - cyberpolygon_network
-    depends_on:
-      - logstash
+  # filebeat:
+  #   image: elastic/filebeat:9.1.1
+  #   container_name: cyberpolygon_filebeat
+  #   restart: unless-stopped
+  #   user: root
+  #   volumes:
+  #     - ./elk-configs/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #     - /var/log/docker:/var/log/docker:ro
+  #     - /var/log/syslog:/var/log/syslog:ro
+  #     - /var/log/messages:/var/log/messages:ro
+  #   networks:
+  #     - cyberpolygon_network
+  #   depends_on:
+  #     - logstash
+
+  # WebSSH - веб-клиент для SSH подключений
 
 volumes:
   postgres_data:

@@ -445,3 +445,124 @@ def delete_lab_with_session_destroy(url: object, lab_name: object, lab_path: obj
 
     r = delete_lab(url, cookie, lab).json()
     logger.debug(r)
+
+
+def get_lab_topology(url, cookie):
+    """Получает топологию лаборатории из PNET"""
+    try:
+        response = requests.get(
+            f"{url}/api/labs/session/topology",
+            cookies=cookie,
+            verify=False,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Failed to get lab topology: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        logger.error(f"Error getting lab topology: {str(e)}")
+        return None
+
+
+def get_guacamole_url(url, node_id, cookie):
+    """Получает ссылку на Guacamole консоль для указанной ноды"""
+    try:
+        response = requests.get(
+            f"{url}/api/labs/session/console_guac_link?&node_id={node_id}",
+            cookies=cookie,
+            verify=False,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('code') == 200 and 'data' in data:
+                # Нормализуем URL, добавляя базовый URL PNET
+                guac_path = data['data']
+                if guac_path.startswith('/'):
+                    guac_path = guac_path[1:]
+                return f"{url}/{guac_path}"
+            else:
+                logger.error(f"Invalid response format: {data}")
+                return None
+        else:
+            logger.error(f"Failed to get guacamole URL: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        logger.error(f"Error getting guacamole URL: {str(e)}")
+        return None
+
+
+def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
+    """Общая логика создания сессии лаборатории в PNET"""
+    try:
+        # Создаем сессию лабы
+        full_url = f"{url}/api/labs/session/factory/create"
+        payload = {'path': lab_path}
+
+        create_session_response = requests.post(
+            full_url,
+            headers={
+                'Content-Type': 'application/json;charset=UTF-8',
+                'Accept': 'application/json, text/plain, */*',
+                'Referer': f"{url}/store/public/admin/main/view",
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            json=payload,
+            cookies=cookie,
+            timeout=10,
+            verify=False
+        )
+
+        if create_session_response.status_code != 200:
+            logger.error(f"Failed to create lab session: {create_session_response.text}")
+            return False, f"Failed to create lab session: {create_session_response.text}"
+
+        return True, "Lab session created successfully"
+
+    except requests.exceptions.Timeout:
+        logger.error("PNET request timeout")
+        return False, "PNET request timeout"
+    except requests.exceptions.ConnectionError:
+        logger.error("Failed to connect to PNET")
+        return False, "Failed to connect to PNET"
+    except Exception as e:
+        logger.error(f"Session creation error: {str(e)}")
+        return False, f"Session creation error: {str(e)}"
+
+
+def turn_on_node(url, node_id, cookie):
+    """Включает ноду в PNET"""
+    try:
+        response = requests.post(
+            f"{url}/api/labs/session/nodes/start",
+            headers={
+                'Content-Type': 'application/json;charset=UTF-8',
+                'Accept': 'application/json, text/plain, */*',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            json={'id': str(node_id)},
+            cookies=cookie,
+            verify=False,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"Node {node_id} started successfully")
+            return True, "Node started successfully"
+        else:
+            logger.error(f"Failed to start node {node_id}: {response.status_code} - {response.text}")
+            return False, f"Failed to start node: {response.text}"
+            
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout starting node {node_id}")
+        return False, "Node start timeout"
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error starting node {node_id}")
+        return False, "Failed to connect to PNET"
+    except Exception as e:
+        logger.error(f"Error starting node {node_id}: {str(e)}")
+        return False, f"Node start error: {str(e)}"
