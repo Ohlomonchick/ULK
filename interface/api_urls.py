@@ -18,4 +18,5 @@ urlpatterns = [
     path('get_kibana_auth/', get_kibana_auth, name='get_kibana_auth'),
     path('check_kibana_auth_status/', check_kibana_auth_status, name='check_kibana_auth_status'),
     path('create_pnet_lab_session/', create_pnet_lab_session, name='create_pnet_lab_session'),
+    path('create_pnet_lab_session_with_console/', create_pnet_lab_session_with_console, name='create_pnet_lab_session_with_console'),
 ]

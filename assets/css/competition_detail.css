@@ -56,28 +56,72 @@
     transform: translateX(100%);
 }
 
-.iframe-toggle-slider:hover {
+/* Кнопка обновления консоли */
+.console-refresh-slider {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    background: linear-gradient(135deg, #0069d1e2, #0069d1e2);
+    color: white;
+    border: none;
+    border-radius: 0 20px 20px 0;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 209, 178, 0.3);
+    z-index: 10;
+    opacity: 0.8;
+    width: 40px;
+    overflow: hidden;
+    white-space: nowrap;
+    transform: translateX(100%);
+}
+
+/* Общие стили для кнопок слайдеров */
+.iframe-toggle-slider:hover,
+.console-refresh-slider:hover {
     opacity: 1;
     width: auto;
+}
+
+.iframe-toggle-slider:hover {
     box-shadow: 0 6px 16px rgba(241, 70, 71, 0.4);
 }
 
-.iframe-toggle-slider:active {
+.console-refresh-slider:hover {
+    box-shadow: 0 6px 16px rgba(0, 209, 178, 0.4);
+}
+
+.iframe-toggle-slider:active,
+.console-refresh-slider:active {
     transform: translateX(100%) scale(0.95);
 }
 
-.iframe-toggle-slider .slider-text {
+.iframe-toggle-slider .slider-text,
+.console-refresh-slider .slider-text {
     opacity: 0;
     transition: opacity 0.3s ease;
 }
 
-.iframe-toggle-slider:hover .slider-text {
+.iframe-toggle-slider:hover .slider-text,
+.console-refresh-slider:hover .slider-text {
     opacity: 1;
 }
 
 /* Контейнер iframe */
 .iframe-container {
     position: relative;
+}
+
+/* Улучшаем захват фокуса iframe */
+#pnetFrame {
+    outline: none;
+}
+
+#pnetFrame:focus {
+    outline: none;
 }
 
 /* Кнопка сворачивания */

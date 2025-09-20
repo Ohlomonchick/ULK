@@ -88,7 +88,7 @@ def execute_pnet_operation_if_needed(lab, operation):
     """
     Выполняет операцию с PNet сессией только если лабораторная работа использует платформу PN.
     """
-    if lab.get_platform() == "PN":
+    if lab.get_platform() == "PN" or lab.get_platform() == "CMD":
         session_manager = ensure_admin_pnet_session()
         operation(session_manager)
 
@@ -97,7 +97,7 @@ def with_pnet_session_if_needed(lab, operation):
     """
     Выполняет операцию с PNet сессией только если лабораторная работа использует платформу PN.
     """
-    if lab.get_platform() == "PN":
+    if lab.get_platform() == "PN" or lab.get_platform() == "CMD":
         session_manager = ensure_admin_pnet_session()
         with session_manager:
             operation()

@@ -1,0 +1,42 @@
+FROM alpine:latest
+
+LABEL maintainer='Cyberpolygon Team'
+LABEL version='1.0.0'
+
+# Установка OpenSSH и необходимых пакетов
+RUN apk add --no-cache openssh openssh-sftp-server bash vim nano htop && \
+    ssh-keygen -A
+
+# Создание пользователя для тестирования
+RUN adduser -D -s /bin/bash testuser && \
+    echo 'testuser:testpass123' | chpasswd && \
+    mkdir -p /home/testuser/.ssh && \
+    chmod 700 /home/testuser/.ssh && \
+    chown -R testuser:testuser /home/testuser
+
+# Настройка SSH
+RUN sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    echo 'Port 22' >> /etc/ssh/sshd_config && \
+    echo 'AddressFamily any' >> /etc/ssh/sshd_config && \
+    echo 'ListenAddress 0.0.0.0' >> /etc/ssh/sshd_config
+
+# Создание директории для логов
+RUN mkdir -p /var/log
+
+# Создание скрипта для запуска SSH
+RUN echo '#!/bin/sh' > /start-ssh.sh && \
+    echo 'echo "Starting SSH server..."' >> /start-ssh.sh && \
+    echo 'echo "Test user: testuser / testpass123"' >> /start-ssh.sh && \
+    echo 'echo "Root user: root / rootpass123"' >> /start-ssh.sh && \
+    echo 'echo "SSH server is ready for connections on port 22"' >> /start-ssh.sh && \
+    echo '/usr/sbin/sshd -D -e' >> /start-ssh.sh && \
+    chmod +x /start-ssh.sh
+
+# Установка пароля для root
+RUN echo 'root:rootpass123' | chpasswd
+
+EXPOSE 22
+
+CMD ["/start-ssh.sh"]

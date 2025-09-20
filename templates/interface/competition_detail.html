@@ -78,19 +78,25 @@
                         </div>
                     {% endif %}
                 </div>
-            {% elif object.lab.platform == "PN" %}
+            {% elif object.lab.platform == "PN" or object.lab.platform == "CMD" %}
                 <div class="iframe-container" style="position: relative;">
                     <button class="iframe-toggle-slider" id="expandIframeBtn">
                         <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
                     </button>
+                    {% if object.lab.platform == "CMD" %}
+                        <button class="console-refresh-slider" id="refreshConsoleBtn" onclick="refreshConsoleSession()">
+                            <i class="fas fa-sync-alt"></i><span class="slider-text"> Обновить консоль</span>
+                        </button>
+                    {% endif %}
                     <iframe
                         id="pnetFrame"
                         style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
-                        data-src="/pnetlab/"
+                        {% if object.lab.platform == "PN" %}data-src="/pnetlab/"{% endif %}
                         width="100%"
                         class="mb-5"
                         height="600px"
-                        frameborder="0">
+                        frameborder="0"
+                        tabindex="0">
                     </iframe>
                 </div>
             {% endif %}
@@ -365,13 +371,21 @@
 
 
 
-    {% if object.lab.platform == "PN" and not user.is_superuser %}
-        <script src="{% static 'js/pnet_controller.js' %}"></script>
+    {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
+        {% if not user.is_superuser %}
+            <script src="{% static 'js/common_utils.js' %}"></script>
+            <script src="{% static 'js/pnet_iframe_controller.js' %}"></script>
+            {% if object.lab.platform == "PN" %}
+                <script src="{% static 'js/pnet_controller.js' %}"></script>
+            {% elif object.lab.platform == "CMD" %}
+                <script src="{% static 'js/cmd_controller.js' %}"></script>
+            {% endif %}
 
-        <div class="iframe-fullscreen-overlay" id="iframeOverlay"></div>
-        <button class="iframe-collapse-btn" id="collapseIframeBtn">
-            <i class="fas fa-compress"></i>
-        </button>
+            <div class="iframe-fullscreen-overlay" id="iframeOverlay"></div>
+            <button class="iframe-collapse-btn" id="collapseIframeBtn">
+                <i class="fas fa-compress"></i>
+            </button>
+        {% endif %}
     {% endif %}
 
 {% endblock %}
