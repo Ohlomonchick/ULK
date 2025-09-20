@@ -67,7 +67,7 @@ http {
 
         # проксируем на kibana
         "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/app/"             kibana;
-        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/e3b2d1cf5b21/"    kibana;
+        "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/616b79995b49/"    kibana;
         "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/internal/"        kibana;
         "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/node_modules/"    kibana;
         "~^https?://[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?/ui/"              kibana;
@@ -165,10 +165,10 @@ http {
             sub_filter_types text/html text/css application/javascript application/json;
 
             # Сносим абсолюты на IP -> делаем относительными
-            sub_filter 'http://{{ kibana_ip }}:5601/'  'http://{{ prod_ip }}:{{ prod_port }}/';
-            sub_filter 'https://{{ kibana_ip }}:5601/' 'http://{{ prod_ip }}:{{ prod_port }}/';
-            sub_filter 'src="//{{ kibana_ip }}:5601/'  'src="//{{ prod_ip }}:{{ prod_port }}/';
-            sub_filter 'href="//{{ kibana_ip }}:5601/' 'href="//{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'http://{{ prod_ip }}:5601/'  'http://{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'https://{{ prod_ip }}:5601/' 'http://{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'src="//{{ prod_ip }}:5601/'  'src="//{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'href="//{{ prod_ip }}:5601/' 'href="//{{ prod_ip }}:{{ prod_port }}/';
 
             # Не добавляй сюда CORS — он не нужен при same-origin
         }
@@ -207,7 +207,7 @@ http {
             }
         }
 
-        location ~ ^/(app|e3b2d1cf5b21|internal|node_modules|ui|spaces|bootstrap.js|translations|plugins|security|logout|login|bootstrap-anonymous.js)(/|$) {
+        location ~ ^/(app|616b79995b49|internal|node_modules|ui|spaces|bootstrap.js|translations|plugins|security|logout|login|bootstrap-anonymous.js)(/|$) {
             proxy_pass http://kibana;
 
             proxy_http_version 1.1;
@@ -229,8 +229,8 @@ http {
 
             sub_filter_once off;
             sub_filter_types text/html text/css application/javascript application/json;
-            sub_filter 'http://{{ kibana_ip }}:5601/'  'http://{{ prod_ip }}:{{ prod_port }}/';
-            sub_filter 'https://{{ kibana_ip }}:5601/' 'http://{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'http://{{ prod_ip }}:5601/'  'http://{{ prod_ip }}:{{ prod_port }}/';
+            sub_filter 'https://{{ prod_ip }}:5601/' 'http://{{ prod_ip }}:{{ prod_port }}/';
         }
 
         # Статические файлы Django
