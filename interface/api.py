@@ -657,6 +657,9 @@ def create_pnet_lab_session_with_console(request):
     slug = request.data.get('slug')
     if not slug:
         return JsonResponse({'error': 'Competition slug required'}, status=400)
+    
+    # Получаем node_name из request.data, если не указан - используем PnetSSHNodeName
+    node_name = request.data.get('node_name')
 
     try:
         logger = logging.getLogger(__name__)
@@ -665,13 +668,17 @@ def create_pnet_lab_session_with_console(request):
         competition = Competition.objects.get(slug=slug)
         user = request.user
         
-        logger.info(f'Competition found: {competition}, Lab: {competition.lab}, SSH Node: {competition.lab.PnetSSHNodeName}')
+        # Если node_name не передан в запросе, используем PnetSSHNodeName из лабы
+        if not node_name:
+            node_name = competition.lab.PnetSSHNodeName
+        
+        logger.info(f'Competition found: {competition}, Lab: {competition.lab}, SSH Node: {node_name}')
 
         if not user.pnet_login or not user.pnet_password:
             logger.error(f'User PNET credentials not configured for user: {user}')
             return JsonResponse({'error': 'User PNET credentials not configured'}, status=400)
 
-        if not competition.lab.PnetSSHNodeName:
+        if not node_name:
             logger = logging.getLogger(__name__)
             logger.error(f'SSH node name not configured for lab: {competition.lab}')
             return JsonResponse({'error': 'SSH node name not configured for this lab'}, status=400)
@@ -707,12 +714,12 @@ def create_pnet_lab_session_with_console(request):
         target_node_id = None
         
         for node_id, node_data in nodes.items():
-            if node_data.get('name') == competition.lab.PnetSSHNodeName:
+            if node_data.get('name') == node_name:
                 target_node_id = int(node_id)
                 break
 
         if target_node_id is None:
-            return JsonResponse({'error': f'SSH node "{competition.lab.PnetSSHNodeName}" not found in topology'}, status=404)
+            return JsonResponse({'error': f'SSH node "{node_name}" not found in topology'}, status=404)
 
         # Включаем ноду перед получением ссылки на консоль
         logger.info(f'Starting node {target_node_id}...')
@@ -729,6 +736,7 @@ def create_pnet_lab_session_with_console(request):
         return JsonResponse({
             'success': True,
             'node_id': target_node_id,
+            'node_name': node_name,
             'guacamole_url': guacamole_url,
             'lab_path': lab_path
         })

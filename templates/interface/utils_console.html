@@ -1,0 +1,57 @@
+<script>
+    // Получаем данные из контекста
+    const slug = '{{ competition.slug }}';
+    const nodeName = '{{ node_name }}';
+    
+    console.log('Slug:', slug);
+    console.log('Node name:', nodeName);
+    
+    // Функция для вызова API и редиректа
+    async function createConsoleSession() {
+        try {
+            const response = await fetch('/api/create_pnet_lab_session_with_console/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    slug: slug,
+                    node_name: nodeName
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.guacamole_url) {
+                console.log('Redirecting to:', data.guacamole_url);
+                window.location.href = data.guacamole_url;
+            } else {
+                console.error('Error creating console session:', data.error);
+                alert('Ошибка создания консольной сессии: ' + (data.error || 'Неизвестная ошибка'));
+            }
+        } catch (error) {
+            console.error('Network error:', error);
+            alert('Ошибка сети при создании консольной сессии');
+        }
+    }
+    
+    // Функция для получения CSRF токена
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Запускаем создание сессии при загрузке страницы
+    document.addEventListener('DOMContentLoaded', createConsoleSession);
+</script>

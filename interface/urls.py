@@ -16,4 +16,5 @@ urlpatterns = [
     path("competition_history/", CompetitionHistoryListView.as_view(), name="competition-history-list"),
     path("team_competitions/", TeamCompetitionListView.as_view(), name="team-competition-list"),
     path("help_page/", lambda request: render(request, "interface/help_page.html"), name="help-page"),
+    path("utils/console/<slug:slug>/<str:node_name>/", utils_console, name="utils-console"),
 ]
