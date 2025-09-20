@@ -651,22 +651,35 @@ def create_pnet_lab_session(request):
 @api_view(['POST'])
 def create_pnet_lab_session_with_console(request):
     """Создает сессию лабы в PNET и возвращает ссылку на консоль SSH ноды"""
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'User not authenticated'}, status=401)
-
     slug = request.data.get('slug')
     if not slug:
         return JsonResponse({'error': 'Competition slug required'}, status=400)
     
     # Получаем node_name из request.data, если не указан - используем PnetSSHNodeName
     node_name = request.data.get('node_name')
+    
+    # Получаем username из request.data, если не передан - используем request.user
+    username = request.data.get('username')
+    if not username:
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'Username required or user must be authenticated'}, status=400)
+        username = request.user.username
 
     try:
         logger = logging.getLogger(__name__)
-        logger.info(f'Creating CMD console session for slug: {slug}')
+        logger.info(f'Creating CMD console session for slug: {slug}, username: {username}')
         
         competition = Competition.objects.get(slug=slug)
-        user = request.user
+        
+        # Получаем пользователя по username
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            # Fallback: попробуем найти по pnet_login
+            try:
+                user = User.objects.get(pnet_login=username)
+            except User.DoesNotExist:
+                return JsonResponse({'error': f'User with username "{username}" not found'}, status=404)
         
         # Если node_name не передан в запросе, используем PnetSSHNodeName из лабы
         if not node_name:

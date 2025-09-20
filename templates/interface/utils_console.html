@@ -2,9 +2,11 @@
     // Получаем данные из контекста
     const slug = '{{ competition.slug }}';
     const nodeName = '{{ node_name }}';
+    const username = '{{ username }}';
     
     console.log('Slug:', slug);
     console.log('Node name:', nodeName);
+    console.log('Username:', username);
     
     // Функция для вызова API и редиректа
     async function createConsoleSession() {
@@ -17,7 +19,8 @@
                 },
                 body: JSON.stringify({
                     slug: slug,
-                    node_name: nodeName
+                    node_name: nodeName,
+                    username: username
                 })
             });
             
