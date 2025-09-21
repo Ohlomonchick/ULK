@@ -329,6 +329,7 @@ def start_lab(request):
             parse_request_data(request),
             {'competition__finish__gt': timezone.now()}
         )
+        logging.info(f"payload: {parse_request_data(request)}")
         if error_response:
             return error_response
 
