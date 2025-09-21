@@ -28,7 +28,8 @@ def try_find_issue_by_lab(lab_filter, user, competition_filters):
     
     # Добавляем сортировку по приоритету lab_type
     issue = TeamCompetition2Team.objects.filter(**team_issue_filters).order_by(
-        get_lab_type_priority_order()
+        get_lab_type_priority_order(),
+        '-competition__start'
     ).first()
 
     if issue is None:
@@ -40,7 +41,8 @@ def try_find_issue_by_lab(lab_filter, user, competition_filters):
         
         # Добавляем сортировку по приоритету lab_type
         issue = Competition2User.objects.filter(**issue_filters).order_by(
-            get_lab_type_priority_order()
+            get_lab_type_priority_order(),
+            '-competition__start'
         ).first()
     
     return issue

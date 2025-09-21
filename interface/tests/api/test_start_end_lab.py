@@ -109,6 +109,50 @@ class GetIssueTests(TestCase):
         self.assertIsNone(error_response)
         self.assertEqual(issue.id, self.issue.id)
 
+    def test_get_issue_sorts_by_competition_start_time(self):
+        """
+        Should return the issue with the most recent competition start time
+        when multiple competitions exist for the same lab and user.
+        """
+        # Create additional competitions with different start times
+        now = timezone.now()
+        
+        # Create older competition (should not be selected)
+        older_competition = Competition.objects.create(
+            lab=self.lab,
+            start=now - timedelta(hours=3),
+            finish=now + timedelta(hours=1)
+        )
+        older_issue = Competition2User.objects.create(
+            competition=older_competition,
+            user=self.user
+        )
+        
+        # Create newer competition (should be selected)
+        newer_competition = Competition.objects.create(
+            lab=self.lab,
+            start=now - timedelta(hours=1),  # More recent than older_competition
+            finish=now + timedelta(hours=3)
+        )
+        newer_issue = Competition2User.objects.create(
+            competition=newer_competition,
+            user=self.user
+        )
+        
+        # Update the original competition to be in the middle
+        self.competition.start = now - timedelta(hours=2)
+        self.competition.save()
+        
+        # Test that the most recent competition is selected
+        data = {'username': 'testuser', 'lab': 'Chemistry Lab'}
+        issue, error_response = get_issue(data, self.competition_filters)
+        
+        self.assertIsNotNone(issue)
+        self.assertIsNone(error_response)
+        # Should return the newest competition (newer_issue)
+        self.assertEqual(issue.id, newer_issue.id)
+        self.assertEqual(issue.competition.start, newer_competition.start)
+
 
 class TeamGetIssueTests(TestCase):
     def setUp(self):
@@ -138,6 +182,51 @@ class TeamGetIssueTests(TestCase):
         self.assertIsNone(error_response)
         self.assertTrue(hasattr(issue, 'team'))
         self.assertEqual(issue.team, self.team)
+
+    def test_get_issue_team_sorts_by_competition_start_time(self):
+        """
+        Should return the team issue with the most recent competition start time
+        when multiple team competitions exist for the same lab and team.
+        """
+        # Create additional team competitions with different start times
+        now = timezone.now()
+        
+        # Create older team competition (should not be selected)
+        older_competition = TeamCompetition.objects.create(
+            lab=self.lab,
+            start=now - timedelta(hours=3),
+            finish=now + timedelta(hours=1)
+        )
+        older_issue = TeamCompetition2Team.objects.create(
+            competition=older_competition,
+            team=self.team
+        )
+        
+        # Create newer team competition (should be selected)
+        newer_competition = TeamCompetition.objects.create(
+            lab=self.lab,
+            start=now - timedelta(hours=1),  # More recent than older_competition
+            finish=now + timedelta(hours=3)
+        )
+        newer_issue = TeamCompetition2Team.objects.create(
+            competition=newer_competition,
+            team=self.team
+        )
+        
+        # Update the original competition to be in the middle
+        self.competition.start = now - timedelta(hours=2)
+        self.competition.save()
+        
+        # Test that the most recent team competition is selected
+        data = {'username': 'teamuser', 'lab': 'Biology Lab'}
+        issue, error_response = get_issue(data, self.competition_filters)
+        
+        self.assertIsNotNone(issue)
+        self.assertIsNone(error_response)
+        self.assertTrue(hasattr(issue, 'team'))
+        # Should return the newest team competition (newer_issue)
+        self.assertEqual(issue.id, newer_issue.id)
+        self.assertEqual(issue.competition.start, newer_competition.start)
 
 
 class StartLabViewTests(APITestCase):
