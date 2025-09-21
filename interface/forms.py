@@ -1,6 +1,4 @@
 import random
-import concurrent.futures
-from time import sleep
 from typing import List
 
 from django import forms
@@ -30,7 +28,6 @@ from django.contrib.auth.forms import UserCreationForm
 from interface.eveFunctions import pf_login, logout, create_user, create_directory
 from interface.pnet_session_manager import execute_pnet_operation_if_needed, with_pnet_session_if_needed
 from django.contrib.admin.widgets import FilteredSelectMultiple
-from django.conf import settings
 from django_select2 import forms as s2forms
 from .config import *
 
@@ -223,7 +220,7 @@ class CompetitionForm(forms.ModelForm):
         new_users = [user for user in all_users if user.id not in existing_user_ids]
         
         if new_users:
-            with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_users_parallel(instance, new_users))
+            with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_users(instance, new_users))
 
         # Удаляем пользователей, которых больше нет в списке
         all_users_ids = set(all_users.values_list('pk', flat=True))
@@ -236,9 +233,9 @@ class CompetitionForm(forms.ModelForm):
 
         return instance
 
-    def _create_competition_users_parallel(self, instance, users: List[User]):
+    def _create_competition_users(self, instance, users: List[User]):
         """
-        Параллельное создание Competition2User записей.
+        Последовательное создание Competition2User записей.
         """
         def _create_single_competition_user(user):
             """Создание одной записи Competition2User"""
@@ -257,25 +254,9 @@ class CompetitionForm(forms.ModelForm):
             return competition2user
 
         created_competition_users = []
-        db_engine = settings.DATABASES['default']['ENGINE']
-        
-        if 'sqlite' in db_engine.lower():
-            max_workers = 1  # SQLite не поддерживает параллельные записи
-        else:
-            max_workers = min(5, len(users))
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_user = {executor.submit(_create_single_competition_user, user): user for user in users}
-            
-            # Ждем завершения всех операций
-            for future in concurrent.futures.as_completed(future_to_user):
-                user = future_to_user[future]
-                try:
-                    competition2user = future.result()
-                    created_competition_users.append(competition2user)
-                    # PNet операции выполняются в сигнале post_create с использованием глобальной сессии
-                except Exception as exc:
-                    print(f'Пользователь {user.username} вызвал исключение: {exc}')
+
+        for user in users:
+            created_competition_users.append(_create_single_competition_user(user))
         
         return created_competition_users
 
