@@ -270,12 +270,20 @@ class Kkz(models.Model):
     platoons = models.ManyToManyField(Platoon, verbose_name="Взвода", blank=True)
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
     unified_tasks = models.BooleanField("Единые задания для всех", default=False)
+
     def get_users(self):
         users = User.objects.filter(platoon__in=self.platoons.all())
         users = users.union(User.objects.filter(id__in=self.non_platoon_users.values('id')))
         return users
+
+    def delete(self, *args, **kwargs):
+        for competition in self.competitions.all():
+            competition.delete()
+        super().delete(*args, **kwargs)
+
     def __str__(self):
         return self.name
+
     class Meta:
         verbose_name = "ККЗ"
         verbose_name_plural = "ККЗ"
