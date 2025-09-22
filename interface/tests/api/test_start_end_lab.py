@@ -846,3 +846,99 @@ class LabTasksTypeTests(APITestCase):
         
         self.assertEqual(data["tasks"], expected_tasks)
         self.assertEqual(data["flag"], 'json_flag')
+
+
+class EndLabWithTasksTests(APITestCase):
+    """
+    Тесты для проверки, что /end не создает Answers, если пользователю назначены задания
+    """
+    
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create(username='testuser', pnet_login='pnetlogin')
+        self.lab = Lab.objects.create(name='Chemistry Lab', answer_flag=None)
+        self.competition = Competition.objects.create(
+            lab=self.lab,
+            start=timezone.now() - timedelta(hours=1),
+            finish=timezone.now() + timedelta(days=1)
+        )
+        self.issue = Competition2User.objects.create(
+            competition=self.competition,
+            user=self.user
+        )
+        self.url = reverse('interface_api:end-lab')
+
+    def test_end_lab_with_tasks_does_not_create_answers(self):
+        """
+        Тест проверяет, что если пользователю назначены задания, то /end не создает Answers,
+        чтобы не повлиять на их общий счёт.
+        """
+        # Создаем задания для лабораторной работы
+        task1 = LabTask.objects.create(
+            lab=self.lab,
+            task_id='task_1',
+            description='First task'
+        )
+        task2 = LabTask.objects.create(
+            lab=self.lab,
+            task_id='task_2',
+            description='Second task'
+        )
+        
+        # Добавляем задания к соревнованию
+        self.competition.tasks.add(task1, task2)
+        self.issue.tasks.add(task1, task2)
+        
+        request_data = {
+            "username": "testuser",
+            "lab": "Chemistry Lab"
+        }
+        
+        # Вызываем /end
+        response = self.client.post(self.url, request_data, format='json')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data["message"], "Task finished")
+        
+        # Проверяем, что НЕ создался Answer
+        answers = Answers.objects.filter(user=self.user, lab=self.lab, lab_task=None)
+        self.assertEqual(answers.count(), 0)
+        
+        # Проверяем, что вообще нет Answers для этого пользователя и лаборатории
+        all_answers = Answers.objects.filter(user=self.user, lab=self.lab)
+        self.assertEqual(all_answers.count(), 0)
+
+    def test_end_lab_with_tasks_after_removing_tasks_creates_answers(self):
+        """
+        Тест проверяет, что если сначала были задания, а потом их убрали, то /end создает Answers.
+        """
+        # Создаем и добавляем задания
+        task1 = LabTask.objects.create(
+            lab=self.lab,
+            task_id='task_1',
+            description='First task'
+        )
+        self.competition.tasks.add(task1)
+        self.issue.tasks.add(task1)
+        
+        # Первый вызов /end - не должен создавать Answer
+        request_data = {
+            "username": "testuser",
+            "lab": "Chemistry Lab"
+        }
+        response1 = self.client.post(self.url, request_data, format='json')
+        self.assertEqual(response1.status_code, 200)
+        
+        answers_after_first = Answers.objects.filter(user=self.user, lab=self.lab, lab_task=None)
+        self.assertEqual(answers_after_first.count(), 0)
+        
+        # Убираем задания
+        self.competition.tasks.clear()
+        self.issue.tasks.clear()
+        
+        # Второй вызов /end - должен создать Answer
+        response2 = self.client.post(self.url, request_data, format='json')
+        self.assertEqual(response2.status_code, 200)
+        
+        answers_after_second = Answers.objects.filter(user=self.user, lab=self.lab, lab_task=None)
+        self.assertEqual(answers_after_second.count(), 1)

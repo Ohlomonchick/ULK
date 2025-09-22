@@ -189,7 +189,8 @@ class AnswerSerializerTests(TestCase):
         data_update = {
             "lab": self.lab.name,
             "pnet_login": "user1",
-            "task": "1"
+            "task": "1",
+            "datetime": self.valid_datetime + timezone.timedelta(hours=1)
         }
         serializer_update = AnswerSerializer(data=data_update)
         self.assertTrue(serializer_update.is_valid(), serializer_update.errors)
@@ -332,5 +333,54 @@ class AnswerSerializerTests(TestCase):
         # Verify that all answers have different timestamps (they were created at different times)
         timestamps = [answer.datetime for answer in user_answers]
         self.assertEqual(len(set(timestamps)), 3)  # All timestamps should be unique 
+
+    def test_multiple_answers_without_task_updates_single_answer(self):
+        """
+        Test that multiple answers created without task field only update a single Answer
+        with task=None, rather than creating multiple instances.
+        """
+        # Create multiple answers without task field
+        data1 = {
+            "lab": self.lab.name,
+            "datetime": self.valid_datetime,
+            "pnet_login": "user1",
+        }
+        data2 = {
+            "lab": self.lab.name,
+            "datetime": self.valid_datetime + timezone.timedelta(minutes=1),
+            "pnet_login": "user1",
+        }
+        data3 = {
+            "lab": self.lab.name,
+            "datetime": self.valid_datetime + timezone.timedelta(minutes=2),
+            "pnet_login": "user1",
+        }
+        
+        # Create first answer
+        serializer1 = AnswerSerializer(data=data1)
+        self.assertTrue(serializer1.is_valid(), serializer1.errors)
+        answer1 = serializer1.save()
+        
+        # Create second answer (should update the same instance)
+        serializer2 = AnswerSerializer(data=data2)
+        self.assertTrue(serializer2.is_valid(), serializer2.errors)
+        answer2 = serializer2.save()
+        
+        # Create third answer (should update the same instance)
+        serializer3 = AnswerSerializer(data=data3)
+        self.assertTrue(serializer3.is_valid(), serializer3.errors)
+        answer3 = serializer3.save()
+        
+        # All answers should be the same instance (same primary key)
+        self.assertEqual(answer1.pk, answer2.pk)
+        self.assertEqual(answer2.pk, answer3.pk)
+        
+        # Verify that only one answer exists for this user and lab without task
+        answers_without_task = Answers.objects.filter(
+            user=self.user_by_pnet,
+            lab=self.lab,
+            lab_task=None
+        )
+        self.assertEqual(answers_without_task.count(), 1)
 
     
