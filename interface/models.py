@@ -5,7 +5,6 @@ import logging
 from django.db import models
 from django.db.models import Q
 from django.db.models.signals import post_save, post_delete
-from django.utils.text import slugify
 from django_summernote.models import AbstractAttachment
 from django.contrib.auth.models import AbstractUser
 

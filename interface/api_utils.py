@@ -2,6 +2,7 @@ from django.db.models import Q, Case, When, IntegerField
 from .models import User, Competition2User, TeamCompetition2Team
 from django.http import JsonResponse
 from rest_framework import status
+from slugify import slugify
 
 
 def get_lab_type_priority_order():
@@ -28,7 +29,8 @@ def try_find_issue_by_lab(lab_filter, user, competition_filters):
     
     # Добавляем сортировку по приоритету lab_type
     issue = TeamCompetition2Team.objects.filter(**team_issue_filters).order_by(
-        get_lab_type_priority_order()
+        get_lab_type_priority_order(),
+        '-competition__start'
     ).first()
 
     if issue is None:
@@ -40,7 +42,8 @@ def try_find_issue_by_lab(lab_filter, user, competition_filters):
         
         # Добавляем сортировку по приоритету lab_type
         issue = Competition2User.objects.filter(**issue_filters).order_by(
-            get_lab_type_priority_order()
+            get_lab_type_priority_order(),
+            '-competition__start'
         ).first()
     
     return issue
@@ -85,6 +88,9 @@ def get_issue(data, competition_filters):
         issue = try_find_issue_by_lab(lab_filter, user, competition_filters)
         if issue is None:
             lab_filter = {'competition__lab__slug': lab_name}
+            issue = try_find_issue_by_lab(lab_filter, user, competition_filters)
+        if issue is None:
+            lab_filter = {'competition__lab__slug': slugify(lab_name)}
             issue = try_find_issue_by_lab(lab_filter, user, competition_filters)
     else:
         lab_filter = {'competition__lab__slug': lab_slug}

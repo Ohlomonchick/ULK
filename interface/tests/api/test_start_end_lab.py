@@ -109,6 +109,50 @@ class GetIssueTests(TestCase):
         self.assertIsNone(error_response)
         self.assertEqual(issue.id, self.issue.id)
 
+    def test_get_issue_sorts_by_competition_start_time(self):
+        """
+        Should return the issue with the most recent competition start time
+        when multiple competitions exist for the same lab and user.
+        """
+        # Create additional competitions with different start times
+        now = timezone.now()
+        
+        # Create older competition (should not be selected)
+        older_competition = Competition.objects.create(
+            lab=self.lab,
+            start=now - timedelta(hours=3),
+            finish=now + timedelta(hours=1)
+        )
+        older_issue = Competition2User.objects.create(
+            competition=older_competition,
+            user=self.user
+        )
+        
+        # Create newer competition (should be selected)
+        newer_competition = Competition.objects.create(
+            lab=self.lab,
+            start=now - timedelta(hours=1),  # More recent than older_competition
+            finish=now + timedelta(hours=3)
+        )
+        newer_issue = Competition2User.objects.create(
+            competition=newer_competition,
+            user=self.user
+        )
+        
+        # Update the original competition to be in the middle
+        self.competition.start = now - timedelta(hours=2)
+        self.competition.save()
+        
+        # Test that the most recent competition is selected
+        data = {'username': 'testuser', 'lab': 'Chemistry Lab'}
+        issue, error_response = get_issue(data, self.competition_filters)
+        
+        self.assertIsNotNone(issue)
+        self.assertIsNone(error_response)
+        # Should return the newest competition (newer_issue)
+        self.assertEqual(issue.id, newer_issue.id)
+        self.assertEqual(issue.competition.start, newer_competition.start)
+
 
 class TeamGetIssueTests(TestCase):
     def setUp(self):
@@ -138,6 +182,51 @@ class TeamGetIssueTests(TestCase):
         self.assertIsNone(error_response)
         self.assertTrue(hasattr(issue, 'team'))
         self.assertEqual(issue.team, self.team)
+
+    def test_get_issue_team_sorts_by_competition_start_time(self):
+        """
+        Should return the team issue with the most recent competition start time
+        when multiple team competitions exist for the same lab and team.
+        """
+        # Create additional team competitions with different start times
+        now = timezone.now()
+        
+        # Create older team competition (should not be selected)
+        older_competition = TeamCompetition.objects.create(
+            lab=self.lab,
+            start=now - timedelta(hours=3),
+            finish=now + timedelta(hours=1)
+        )
+        older_issue = TeamCompetition2Team.objects.create(
+            competition=older_competition,
+            team=self.team
+        )
+        
+        # Create newer team competition (should be selected)
+        newer_competition = TeamCompetition.objects.create(
+            lab=self.lab,
+            start=now - timedelta(hours=1),  # More recent than older_competition
+            finish=now + timedelta(hours=3)
+        )
+        newer_issue = TeamCompetition2Team.objects.create(
+            competition=newer_competition,
+            team=self.team
+        )
+        
+        # Update the original competition to be in the middle
+        self.competition.start = now - timedelta(hours=2)
+        self.competition.save()
+        
+        # Test that the most recent team competition is selected
+        data = {'username': 'teamuser', 'lab': 'Biology Lab'}
+        issue, error_response = get_issue(data, self.competition_filters)
+        
+        self.assertIsNotNone(issue)
+        self.assertIsNone(error_response)
+        self.assertTrue(hasattr(issue, 'team'))
+        # Should return the newest team competition (newer_issue)
+        self.assertEqual(issue.id, newer_issue.id)
+        self.assertEqual(issue.competition.start, newer_competition.start)
 
 
 class StartLabViewTests(APITestCase):
@@ -757,3 +846,99 @@ class LabTasksTypeTests(APITestCase):
         
         self.assertEqual(data["tasks"], expected_tasks)
         self.assertEqual(data["flag"], 'json_flag')
+
+
+class EndLabWithTasksTests(APITestCase):
+    """
+    Тесты для проверки, что /end не создает Answers, если пользователю назначены задания
+    """
+    
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create(username='testuser', pnet_login='pnetlogin')
+        self.lab = Lab.objects.create(name='Chemistry Lab', answer_flag=None)
+        self.competition = Competition.objects.create(
+            lab=self.lab,
+            start=timezone.now() - timedelta(hours=1),
+            finish=timezone.now() + timedelta(days=1)
+        )
+        self.issue = Competition2User.objects.create(
+            competition=self.competition,
+            user=self.user
+        )
+        self.url = reverse('interface_api:end-lab')
+
+    def test_end_lab_with_tasks_does_not_create_answers(self):
+        """
+        Тест проверяет, что если пользователю назначены задания, то /end не создает Answers,
+        чтобы не повлиять на их общий счёт.
+        """
+        # Создаем задания для лабораторной работы
+        task1 = LabTask.objects.create(
+            lab=self.lab,
+            task_id='task_1',
+            description='First task'
+        )
+        task2 = LabTask.objects.create(
+            lab=self.lab,
+            task_id='task_2',
+            description='Second task'
+        )
+        
+        # Добавляем задания к соревнованию
+        self.competition.tasks.add(task1, task2)
+        self.issue.tasks.add(task1, task2)
+        
+        request_data = {
+            "username": "testuser",
+            "lab": "Chemistry Lab"
+        }
+        
+        # Вызываем /end
+        response = self.client.post(self.url, request_data, format='json')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data["message"], "Task finished")
+        
+        # Проверяем, что НЕ создался Answer
+        answers = Answers.objects.filter(user=self.user, lab=self.lab, lab_task=None)
+        self.assertEqual(answers.count(), 0)
+        
+        # Проверяем, что вообще нет Answers для этого пользователя и лаборатории
+        all_answers = Answers.objects.filter(user=self.user, lab=self.lab)
+        self.assertEqual(all_answers.count(), 0)
+
+    def test_end_lab_with_tasks_after_removing_tasks_creates_answers(self):
+        """
+        Тест проверяет, что если сначала были задания, а потом их убрали, то /end создает Answers.
+        """
+        # Создаем и добавляем задания
+        task1 = LabTask.objects.create(
+            lab=self.lab,
+            task_id='task_1',
+            description='First task'
+        )
+        self.competition.tasks.add(task1)
+        self.issue.tasks.add(task1)
+        
+        # Первый вызов /end - не должен создавать Answer
+        request_data = {
+            "username": "testuser",
+            "lab": "Chemistry Lab"
+        }
+        response1 = self.client.post(self.url, request_data, format='json')
+        self.assertEqual(response1.status_code, 200)
+        
+        answers_after_first = Answers.objects.filter(user=self.user, lab=self.lab, lab_task=None)
+        self.assertEqual(answers_after_first.count(), 0)
+        
+        # Убираем задания
+        self.competition.tasks.clear()
+        self.issue.tasks.clear()
+        
+        # Второй вызов /end - должен создать Answer
+        response2 = self.client.post(self.url, request_data, format='json')
+        self.assertEqual(response2.status_code, 200)
+        
+        answers_after_second = Answers.objects.filter(user=self.user, lab=self.lab, lab_task=None)
+        self.assertEqual(answers_after_second.count(), 1)

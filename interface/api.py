@@ -329,6 +329,7 @@ def start_lab(request):
             parse_request_data(request),
             {'competition__finish__gt': timezone.now()}
         )
+        logging.info(f"payload: {parse_request_data(request)}")
         if error_response:
             return error_response
 
@@ -357,12 +358,23 @@ def end_lab(request):
         if error_response:
             return error_response
 
+        if issue.tasks.count() > 0:
+            return JsonResponse({'message': 'Task finished'})
+
         if hasattr(issue, 'user'):
-            ans = Answers(lab=issue.competition.lab, user=issue.user, datetime=timezone.now())
-            ans.save()
+            Answers.objects.update_or_create(
+                lab=issue.competition.lab, 
+                user=issue.user,
+                lab_task=None,
+                defaults={'datetime': timezone.now()}
+            )
         elif hasattr(issue, 'team'):
-            ans = Answers(lab=issue.competition.lab, team=issue.team, datetime=timezone.now())
-            ans.save()
+            Answers.objects.update_or_create(
+                lab=issue.competition.lab,
+                team=issue.team,
+                lab_task=None,
+                defaults={'datetime': timezone.now()}
+            )
 
         return JsonResponse({'message': 'Task finished'})
 
