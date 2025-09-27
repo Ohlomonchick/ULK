@@ -118,7 +118,8 @@ def create_lab(url, lab_name, lab_description, lab_path, cookie, xsrf, username)
             url + '/api/labs',
             json=lab_parameters,
             cookies=cookie,
-            verify=False
+            verify=False,
+            timeout=2  # 2 секунды таймаут для создания лабы
         )
         logger.debug(
             "Lab created at path {}\nServer response\t{}".format(f"{lab_path}/{username}", r.json()["message"]))
@@ -153,7 +154,8 @@ def filter_user(url, cookie, xsrf):
         headers=header,
         data=payload,
         cookies=cookie,
-        verify=False
+        verify=False,
+        timeout=4  # 4 секунды таймаут для фильтрации пользователей
     )
     return r
 
@@ -252,7 +254,8 @@ def create_session(url, lab, cookie):
         url + '/api/labs/session/factory/create',
         data=lab,
         headers={'content-type': 'application/json'},
-        cookies=cookie, verify=False
+        cookies=cookie, verify=False,
+        timeout=4  # 4 секунды таймаут для создания сессии
     )
     logger.debug(r)
 
@@ -264,7 +267,8 @@ def join_session(url, lab_session_id, cookie):
         data=lab_session_id,
         headers={'content-type': 'application/json'},
         cookies=cookie,
-        verify=False
+        verify=False,
+        timeout=4  # 4 секунды таймаут для подключения к сессии
     )
     logger.debug(r)
 
@@ -275,7 +279,8 @@ def create_node(url, node_params, cookie, xsrf):
             url + '/api/labs/session/nodes/add',
             json=node_params,
             cookies=cookie,
-            verify=False
+            verify=False,
+            timeout=4  # 4 секунды таймаут для создания узла
         )
         logger.debug(
             "Node {} has been created\nServer response\t{}".format(node_params["template"], r.json()["message"]))
@@ -290,7 +295,8 @@ def create_p2p(url, p2p_params, cookie):
             url + '/api/labs/session/networks/p2p',
             json=p2p_params,
             cookies=cookie,
-            verify=False
+            verify=False,
+            timeout=4  # 4 секунды таймаут для создания P2P соединения
         )
         logger.debug("P2P {} has been created \nServer response\t{}".format(p2p_params["name"], r.json()["message"]))
     except Exception as e:
@@ -304,7 +310,8 @@ def destroy_session(url, lab_session_id, cookie):
         url + '/api/labs/session/factory/destroy',
         data=lab_session_id,
         headers={'content-type': 'application/json'},
-        cookies=cookie, verify=False
+        cookies=cookie, verify=False,
+        timeout=4  # 4 секунды таймаут для уничтожения сессии
     )
     logger.debug(r)
 
@@ -315,7 +322,8 @@ def create_network(url, net_params, cookie):
             url + '/api/labs/session/networks/add',
             json=net_params,
             cookies=cookie,
-            verify=False
+            verify=False,
+            timeout=4  # 4 секунды таймаут для создания сети
         )
         logger.debug(
             "Network {} has been created \nServer response\t{}".format(net_params["name"], r.json()["message"]))
@@ -330,7 +338,8 @@ def create_p2p_nat(url, p2p_params, cookie):
             url + '/api/labs/session/interfaces/edit',
             json=p2p_params,
             cookies=cookie,
-            verify=False
+            verify=False,
+            timeout=4  # 4 секунды таймаут для редактирования интерфейса
         )
         logger.debug(
             "P2P_NAT {} has been created\nServer response\t{}".format(p2p_params["node_id"], r.json()["message"]))
@@ -456,7 +465,7 @@ def get_lab_topology(url, cookie):
             verify=False,
             timeout=10
         )
-        
+
         if response.status_code == 200:
             return response.json()
         else:
@@ -476,7 +485,7 @@ def get_guacamole_url(url, node_id, cookie):
             verify=False,
             timeout=10
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             if data.get('code') == 200 and 'data' in data:
@@ -549,14 +558,14 @@ def turn_on_node(url, node_id, cookie):
             verify=False,
             timeout=10
         )
-        
+
         if response.status_code == 200:
             logger.info(f"Node {node_id} started successfully")
             return True, "Node started successfully"
         else:
             logger.error(f"Failed to start node {node_id}: {response.status_code} - {response.text}")
             return False, f"Failed to start node: {response.text}"
-            
+
     except requests.exceptions.Timeout:
         logger.error(f"Timeout starting node {node_id}")
         return False, "Node start timeout"

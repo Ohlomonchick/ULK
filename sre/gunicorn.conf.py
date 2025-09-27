@@ -1,7 +1,10 @@
 # gunicorn.conf.py
 # Non logging stuff
 bind = "0.0.0.0:8002"
-workers = 2
+workers = 4
+worker_class = "gevent"
+worker_connections = 1000
+timeout = 90
 # Access log - records incoming HTTP requests
 accesslog = "/var/log/cyberpolygon.access.log"
 # Error log - records Gunicorn server goings-on
