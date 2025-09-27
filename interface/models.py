@@ -61,6 +61,7 @@ class Lab(models.Model):
     description = models.TextField('Описание')
     answer_flag = models.CharField('Ответный флаг', max_length=1024, blank=True, null=True)
     slug = models.SlugField('Название в адресной строке', max_length=255)
+    pnet_slug = models.SlugField('Ключ лабы в API (lab_slug)', max_length=255, blank=True)
     platform = models.CharField('Платформа', max_length=3, choices=get_platform_choices, default="NO")
     program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices)
     lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices)
@@ -97,7 +98,8 @@ class Lab(models.Model):
         if self._state.adding:
             base_slug = slugify(self.name)
             self.slug = base_slug
-            
+            self.pnet_slug = base_slug
+
         super(Lab, self).save(*args, **kwargs)
 
     def get_platform(self):

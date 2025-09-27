@@ -35,12 +35,12 @@ def get_admin_pnet_session():
     Thread-safe создание и возврат сессии.
     """
     global ADMIN_PNET_SESSION
-    
+
     with ADMIN_SESSION_LOCK:
         if ADMIN_PNET_SESSION is None:
             ADMIN_PNET_SESSION = PNetSessionManager()
             logger.info("Создана глобальная административная PNet сессия")
-        
+
         return ADMIN_PNET_SESSION
 
 
@@ -50,7 +50,7 @@ def reset_admin_pnet_session():
     Используется для принудительного пересоздания сессии.
     """
     global ADMIN_PNET_SESSION
-    
+
     with ADMIN_SESSION_LOCK:
         if ADMIN_PNET_SESSION is not None:
             try:
@@ -73,7 +73,7 @@ def ensure_admin_pnet_session():
     session._url = get_pnet_url()
     if not session._url:
         return session
-    
+
     # Проверяем состояние сессии без блокировки (внутренняя блокировка уже есть)
     try:
         session.session_data
@@ -109,7 +109,7 @@ class PNetSessionManager:
     """
     Менеджер для управления PNet сессиями.
     Позволяет переиспользовать одну сессию для множественных операций.
-    
+
     Thread-safety:
     - Все операции с состоянием аутентификации защищены блокировкой
     - Экземпляр класса может безопасно использоваться в многопоточной среде
@@ -117,7 +117,7 @@ class PNetSessionManager:
     - Рекомендуется создавать отдельный экземпляр для каждого потока
       или использовать в контекстном менеджере with_pnet_session_if_needed для автоматического управления
     """
-    
+
     def __init__(self):
         self._session = None
         self._url = None
@@ -125,33 +125,33 @@ class PNetSessionManager:
         self._xsrf = None
         self._is_authenticated = False
         self._lock = threading.Lock()  # Блокировка для thread-safety
-    
+
     def __enter__(self):
         """Контекстный менеджер для автоматического логина/логаута"""
         self.login()
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Автоматический логаут при выходе из контекста"""
         self.logout()
-    
+
     def login(self):
         """Логин в PNet если еще не залогинены"""
         with self._lock:  # Атомарная проверка и установка флага
             if self._is_authenticated:
                 return
-            
+
             self._url = get_pnet_url()
             if not self._url:
                 raise ValueError("PNet URL не настроен")
-            
+
             Login = 'pnet_scripts'
             Pass = 'eve'
-            
+
             self._cookie, self._xsrf = pf_login(self._url, Login, Pass)
             self._is_authenticated = True
             logger.debug("PNet сессия создана")
-    
+
     def logout(self):
         """Логаут из PNet"""
         with self._lock:  # Атомарная проверка и сброс флага
@@ -165,7 +165,7 @@ class PNetSessionManager:
                     self._is_authenticated = False
                     self._cookie = None
                     self._xsrf = None
-    
+
     @property
     def session_data(self):
         """Возвращает данные сессии для использования в операциях"""
@@ -175,25 +175,25 @@ class PNetSessionManager:
             if not self._is_authenticated:
                 raise RuntimeError("Сессия не активна. Вызовите login() сначала")
             return self._url, self._cookie, self._xsrf
-    
+
     @require_pnet_url
     def create_lab_for_user(self, lab, username):
         """Создание лаборатории для пользователя"""
         url, cookie, xsrf = self.session_data
         create_lab(url, get_pnet_lab_name(lab), "", get_pnet_base_dir(), cookie, xsrf, username)
-    
+
     @require_pnet_url
     def create_lab_nodes_and_connectors(self, lab, username):
         """Создание узлов и коннекторов для пользователя"""
         url, cookie, xsrf = self.session_data
         create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), cookie, xsrf, username)
-    
+
     @require_pnet_url
     def delete_lab_for_team(self, lab, team_slug):
         """Удаление лаборатории для команды"""
         url, cookie, xsrf = self.session_data
         delete_lab_with_session_destroy(
-            url, lab.slug + '_' + lab.lab_type.lower(), 
+            url, lab.slug + '_' + lab.lab_type.lower(),
             get_pnet_base_dir(), cookie, xsrf, team_slug
         )
 
@@ -202,10 +202,10 @@ class PNetSessionManager:
         """Удаление лаборатории для пользователя"""
         url, cookie, xsrf = self.session_data
         delete_lab_with_session_destroy(
-            url, lab.slug + '_' + lab.lab_type.lower(), 
+            url, lab.slug + '_' + lab.lab_type.lower(),
             get_pnet_base_dir(), cookie, xsrf, username
         )
-    
+
     @require_pnet_url
     def change_user_workspace(self, username, workspace_path):
         """Изменение рабочего пространства пользователя"""
