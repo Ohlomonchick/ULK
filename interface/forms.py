@@ -368,6 +368,7 @@ class LabForm(forms.ModelForm):
         current = self.instance.learning_years or []
         self.fields['learning_years'].initial = [str(v) for v in current]
         self.fields['learning_years'].help_text = 'Можно выбрать несколько значений.'
+        self.fields['pnet_slug'].help_text = 'При создании сгенерируется автоматически.'
 
     def clean_learning_years(self):
         values = self.cleaned_data.get('learning_years') or []
