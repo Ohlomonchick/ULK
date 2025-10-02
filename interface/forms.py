@@ -1,4 +1,5 @@
 import random
+import json
 from typing import List
 
 from django import forms
@@ -16,6 +17,7 @@ from .models import (
     Competition2User,
     KkzLab,
     Kkz,
+    KkzPreview,
     Lab,
     Platoon,
     TeamCompetition,
@@ -316,7 +318,14 @@ class CustomFilteredSelectMultiple(FilteredSelectMultiple):
             'all': ('admin/css/kkz_custom.css',)
         }
 
+
 class KkzLabInlineForm(forms.ModelForm):  # pragma: no cover
+    assignments = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=False,
+        initial='{}'
+    )
+
     class Meta:
         model = KkzLab
         fields = ['lab', 'tasks', 'num_tasks']
@@ -333,6 +342,18 @@ class KkzLabInlineForm(forms.ModelForm):  # pragma: no cover
             'Вы можете выбрать, какое количество заданий из выбранных будут распределены случайно.'
         if self.instance and self.instance.pk:
             self.fields['tasks'].queryset = LabTask.objects.filter(lab=self.instance.lab)
+            previews = KkzPreview.objects.filter(
+                kkz=self.instance.kkz,
+                lab=self.instance.lab
+            ).prefetch_related('tasks')
+
+            assignments = {}
+            for preview in previews:
+                assignments[str(preview.user.id)] = [t.id for t in preview.tasks.all()]
+
+            if assignments:
+                self.initial['assignments'] = json.dumps(assignments)
+                print(f"Loaded {len(assignments)} assignments for KkzLab {self.instance.pk}")
 
 
 class Competition2UserInlineForm(forms.ModelForm):

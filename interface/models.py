@@ -304,6 +304,20 @@ class KkzLab(models.Model):
         verbose_name_plural = 'Лабораторные работы в ККЗ'
 
 
+class KkzPreview(models.Model):
+    kkz = models.ForeignKey('Kkz', on_delete=models.CASCADE, related_name='previews')
+    lab = models.ForeignKey('Lab', on_delete=models.CASCADE, related_name='kkz_previews')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
+    tasks = models.ManyToManyField(LabTask, blank=True, verbose_name="Задания")
+
+    class Meta:
+        verbose_name = "Превью распределения ККЗ"
+        verbose_name_plural = "Превью распределений ККЗ"
+
+    def __str__(self):
+        return f"Preview для {self.kkz} / {self.lab}"
+
+
 class Competition(models.Model):
     slug = models.SlugField('Название в адресной строке', unique=True, max_length=255)
     start = models.DateTimeField("Начало")

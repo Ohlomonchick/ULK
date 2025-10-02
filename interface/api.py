@@ -2,6 +2,7 @@ import json
 import requests
 import urllib3
 import logging
+import random
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -15,6 +16,7 @@ from django.db.models import Q
 from datetime import timedelta, datetime
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 
 
 from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType
@@ -776,3 +778,168 @@ def create_pnet_lab_session_with_console(request):
         logger = logging.getLogger(__name__)
         logger.error(f'Console session creation error: {str(e)}')
         return JsonResponse({'error': f'Console session creation error: {str(e)}'}, status=500)
+
+
+@require_POST
+def kkz_preview_random(request):
+    lab_id = request.GET.get('lab_id')
+    num_tasks_str = request.GET.get('num_tasks', '0')
+    count_str = request.GET.get('count', '1')
+
+    try:
+        num_tasks = int(num_tasks_str)
+        count = int(count_str)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid parameters'}, status=400)
+
+    if num_tasks <= 0:
+        return JsonResponse({'sets': [[] for _ in range(count)] if count > 1 else {'tasks': []}})
+
+    try:
+        lab = Lab.objects.get(id=lab_id)
+    except Lab.DoesNotExist:
+        return JsonResponse({'error': 'Lab not found'}, status=400)
+
+    all_tasks = list(lab.options.all())
+    if len(all_tasks) < num_tasks:
+        return JsonResponse({'error': 'Not enough tasks'}, status=400)
+
+    sets = []
+    for _ in range(count):
+        sampled = random.sample(all_tasks, num_tasks)
+        sets.append([t.id for t in sampled])
+
+    if count == 1:
+        return JsonResponse({'tasks': sets[0]})
+    else:
+        return JsonResponse({'sets': sets})
+
+
+@require_GET
+def kkz_preview_random(request):
+    lab_id = request.GET.get("lab_id")
+    num_tasks = int(request.GET.get("num_tasks", 0) or 0)
+    unified = request.GET.get("unified", "false").lower() in ("1", "true", "yes", "on")
+    platoon_ids = request.GET.get("platoon_ids")
+    user_ids = request.GET.get("user_ids")
+    kkz_id = request.GET.get("kkz_id")
+    force_regen = request.GET.get("force_regen", "false").lower() in ("1", "true", "yes", "on")
+
+    selected_task_ids = request.GET.get("selected_tasks")
+
+    if platoon_ids:
+        platoon_ids = [int(x) for x in platoon_ids.split(",") if x.strip()]
+    else:
+        platoon_ids = None
+
+    if user_ids:
+        user_ids = [int(x) for x in user_ids.split(",") if x.strip()]
+    else:
+        user_ids = None
+
+    if selected_task_ids:
+        selected_task_ids = [int(x) for x in selected_task_ids.split(",") if x.strip()]
+    else:
+        selected_task_ids = None
+
+    lab = get_object_or_404(Lab, id=lab_id)
+    all_tasks = list(LabTask.objects.filter(lab=lab, id__in=selected_task_ids).order_by('id'))
+    tasks_json = [{"id": t.id, "description": getattr(t, "description", str(t))} for t in all_tasks]
+    task_ids_set = {t.id for t in all_tasks}
+
+    if kkz_id:
+        kkz = get_object_or_404(Kkz, id=kkz_id)
+        users = list(kkz.get_users())
+        unified = kkz.unified_tasks
+    else:
+        users = set()
+        if platoon_ids:
+            users.update(User.objects.filter(platoon__in=platoon_ids))
+        if user_ids:
+            users.update(User.objects.filter(id__in=user_ids))
+        users = list(users)
+
+    users = sorted(users, key=lambda u: u.get_full_name() or u.username)
+    users_json = [{"id": u.id, "username": u.username, "display": u.get_full_name() or u.username} for u in users]
+
+    assignments = {}
+    regenerate = force_regen
+
+    if kkz_id and not force_regen:
+        previews = KkzPreview.objects.filter(kkz=kkz, lab=lab)
+        previews_dict = {p.user.id: p for p in previews}
+        missing_users = [u for u in users if u.id not in previews_dict]
+        invalid_previews = False
+        for user_id, preview in previews_dict.items():
+            preview_task_ids = {t.id for t in preview.tasks.all()}
+            if not preview_task_ids.issubset(task_ids_set):
+                invalid_previews = True
+                break
+
+        if missing_users or invalid_previews or previews.count() != len(users):
+            regenerate = True
+        else:
+            assignments = {str(u.id): [t.id for t in previews_dict[u.id].tasks.all()] for u in users}
+
+    if regenerate or not kkz_id:
+        assignments = {}
+        if users:
+            if unified:
+                picked = random.sample(all_tasks, min(num_tasks, len(all_tasks)))
+                p_ids = [t.id for t in picked]
+                for u in users:
+                    assignments[str(u.id)] = p_ids
+            else:
+                for u in users:
+                    sel = random.sample(all_tasks, min(num_tasks, len(all_tasks)))
+                    assignments[str(u.id)] = [t.id for t in sel]
+
+    return JsonResponse({
+        "lab": {"id": lab.id, "name": lab.name},
+        "tasks": tasks_json,
+        "users": users_json,
+        "assignments": assignments
+    })
+
+
+@require_POST
+def kkz_save_preview(request):
+    data = json.loads(request.body)
+    kkz_id = data.get('kkz_id')
+    lab_id = data.get('lab_id')
+    assignments = data.get('assignments', {})
+
+    print(f"kkz_save_preview called: kkz_id={kkz_id}, lab_id={lab_id}, assignments={assignments}")
+
+    kkz = get_object_or_404(Kkz, id=kkz_id)
+    lab = get_object_or_404(Lab, id=lab_id)
+
+    if kkz.unified_tasks:
+        if assignments:
+            first_user_id = next(iter(assignments))
+            uniform_task_ids = assignments[first_user_id]
+            users = kkz.get_users()
+            for user in users:
+                preview, created = KkzPreview.objects.update_or_create(
+                    kkz=kkz,
+                    lab=lab,
+                    user=user,
+                    defaults={}
+                )
+                preview.tasks.set(uniform_task_ids)
+    else:
+        for user_id_str, task_ids in assignments.items():
+            try:
+                user_id = int(user_id_str)
+                user = get_object_or_404(User, id=user_id)
+                preview, created = KkzPreview.objects.update_or_create(
+                    kkz=kkz,
+                    lab=lab,
+                    user=user,
+                    defaults={}
+                )
+                preview.tasks.set(task_ids)
+            except (ValueError, User.DoesNotExist):
+                continue
+
+    return JsonResponse({'status': 'ok'})

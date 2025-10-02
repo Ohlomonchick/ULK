@@ -19,4 +19,6 @@ urlpatterns = [
     path('check_kibana_auth_status/', check_kibana_auth_status, name='check_kibana_auth_status'),
     path('create_pnet_lab_session/', create_pnet_lab_session, name='create_pnet_lab_session'),
     path('create_pnet_lab_session_with_console/', create_pnet_lab_session_with_console, name='create_pnet_lab_session_with_console'),
+    path('kkz_preview_random/', kkz_preview_random, name='kkz_preview_random'),
+    path('kkz_save_preview/', kkz_save_preview, name='kkz_save_preview'),
 ]
