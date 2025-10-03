@@ -14,7 +14,7 @@ from django_apscheduler.models import DjangoJobExecution
 from django_apscheduler import util
 
 from interface.models import Competition2User, TeamCompetition2Team
-from pnet_session_manager import with_pnet_session_if_needed
+from interface.pnet_session_manager import with_pnet_session_if_needed
 
 logger = logging.getLogger(__name__)
 
