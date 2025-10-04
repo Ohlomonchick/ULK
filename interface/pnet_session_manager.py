@@ -2,7 +2,7 @@ import logging
 import threading
 from functools import wraps
 
-from interface.eveFunctions import pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
+from interface.eveFunctions import change_user_password, create_directory, create_user, pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
     delete_lab_with_session_destroy, change_user_workspace
 from interface.utils import get_pnet_lab_name
 from interface.config import get_pnet_url, get_pnet_base_dir
@@ -68,8 +68,6 @@ def ensure_admin_pnet_session():
     Автоматически выполняет логин если сессия не аутентифицирована.
     """
     session = get_admin_pnet_session()
-
-
     session._url = get_pnet_url()
     if not session._url:
         return session
@@ -211,3 +209,21 @@ class PNetSessionManager:
         """Изменение рабочего пространства пользователя"""
         url, cookie, xsrf = self.session_data
         change_user_workspace(url, cookie, xsrf, username, workspace_path)
+
+    @require_pnet_url
+    def change_user_password(self, username, password):
+        """Изменение пароля пользователя"""
+        url, cookie, xsrf = self.session_data
+        change_user_password(url, cookie, xsrf, username, password)
+
+    @require_pnet_url
+    def create_directory(self, path, dir_name):
+        """Создание директории"""
+        url, cookie, xsrf = self.session_data
+        create_directory(url, path, dir_name, cookie)
+
+    @require_pnet_url
+    def create_user(self, username, password):
+        """Создание пользователя"""
+        url, cookie, xsrf = self.session_data
+        create_user(url, username, password, '1', cookie, xsrf)

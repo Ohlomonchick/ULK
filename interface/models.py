@@ -16,7 +16,7 @@ from django.conf import settings
 from interface.eveFunctions import pf_login, logout, create_directory, get_user_workspace_relative_path
 from interface.config import get_pnet_url, get_pnet_base_dir
 from .validators import validate_top_level_array, validate_lab_task_json_config
-from .pnet_session_manager import execute_pnet_operation_if_needed
+from .pnet_session_manager import ensure_admin_pnet_session, execute_pnet_operation_if_needed
 from .elastic_utils import delete_elastic_user
 logger = logging.getLogger(__name__)
 
@@ -227,16 +227,9 @@ class Team(models.Model):
     def post_create(cls, sender, instance, created, *args, **kwargs):
         if not created:
             return
-
-        url = get_pnet_url()
-        if url:
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            cookie, xsrf = pf_login(url, Login, Pass)
-            logging.debug(f'create dir with name {instance.slug}')
-            create_directory(url, get_pnet_base_dir(), instance.slug, cookie)
-            logout(url)
-
+        pnet_session = ensure_admin_pnet_session()
+        with pnet_session:
+            pnet_session.create_directory(get_pnet_base_dir(), instance.slug)
 
 class Answers(models.Model):
     lab = models.ForeignKey(Lab, related_name="lab", on_delete=models.CASCADE)

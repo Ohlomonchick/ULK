@@ -27,8 +27,7 @@ from .models import (
 )
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
-from interface.eveFunctions import pf_login, logout, create_user, create_directory
-from interface.pnet_session_manager import execute_pnet_operation_if_needed, with_pnet_session_if_needed
+from interface.pnet_session_manager import ensure_admin_pnet_session, with_pnet_session_if_needed
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django_select2 import forms as s2forms
 from .config import *
@@ -133,14 +132,10 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
         if not user.username:
             user.username = user.last_name + "_" + user.first_name
         user.save()
-        url = get_pnet_url()
-        if url:
-            Login = 'pnet_scripts'
-            Pass = 'eve'
-            cookie, xsrf = pf_login(url, Login, Pass)
-            create_directory(url, get_pnet_base_dir(), user.username, cookie)
-            create_user(url, user.pnet_login, user.pnet_password, '1', cookie)
-            logout(url)
+        pnet_session = ensure_admin_pnet_session()
+        with pnet_session:
+            pnet_session.create_directory(get_pnet_base_dir(), user.username)
+            pnet_session.create_user(user.pnet_login, user.pnet_password)
 
         # Создаем пользователя в Elasticsearch
         try:

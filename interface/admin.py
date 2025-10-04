@@ -22,7 +22,6 @@ from django.db import transaction
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
 
 
-
 class CustomJSONEditorWidget(JSONEditorWidget):
     class Media:
         css = {

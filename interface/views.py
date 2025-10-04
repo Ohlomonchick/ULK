@@ -9,10 +9,10 @@ from interface.forms import LabAnswerForm, SimpleCompetitionForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.utils import timezone
-from interface.eveFunctions import pf_login, logout, change_user_password
 
+from interface.pnet_session_manager import ensure_admin_pnet_session
 from interface.serializers import *
 from rest_framework import viewsets
 
@@ -445,16 +445,15 @@ def change_password(request):  # pragma: no cover
         if request.POST.get('password1') == request.POST.get('password2') and request.POST.get('password1') != "":
             user = request.user
             user.set_password(request.POST.get('password1'))
+            user.pnet_password = get_pnet_password(request.POST.get('password1'))
             user.save()
             login(request, user)
-            url = get_pnet_url()
-            if url:
-                Login = 'pnet_scripts'
-                Pass = 'eve'
-                cookie, xsrf = pf_login(url, Login, Pass)
-                change_user_password(url, cookie, xsrf, user.pnet_login, get_pnet_password(request.POST.get('password1')))
-                logout(url)
-                return redirect('/cyberpolygon/competitions')
+
+            session_manager = ensure_admin_pnet_session()
+            with session_manager:             
+                session_manager.change_user_password(user.pnet_login, user.pnet_password)
+
+            return redirect('/cyberpolygon/competitions')
         else:
             form = ChangePasswordForm()
     else:
