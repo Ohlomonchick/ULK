@@ -473,7 +473,7 @@ def check_kibana_auth_status(request):
         # Проверяем статус аутентификации через API Kibana
         headers = {
             'Accept': 'application/json',
-            'kbn-version': '9.1.1',
+            'kbn-version': '9.1.2',
             'x-elastic-internal-origin': 'Kibana'
         }
 
@@ -528,7 +528,7 @@ def get_kibana_auth(request):
             return JsonResponse({'error': 'Failed to connect to Kibana'}, status=500)
 
         # Извлекаем версию Kibana из заголовков
-        kbn_version = main_page_response.headers.get('kbn-version', '9.1.1')
+        kbn_version = main_page_response.headers.get('kbn-version', '9.1.2')
 
         # Аутентификация через внутренний API Kibana
         headers = {
