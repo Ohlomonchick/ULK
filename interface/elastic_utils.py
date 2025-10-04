@@ -1,5 +1,6 @@
 import os
 import logging
+import ssl
 from elasticsearch import Elasticsearch
 from django.conf import settings
 from dynamic_config.utils import get_elastic_config
@@ -24,11 +25,15 @@ def get_elastic_client():
     if config['use_https']:
         ca_cert_path = os.path.join(settings.BASE_DIR, config['ca_cert_path'])
         if os.path.exists(ca_cert_path):
-            ssl_settings['ca_certs'] = ca_cert_path
+            # Создаем SSL контекст для работы с самоподписанными сертификатами
+            ssl_context = ssl.create_default_context(cafile=ca_cert_path)
+            # Отключаем проверку имени хоста для самоподписанных сертификатов
+            ssl_context.check_hostname = False
+            # Разрешаем самоподписанные сертификаты
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
+            
+            ssl_settings['ssl_context'] = ssl_context
             ssl_settings['verify_certs'] = True
-            # Отключаем проверку имени хоста для development
-            ssl_settings['ssl_assert_hostname'] = False
-            ssl_settings['ssl_assert_fingerprint'] = False
         else:
             logger.warning(f"CA certificate not found at {ca_cert_path}, using verify_certs=False")
             ssl_settings['verify_certs'] = False
