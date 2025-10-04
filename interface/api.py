@@ -4,6 +4,8 @@ import urllib3
 import logging
 import random
 
+from interface.utils import get_kibana_url
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from django.core.cache import cache
@@ -454,9 +456,6 @@ def get_pnet_auth(request):
     except Exception as e:
         return JsonResponse({'error': f'Authentication error: {str(e)}'}, status=500)
 
-
-def get_kibana_url():
-    return get_web_url().split(':')[0] + ':5601'
 
 @api_view(['GET'])
 def check_kibana_auth_status(request):

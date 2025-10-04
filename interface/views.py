@@ -19,7 +19,7 @@ from rest_framework import viewsets
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
-from interface.utils import get_pnet_password
+from interface.utils import get_kibana_url, get_pnet_password
 
 
 class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
@@ -486,5 +486,5 @@ def utils_console(request, slug, node_name):
 
 
 def kibana_dashboard(request, slug):
-    web_ip = get_web_url().split(':')[0]
+    web_ip = get_kibana_url()
     return render(request, 'interface/kibana_dashboard.html', {'slug': slug, 'web_ip': web_ip})

@@ -1,5 +1,7 @@
 import hashlib
 
+from interface.config import get_web_url
+
 def get_pnet_password(user_password):
     return hashlib.md5((user_password + '42').encode()).hexdigest()[:8]
 
@@ -32,3 +34,7 @@ def get_database_type():
             return 'postgresql'
         else:
             raise ValueError(f"Неподдерживаемый тип базы данных: {vendor}")
+
+
+def get_kibana_url():
+    return get_web_url().split(':')[1] + ':5601'
