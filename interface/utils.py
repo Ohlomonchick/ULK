@@ -37,4 +37,4 @@ def get_database_type():
 
 
 def get_kibana_url():
-    return get_web_url().split(':')[1] + ':5601'
+    return 'http:' + get_web_url().split(':')[1] + ':5601'
