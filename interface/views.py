@@ -4,6 +4,7 @@ from time import sleep
 
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
+from interface.config import get_web_url
 from interface.models import *
 from interface.forms import LabAnswerForm, SimpleCompetitionForm
 
@@ -482,3 +483,8 @@ def utils_console(request, slug, node_name):
         return error_response
     
     return render(request, 'interface/utils_console.html', {'competition': issue.competition, 'node_name': node_name, 'username': username})
+
+
+def kibana_dashboard(request, slug):
+    web_ip = get_web_url().split(':')[0]
+    return render(request, 'interface/kibana_dashboard.html', {'slug': slug, 'web_ip': web_ip})

@@ -46,7 +46,7 @@
 <iframe
     id="kibanaFrame"
     style="aspect-ratio: 16/9;"
-    data-src="/kibana/app/dashboards#/view/78289c40-86da-11e8-b59d-21efb914e65c-ecs?_g=(refreshInterval:(pause:!t,value:60000),time:(from:now-15m,to:now))&_a=(filters:!(('$state':(store:appState),meta:(alias:!n,disabled:!f,field:'@version',index:'filebeat-*',key:'@version',negate:!f,params:(query:'1'),type:phrase),query:(match_phrase:('@version':'1')))),viewMode:view)"
+    data-src="{{ web_ip }}:5601/app/dashboards#/view/78289c40-86da-11e8-b59d-21efb914e65c-ecs?_g=(refreshInterval:(pause:!t,value:60000),time:(from:now-15m,to:now))&_a=(filters:!(('$state':(store:appState),meta:(alias:!n,disabled:!f,field:'@version',index:'filebeat-*',key:'@version',negate:!f,params:(query:'1'),type:phrase),query:(match_phrase:('@version':'1')))),viewMode:view)"
     width="100%"
     class="mb-5"
     height="100%"

@@ -455,6 +455,9 @@ def get_pnet_auth(request):
         return JsonResponse({'error': f'Authentication error: {str(e)}'}, status=500)
 
 
+def get_kibana_url():
+    return get_web_url().split(':')[0] + ':5601'
+
 @api_view(['GET'])
 def check_kibana_auth_status(request):
     """Проверяет статус аутентификации пользователя в Kibana"""
@@ -466,7 +469,7 @@ def check_kibana_auth_status(request):
         return JsonResponse({'authenticated': False, 'error': 'User credentials not configured'}, status=400)
 
     try:
-        kibana_url = f"{get_web_url()}/kibana"
+        kibana_url = get_kibana_url()
         session = requests.Session()
         session.verify = False
 
@@ -518,7 +521,7 @@ def get_kibana_auth(request):
         return JsonResponse({'error': 'User credentials not configured'}, status=400)
 
     try:
-        kibana_url = f"{get_web_url()}/kibana"
+        kibana_url = get_kibana_url()
         session = requests.Session()
         session.verify = False
 
