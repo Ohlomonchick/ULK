@@ -486,5 +486,4 @@ def utils_console(request, slug, node_name):
 
 
 def kibana_dashboard(request, slug):
-    web_ip = get_kibana_url()
-    return render(request, 'interface/kibana_dashboard.html', {'slug': slug, 'web_ip': web_ip})
+    return render(request, 'interface/kibana_dashboard.html', {'slug': slug, 'kibana_url': get_kibana_url()})
