@@ -114,7 +114,7 @@ async function initializeKibanaFrame() {
 
     // Загружаем iframe с Kibana
     const targetSrc = iframe.getAttribute('data-src') || '/kibana/';
-    iframe.src = targetSrc + '?t=' + Date.now();
+    iframe.src = targetSrc;
 }
 
 // Функция для очистки кэша аутентификации (можно вызвать при необходимости)
