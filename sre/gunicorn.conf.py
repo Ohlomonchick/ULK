@@ -1,7 +1,12 @@
 # gunicorn.conf.py
+import os
+
+# Устанавливаем флаг для wsgi.py чтобы он знал что запущен через Gunicorn
+os.environ['GUNICORN_WORKER'] = 'true'
+
 # Non logging stuff
 bind = "0.0.0.0:8002"
-workers = 4
+workers = 3
 worker_class = "gevent"
 worker_connections = 1000
 timeout = 90
