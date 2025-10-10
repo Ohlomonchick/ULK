@@ -3,7 +3,6 @@ from slugify import slugify
 import logging
 import json
 
-from interface.utils import get_pnet_lab_name
 from .config import *
 
 logger = logging.getLogger(__name__)
@@ -364,8 +363,7 @@ def delete_lab(url, cookie, lab_path):
     return r
 
 
-def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, cookie, xsrf, username):
-    lab_name = get_pnet_lab_name(lab_object)
+def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username):
     username = slugify(username)
     lab_path += "/" + username
 

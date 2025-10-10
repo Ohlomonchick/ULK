@@ -25,6 +25,7 @@ from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamComp
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
+from .utils import get_pnet_lab_name
 
 
 @api_view(['GET'])
@@ -621,11 +622,8 @@ def create_pnet_lab_session(request):
         if not user.pnet_login:
             return JsonResponse({'error': 'User PNET login not configured'}, status=400)
 
-        # Получаем путь до лабы пользователя
-        from .utils import get_pnet_lab_name
-
         base_path = get_pnet_base_dir()
-        lab_name = get_pnet_lab_name(competition.lab)
+        lab_name = get_pnet_lab_name(competition)
         lab_file_name = lab_name + '.unl'
         lab_path = f"/{base_path.rstrip('/').lstrip('/')}/{user.pnet_login}/{lab_file_name}"
 
@@ -714,7 +712,6 @@ def create_pnet_lab_session_with_console(request):
 
         # Импортируем функции из eveFunctions
         from .eveFunctions import pf_login, create_pnet_lab_session_common, get_lab_topology, get_guacamole_url, turn_on_node
-        from .utils import get_pnet_lab_name
 
         # Получаем URL PNET
         pnet_url = get_pnet_url()
@@ -724,7 +721,7 @@ def create_pnet_lab_session_with_console(request):
         
         # Получаем путь до лабы пользователя
         base_path = get_pnet_base_dir()
-        lab_name = get_pnet_lab_name(competition.lab)
+        lab_name = get_pnet_lab_name(competition)
         lab_file_name = lab_name + '.unl'
         lab_path = f"/{base_path.rstrip('/').lstrip('/')}/{user.pnet_login}/{lab_file_name}"
 

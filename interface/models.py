@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.conf import settings
 from interface.eveFunctions import pf_login, logout, create_directory, get_user_workspace_relative_path
 from interface.config import get_pnet_url, get_pnet_base_dir
+from interface.utils import get_pnet_lab_name
 from .validators import validate_top_level_array, validate_lab_task_json_config
 from .pnet_session_manager import ensure_admin_pnet_session, execute_pnet_operation_if_needed
 from .elastic_utils import delete_elastic_user
@@ -421,8 +422,8 @@ class Competition2User(models.Model):
         lab = instance.competition.lab
 
         def _create_operation(session_manager):
-            session_manager.create_lab_for_user(lab, instance.user.username)
-            session_manager.create_lab_nodes_and_connectors(lab, instance.user.username)
+            session_manager.create_lab_for_user(get_pnet_lab_name(instance), instance.user.username)
+            session_manager.create_lab_nodes_and_connectors(lab, get_pnet_lab_name(instance), instance.user.username)
 
         execute_pnet_operation_if_needed(lab, _create_operation)
 
@@ -468,7 +469,7 @@ class TeamCompetition2Team(models.Model):
         lab = instance.competition.lab
 
         def _create_operation(session_manager):
-            session_manager.create_lab_for_user(lab, instance.team.slug)
+            session_manager.create_lab_for_user(get_pnet_lab_name(instance), instance.team.slug)
             session_manager.create_lab_nodes_and_connectors(lab, instance.team.slug)
 
             relative_path = f'{get_user_workspace_relative_path()}/{instance.team.slug}'

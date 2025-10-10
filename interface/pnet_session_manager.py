@@ -4,7 +4,6 @@ from functools import wraps
 
 from interface.eveFunctions import change_user_password, create_directory, create_user, pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
     delete_lab_with_session_destroy, change_user_workspace
-from interface.utils import get_pnet_lab_name
 from interface.config import get_pnet_url, get_pnet_base_dir
 
 logger = logging.getLogger(__name__)
@@ -175,16 +174,16 @@ class PNetSessionManager:
             return self._url, self._cookie, self._xsrf
 
     @require_pnet_url
-    def create_lab_for_user(self, lab, username):
+    def create_lab_for_user(self, lab_name, username):
         """Создание лаборатории для пользователя"""
         url, cookie, xsrf = self.session_data
-        create_lab(url, get_pnet_lab_name(lab), "", get_pnet_base_dir(), cookie, xsrf, username)
+        create_lab(url, lab_name, "", get_pnet_base_dir(), cookie, xsrf, username)
 
     @require_pnet_url
-    def create_lab_nodes_and_connectors(self, lab, username):
+    def create_lab_nodes_and_connectors(self, lab, lab_name, username):
         """Создание узлов и коннекторов для пользователя"""
         url, cookie, xsrf = self.session_data
-        create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), cookie, xsrf, username)
+        create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), lab_name, cookie, xsrf, username)
 
     @require_pnet_url
     def delete_lab_for_team(self, lab, team_slug):

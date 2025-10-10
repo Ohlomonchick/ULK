@@ -6,8 +6,8 @@ def get_pnet_password(user_password):
     return hashlib.md5((user_password + '42').encode()).hexdigest()[:8]
 
 
-def get_pnet_lab_name(lab):
-    return lab.slug + '_' + lab.lab_type.lower()
+def get_pnet_lab_name(competition):
+    return competition.lab.slug + '_' + competition.lab.lab_type.lower() + '_' + competition.start.strftime('%Y%m%d%H%M%S')
 
 
 def get_database_type():
