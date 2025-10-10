@@ -67,34 +67,45 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         return self.request.user.is_staff
 
     def get_queryset(self):
-        queryset = Lab.objects.all()
-        program = self.request.GET.get("program")
-        if program:
-            queryset = queryset.filter(program=program)
-        return queryset
+        # Return all labs for all programs
+        return Lab.objects.all()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         labs = self.get_queryset().order_by('slug', 'lab_type')
-        lab_bundles = []
-        bundle_dict = {}
-        for lab in labs:
-            slug = lab.slug
-            if slug not in bundle_dict:
-                bundle_dict[slug] = {LabType.HW: None, LabType.EXAM: None, LabType.PZ: None}
-            bundle_dict[slug][lab.lab_type] = lab
-        for slug, labs_by_type in bundle_dict.items():
-            lab_bundles.append({
-                "name": [lab.name for lab in labs_by_type.values() if lab is not None][0],
-                "slug": slug,
-                "labs": labs_by_type,
-                "cover": [lab.cover for lab in labs_by_type.values() if lab is not None and lab.cover is not None][0]
-            })
-        context['lab_bundles'] = lab_bundles
-
-        from django.conf import settings
-        db_engine = settings.DATABASES['default']['ENGINE']
-        print("DB ENGINE: ", db_engine)
+        
+        # Group labs by program
+        programs_data = {}
+        for program_value, program_label in LabProgram.choices:
+            program_labs = labs.filter(program=program_value)
+            bundle_dict = {}
+            
+            for lab in program_labs:
+                slug = lab.slug
+                if slug not in bundle_dict:
+                    bundle_dict[slug] = {LabType.HW: None, LabType.EXAM: None, LabType.PZ: None}
+                bundle_dict[slug][lab.lab_type] = lab
+            
+            lab_bundles = []
+            for slug, labs_by_type in bundle_dict.items():
+                available_labs = [lab for lab in labs_by_type.values() if lab is not None]
+                if available_labs:
+                    covers_with_images = [lab.cover for lab in available_labs if lab.cover]
+                    lab_bundles.append({
+                        "name": available_labs[0].name,
+                        "slug": slug,
+                        "labs": labs_by_type,
+                        "cover": covers_with_images[0] if covers_with_images else None
+                    })
+            
+            programs_data[program_value] = {
+                "label": program_label,
+                "bundles": lab_bundles
+            }
+        
+        context['programs_data'] = programs_data
+        context['initial_program'] = self.request.GET.get("program", LabProgram.choices[0][0] if LabProgram.choices else None)
+        
         return context
 
 
