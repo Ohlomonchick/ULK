@@ -190,7 +190,7 @@ class CompetitionAdmin(admin.ModelAdmin):
     add_form = CompetitionForm
     list_display = ("start", "lab", 'all_platoons', 'all_non_platoon_users')
     search_fields = ['lab__name']
-    exclude = ('participants', 'deleted', 'slug', 'issued_labs', 'kkz')
+    exclude = ('participants', 'deleted', 'slug', 'issued_labs', 'kkz', 'created_at')
     inlines = [Competition2UserInline]
     actions = [set_all_users_to_competition_level]
 
