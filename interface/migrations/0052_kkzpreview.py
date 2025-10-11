@@ -2,7 +2,33 @@
 
 import django.db.models.deletion
 from django.conf import settings
-from django.db import migrations, models
+from django.db import migrations, models, connection
+
+
+def add_primary_key_constraint(apps, schema_editor):
+    """
+    Add PRIMARY KEY constraint to interface_lab table
+    """
+    if connection.vendor == 'postgresql':
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE interface_lab ADD CONSTRAINT interface_lab_pkey PRIMARY KEY (id);")
+    elif connection.vendor == 'sqlite':
+        # SQLite doesn't support adding PRIMARY KEY to existing table
+        # We'll create a unique index instead
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS interface_lab_pkey ON interface_lab(id);")
+
+
+def remove_primary_key_constraint(apps, schema_editor):
+    """
+    Remove PRIMARY KEY constraint from interface_lab table
+    """
+    if connection.vendor == 'postgresql':
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE interface_lab DROP CONSTRAINT interface_lab_pkey;")
+    elif connection.vendor == 'sqlite':
+        with connection.cursor() as cursor:
+            cursor.execute("DROP INDEX IF EXISTS interface_lab_pkey;")
 
 
 class Migration(migrations.Migration):
@@ -12,6 +38,12 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # First, add PRIMARY KEY constraint to interface_lab table
+        migrations.RunPython(
+            add_primary_key_constraint,
+            remove_primary_key_constraint
+        ),
+        # Then create the KkzPreview model
         migrations.CreateModel(
             name='KkzPreview',
             fields=[
