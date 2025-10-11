@@ -186,20 +186,20 @@ class PNetSessionManager:
         create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), lab_name, cookie, xsrf, username)
 
     @require_pnet_url
-    def delete_lab_for_team(self, lab, team_slug):
+    def delete_lab_for_team(self, lab_name, team_slug):
         """Удаление лаборатории для команды"""
         url, cookie, xsrf = self.session_data
         delete_lab_with_session_destroy(
-            url, lab.slug + '_' + lab.lab_type.lower(),
+            url, lab_name,
             get_pnet_base_dir(), cookie, xsrf, team_slug
         )
 
     @require_pnet_url
-    def delete_lab_for_user(self, lab, username):
+    def delete_lab_for_user(self, lab_name, username):
         """Удаление лаборатории для пользователя"""
         url, cookie, xsrf = self.session_data
         delete_lab_with_session_destroy(
-            url, lab.slug + '_' + lab.lab_type.lower(),
+            url, lab_name,
             get_pnet_base_dir(), cookie, xsrf, username
         )
 

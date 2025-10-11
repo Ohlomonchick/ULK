@@ -7,7 +7,7 @@ def get_pnet_password(user_password):
 
 
 def get_pnet_lab_name(competition):
-    return competition.lab.slug + '_' + competition.lab.lab_type.lower() + '_' + competition.start.strftime('%Y%m%d%H%M%S')
+    return competition.lab.slug + '_' + competition.lab.lab_type.lower() + '_' + competition.created_at.strftime('%Y%m%d%H%M%S')
 
 
 def get_database_type():

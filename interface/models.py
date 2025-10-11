@@ -333,6 +333,7 @@ class Competition(models.Model):
                             null=True, blank=True)
     num_tasks = models.PositiveIntegerField("Количество заданий для распределения", default=1, blank=True)
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
+    created_at = models.DateTimeField(default=timezone.now, blank=True)
 
     def clean(self):
         if not self.start or not self.finish:
@@ -400,7 +401,7 @@ class Competition2User(models.Model):
 
         execute_pnet_operation_if_needed(
             self.competition.lab,
-            lambda session_manager: session_manager.delete_lab_for_user(self.competition.lab, self.user.username)
+            lambda session_manager: session_manager.delete_lab_for_user(get_pnet_lab_name(self.competition), self.user.username)
         )
 
         self.deleted = True
@@ -487,7 +488,7 @@ class TeamCompetition2Team(models.Model):
             return
 
         def _delete_operation(session_manager):
-            session_manager.delete_lab_for_team(self.competition.lab, self.team.slug)
+            session_manager.delete_lab_for_team(get_pnet_lab_name(self.competition), self.team.slug)
             for user in self.team.users.all():
                 session_manager.change_user_workspace(
                     user.pnet_login, f'{get_user_workspace_relative_path()}/{user.pnet_login}'
