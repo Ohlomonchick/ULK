@@ -422,8 +422,8 @@ class Competition2User(models.Model):
         lab = instance.competition.lab
 
         def _create_operation(session_manager):
-            session_manager.create_lab_for_user(get_pnet_lab_name(instance), instance.user.username)
-            session_manager.create_lab_nodes_and_connectors(lab, get_pnet_lab_name(instance), instance.user.username)
+            session_manager.create_lab_for_user(get_pnet_lab_name(instance.competition), instance.user.username)
+            session_manager.create_lab_nodes_and_connectors(lab, get_pnet_lab_name(instance.competition), instance.user.username)
 
         execute_pnet_operation_if_needed(lab, _create_operation)
 
@@ -469,8 +469,8 @@ class TeamCompetition2Team(models.Model):
         lab = instance.competition.lab
 
         def _create_operation(session_manager):
-            session_manager.create_lab_for_user(get_pnet_lab_name(instance), instance.team.slug)
-            session_manager.create_lab_nodes_and_connectors(lab, instance.team.slug)
+            session_manager.create_lab_for_user(get_pnet_lab_name(instance.competition), instance.team.slug)
+            session_manager.create_lab_nodes_and_connectors(lab, get_pnet_lab_name(instance.competition), instance.team.slug)
 
             relative_path = f'{get_user_workspace_relative_path()}/{instance.team.slug}'
             logger.debug(f'competition created for team {instance.team.slug}')
