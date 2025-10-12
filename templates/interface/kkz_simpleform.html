@@ -1,0 +1,356 @@
+{% extends 'interface/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .lab-item {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .lab-item.excluded {
+        opacity: 0.5;
+        background-color: #f5f5f5;
+    }
+
+    .lab-item.excluded .lab-name {
+        text-decoration: line-through;
+        color: #999;
+    }
+
+    .task-checkbox {
+        margin-right: 0.5rem;
+    }
+
+    .exclude-btn, .include-btn {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .exclude-btn:hover, .include-btn:hover {
+        transform: scale(1.1);
+    }
+
+    #labs-container {
+        display: none;
+    }
+
+    #labs-container.loaded {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="columns is-centered">
+    <div class="column is-full">
+        <h1 class="title is-2">
+            {% if creating_from_lab %}
+                Создать ККЗ с включением: {{ lab.name }}
+            {% else %}
+                Создать контрольно-квалификационное задание
+            {% endif %}
+        </h1>
+    </div>
+</div>
+
+<form method="post" id="kkz-form">
+    {% csrf_token %}
+
+    <div class="columns">
+        <div class="column is-one-third">
+            <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+                <h3 class="title is-4">Основные параметры</h3>
+
+                <div class="field">
+                    <label class="label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                    <div class="control">
+                        {{ form.name }}
+                    </div>
+                    {% if form.name.errors %}
+                        <p class="help is-danger">{{ form.name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="field">
+                    <label class="label" for="{{ form.platoon.id_for_label }}">{{ form.platoon.label }}</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            {{ form.platoon }}
+                        </div>
+                    </div>
+                    {% if form.platoon.errors %}
+                        <p class="help is-danger">{{ form.platoon.errors.0 }}</p>
+                    {% endif %}
+                    <p class="help">При выборе взвода автоматически загрузятся доступные лабораторные работы.</p>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="{{ form.duration.id_for_label }}">{{ form.duration.label }}</label>
+                    <div class="durationwidget">
+                        {{ form.duration }}
+                    </div>
+                    {% if form.duration.errors %}
+                        <p class="help is-danger">{{ form.duration.errors.0 }}</p>
+                    {% endif %}
+                    <p class="help">Время начнётся с момента создания ККЗ.</p>
+                </div>
+
+                <div class="field">
+                    <div class="control">
+                        <label class="checkbox">
+                            {{ form.unified_tasks }}
+                            {{ form.unified_tasks.label }}
+                        </label>
+                    </div>
+                    <p class="help">Если отмечено, все студенты получат одинаковые задания. Иначе - индивидуальные.</p>
+                </div>
+
+                {{ form.labs_data }}
+
+                <div class="field">
+                    <div class="control" style="display: flex; align-items: center;">
+                        <button id="create-kkz-button" class="button is-info" type="submit">Создать ККЗ</button>
+                        <div id="loading-container" class="hidden" style="margin-left: 1rem;">
+                            <div id="loading-text" class="has-text-info" style="font-size: 1.1rem; font-weight: 500;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="column is-two-thirds">
+            <div id="platoon-prompt" class="box has-background-light">
+                <p class="content">Выберите взвод, чтобы загрузить список доступных лабораторных работ.</p>
+            </div>
+
+            <div id="labs-container">
+                <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1); margin-bottom: 1rem;">
+                    <h3 class="title is-4">Лабораторные работы для выдачи</h3>
+                    <p class="help mb-3">Вы можете исключить ненужные лабы или снять отметку с ненужных заданий.</p>
+
+                    <div id="labs-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const platoonSelect = document.querySelector('select[name="platoon"]') || document.getElementById('id_platoon');
+    const labsContainer = document.getElementById('labs-container');
+    const labsList = document.getElementById('labs-list');
+    const platoonPrompt = document.getElementById('platoon-prompt');
+    const labsDataInput = document.querySelector('input[name="labs_data"]') || document.getElementById('id_labs_data');
+    const form = document.getElementById('kkz-form');
+
+    if (!platoonSelect || !labsContainer || !labsList || !platoonPrompt || !labsDataInput || !form) {
+        console.error('Some required elements not found:', {
+            platoonSelect: !!platoonSelect,
+            labsContainer: !!labsContainer,
+            labsList: !!labsList,
+            platoonPrompt: !!platoonPrompt,
+            labsDataInput: !!labsDataInput,
+            form: !!form
+        });
+
+        console.log('Form HTML:', document.querySelector('.box').innerHTML);
+        return;
+    }
+
+    console.log('All elements found successfully!');
+
+    let currentLabs = [];
+
+    {% if creating_from_lab %}
+    const initialLabId = {{ lab.id }};
+    {% endif %}
+
+    platoonSelect.addEventListener('change', function() {
+        const platoonId = this.value;
+        if (!platoonId) {
+            labsContainer.classList.remove('loaded');
+            platoonPrompt.style.display = 'block';
+            return;
+        }
+
+        loadLabsForPlatoon(platoonId);
+    });
+
+    if (platoonSelect.value) {
+        loadLabsForPlatoon(platoonSelect.value);
+    }
+
+    const maxTasksInput = document.getElementById('max-tasks-limit');
+    if (maxTasksInput) {
+        maxTasksInput.addEventListener('input', function() {
+            updateHiddenField();
+        });
+    }
+
+    function loadLabsForPlatoon(platoonId) {
+        console.log('Loading labs for platoon:', platoonId);
+        fetch(`/api/get_labs_for_platoon/?platoon_id=${platoonId}`)
+            .then(response => {
+                console.log('Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Received data:', data);
+                if (data.labs) {
+                    currentLabs = data.labs.map(lab => ({
+                        lab_id: lab.id,
+                        name: lab.name,
+                        tasks: lab.tasks,
+                        included: true,
+                        task_ids: lab.tasks.map(t => t.id),
+                        num_tasks: lab.tasks.length
+                    }));
+
+                    renderLabs();
+                    platoonPrompt.style.display = 'none';
+                    labsContainer.classList.add('loaded');
+                    updateHiddenField();
+                }
+            })
+            .catch(error => {
+                console.error('Error loading labs:', error);
+                alert('Ошибка при загрузке лабораторных работ: ' + error.message);
+            });
+    }
+
+    function renderLabs() {
+        labsList.innerHTML = '';
+
+        currentLabs.forEach((lab, index) => {
+            const labBox = document.createElement('div');
+            labBox.className = 'box lab-item' + (lab.included ? '' : ' excluded');
+            labBox.style.marginBottom = '1rem';
+
+            labBox.innerHTML = `
+                <div class="level" style="margin-bottom: 1rem;">
+                    <div class="level-left">
+                        <div class="level-item">
+                            <h4 class="title is-5 lab-name">${lab.name}</h4>
+                        </div>
+                    </div>
+                    <div class="level-right">
+                        <div class="level-item">
+                            ${lab.included ?
+                                `<span class="icon has-text-danger exclude-btn" data-index="${index}" title="Исключить">
+                                    <i class="fas fa-times-circle fa-lg"></i>
+                                </span>` :
+                                `<span class="icon has-text-success include-btn" data-index="${index}" title="Включить обратно">
+                                    <i class="fas fa-check-circle fa-lg"></i>
+                                </span>`
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tasks-list">
+                    ${lab.tasks.map((task, taskIndex) => `
+                        <article class="media" style="margin-bottom: 0.75rem;">
+                            <div class="media-left" style="margin-right: 0.75rem;">
+                                <label class="checkbox">
+                                    <input type="checkbox" class="task-checkbox"
+                                           data-lab-index="${index}"
+                                           data-task-id="${task.id}"
+                                           ${lab.task_ids.includes(task.id) && lab.included ? 'checked' : ''}
+                                           ${!lab.included ? 'disabled' : ''}>
+                                </label>
+                            </div>
+                            <div class="media-content">
+                                <div class="content">
+                                    <p>
+                                        <strong>Задание ${taskIndex + 1}</strong>
+                                        <br>
+                                        ${task.description}
+                                    </p>
+                                </div>
+                            </div>
+                        </article>
+                    `).join('')}
+                </div>
+            `;
+
+            labsList.appendChild(labBox);
+        });
+
+        document.querySelectorAll('.exclude-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const index = parseInt(this.dataset.index);
+                currentLabs[index].included = false;
+                renderLabs();
+                updateHiddenField();
+            });
+        });
+
+        document.querySelectorAll('.include-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const index = parseInt(this.dataset.index);
+                currentLabs[index].included = true;
+                renderLabs();
+                updateHiddenField();
+            });
+        });
+
+        document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const labIndex = parseInt(this.dataset.labIndex);
+                const taskId = parseInt(this.dataset.taskId);
+
+                if (this.checked) {
+                    if (!currentLabs[labIndex].task_ids.includes(taskId)) {
+                        currentLabs[labIndex].task_ids.push(taskId);
+                    }
+                } else {
+                    currentLabs[labIndex].task_ids = currentLabs[labIndex].task_ids.filter(id => id !== taskId);
+                }
+
+                currentLabs[labIndex].num_tasks = currentLabs[labIndex].task_ids.length;
+                updateHiddenField();
+            });
+        });
+    }
+
+    function updateHiddenField() {
+        const maxTasksInput = document.getElementById('max-tasks-limit');
+        const maxTasks = maxTasksInput && maxTasksInput.value ? parseInt(maxTasksInput.value) : null;
+        const labsDataWithLimit = currentLabs.map(lab => ({
+            ...lab,
+            max_tasks_limit: maxTasks
+        }));
+
+        labsDataInput.value = JSON.stringify(labsDataWithLimit);
+    }
+
+    form.addEventListener('submit', function(e) {
+        const button = document.getElementById('create-kkz-button');
+        const loadingContainer = document.getElementById('loading-container');
+        const loadingText = document.getElementById('loading-text');
+
+        button.disabled = true;
+        loadingContainer.classList.remove('hidden');
+
+        let dots = 0;
+        const messages = ['Создание ККЗ', 'Распределение заданий', 'Подготовка ресурсов'];
+        let messageIndex = 0;
+
+        const interval = setInterval(() => {
+            dots = (dots + 1) % 4;
+            loadingText.textContent = messages[messageIndex] + '.'.repeat(dots);
+
+            if (dots === 0) {
+                messageIndex = (messageIndex + 1) % messages.length;
+            }
+        }, 500);
+    });
+});
+</script>
+
+{% endblock %}

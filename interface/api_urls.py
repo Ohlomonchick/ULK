@@ -21,4 +21,5 @@ urlpatterns = [
     path('create_pnet_lab_session_with_console/', create_pnet_lab_session_with_console, name='create_pnet_lab_session_with_console'),
     path('kkz_preview_random/', kkz_preview_random, name='kkz_preview_random'),
     path('kkz_save_preview/', kkz_save_preview, name='kkz_save_preview'),
+    path('get_labs_for_platoon/', get_labs_for_platoon, name='get-labs-for-platoon'),
 ]

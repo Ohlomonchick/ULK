@@ -6,12 +6,13 @@ from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from interface.config import get_web_url
 from interface.models import *
-from interface.forms import LabAnswerForm, SimpleCompetitionForm
+from interface.forms import LabAnswerForm, SimpleCompetitionForm, SimpleKkzForm
 
 from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from django.views.generic import FormView
 
 from interface.pnet_session_manager import ensure_admin_pnet_session
 from interface.serializers import *
@@ -59,6 +60,7 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         return context
 
 
+# noinspection PyUnresolvedReferences
 class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Lab
 
@@ -328,6 +330,56 @@ class TeamCompetitionDetailView(CompetitionDetailView):
         return context
 
 
+class CreateKkzView(LoginRequiredMixin, UserPassesTestMixin, FormView):
+    """Общая страница создания ККЗ (выбор взвода)"""
+    template_name = 'interface/kkz_simpleform.html'
+    form_class = SimpleKkzForm
+
+    def test_func(self):
+        return self.request.user.is_staff
+
+    def form_valid(self, form):
+        kkz = form.create_kkz()
+        sleep(5)
+        return redirect('interface:competition-list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['creating_from_lab'] = False
+        return context
+
+
+class CreateKkzFromLabView(LoginRequiredMixin, UserPassesTestMixin, FormView):
+    """Создание ККЗ из конкретной лабы"""
+    template_name = 'interface/kkz_simpleform.html'
+    form_class = SimpleKkzForm
+
+    def test_func(self):
+        return self.request.user.is_staff
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Получаем лабу из URL
+        slug = self.kwargs.get('slug')
+        lab_type = self.kwargs.get('lab_type')
+        lab = get_object_or_404(Lab, slug=slug, lab_type=lab_type)
+        kwargs['lab'] = lab
+        return kwargs
+
+    def form_valid(self, form):
+        kkz = form.create_kkz()
+        sleep(5)
+        return redirect('interface:competition-list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        slug = self.kwargs.get('slug')
+        lab_type = self.kwargs.get('lab_type')
+        lab = get_object_or_404(Lab, slug=slug, lab_type=lab_type)
+        context['lab'] = lab
+        context['creating_from_lab'] = True
+        return context
+
 class PlatoonDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):  # pragma: no cover
     model = Platoon
     pk_url_kwarg = 'id'
@@ -451,6 +503,7 @@ def registration(request):  # pragma: no cover
     return render(request, 'registration/reg_user.html', {'form': form})
 
 
+# noinspection PyUnresolvedReferences
 def change_password(request):  # pragma: no cover
     if request.method == 'POST':
         form = ChangePasswordForm(request.POST)

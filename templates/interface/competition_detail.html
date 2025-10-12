@@ -129,7 +129,7 @@
             {% if object.lab.need_kibana and not user.is_superuser %}
                 <a href="{% url 'interface:kibana-dashboard' slug=object.slug %}" class="button is-dark is-medium mb-3 mt-0">
                     <img src="{% static 'icons/kibana-dark-logo.svg' %}" style="width: 20px; height: 20px; filter: invert(1); margin-right: 8px;" alt="Kibana">
-                    Перейтив в ELK
+                    Перейти в ELK
                 </a>
             {% endif %}
 

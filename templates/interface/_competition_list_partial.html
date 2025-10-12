@@ -53,6 +53,14 @@
             <div class="box has-background-light">
                 <div style="min-height: 8rem;">
                     <h2 class="title is-3">Контрольно-квалификационные задания</h2>
+                    {% if user.is_staff %}
+                        <a href="{% url 'interface:kkz-create' %}" class="button is-success" style="margin-bottom: 1rem;">
+                            <span class="icon">
+                                <i class="fas fa-plus"></i>
+                            </span>
+                            <span>Создать ККЗ</span>
+                        </a>
+                    {% endif %}
                 </div>
                 {% for kkz, comps in kkz_groups.items %}
                     <div class="box" style="border: thin solid darkslategray; margin-bottom: 1rem;">
@@ -105,7 +113,7 @@
                 }
             });
         });
-        
+
         function checkForUpdates() {
             fetch('/api/check_updates/')
                 .then(response => response.json())

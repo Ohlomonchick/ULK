@@ -1,6 +1,7 @@
 import random
 import json
 from typing import List
+from datetime import timedelta
 
 from django import forms
 from durationwidget.widgets import TimeDurationWidget
@@ -585,3 +586,161 @@ class SimpleCompetitionForm(forms.Form):
                 self.add_error(field if field in self.fields else None, err)
 
         raise ValidationError("Форма некорректна")
+
+
+class SimpleKkzForm(forms.Form):
+    name = forms.CharField(
+        label="Название ККЗ",
+        max_length=255,
+        widget=forms.TextInput(attrs={'class': 'input'})
+    )
+
+    platoon = forms.ModelChoiceField(
+        label="Взвод",
+        queryset=Platoon.objects.filter(number__gt=0),
+        widget=forms.Select(attrs={
+            'class': 'select',
+            'id': 'id_platoon'
+        })
+    )
+
+    duration = forms.DurationField(
+        label="Длительность",
+        initial=timedelta(hours=2),
+        widget=TimeDurationWidget(
+            show_days=False,
+            show_hours=True,
+            show_minutes=True,
+            show_seconds=False,
+            attrs={'class': 'input is-small', 'style': 'width: 6rem;'}
+        )
+    )
+
+    unified_tasks = forms.BooleanField(
+        label="Единые задания для всех студентов",
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={'class': 'checkbox'})
+    )
+
+    labs_data = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=False,
+        initial='[]'
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.lab = kwargs.pop("lab", None)
+        self.platoon_id = kwargs.pop("platoon_id", None)
+        super().__init__(*args, **kwargs)
+
+        if self.lab:
+            years = self.lab.learning_years or []
+            self.fields["platoon"].queryset = Platoon.objects.filter(
+                number__gt=0,
+                learning_year__in=years
+            )
+
+            if self.fields["platoon"].queryset.count() == 1:
+                self.fields["platoon"].initial = self.fields["platoon"].queryset.first()
+
+        if self.platoon_id:
+            self.fields["platoon"].initial = self.platoon_id
+
+    def clean_labs_data(self):
+        data = self.cleaned_data.get('labs_data', '[]')
+        try:
+            labs_data = json.loads(data)
+            included_labs = [lab for lab in labs_data if lab.get('included', True)]
+            if not included_labs:
+                raise ValidationError("Необходимо выбрать хотя бы одну лабораторную работу")
+            return labs_data
+        except json.JSONDecodeError:
+            raise ValidationError("Некорректный формат данных лаб")
+
+    def create_kkz(self):
+        platoon = self.cleaned_data["platoon"]
+        duration = self.cleaned_data["duration"]
+        labs_data = self.cleaned_data["labs_data"]
+        kkz = Kkz.objects.create(
+            name=self.cleaned_data["name"],
+            start=timezone.now(),
+            finish=timezone.now() + duration,
+            unified_tasks=self.cleaned_data["unified_tasks"]
+        )
+
+        kkz.platoons.add(platoon)
+        users = list(kkz.get_users())
+
+        for lab_info in labs_data:
+            if not lab_info.get('included', True):
+                continue
+
+            lab_id = lab_info['lab_id']
+            task_ids = lab_info.get('task_ids', [])
+            num_tasks = lab_info.get('num_tasks', len(task_ids))
+
+            try:
+                lab = Lab.objects.get(id=lab_id)
+            except Lab.DoesNotExist:
+                continue
+
+            kkz_lab = KkzLab.objects.create(
+                kkz=kkz,
+                lab=lab,
+                num_tasks=num_tasks
+            )
+
+            if task_ids:
+                all_tasks = list(LabTask.objects.filter(id__in=task_ids))
+                kkz_lab.tasks.set(all_tasks)
+            else:
+                all_tasks = list(LabTask.objects.filter(lab=lab))
+
+            competition = Competition.objects.create(
+                lab=lab,
+                start=kkz.start,
+                finish=kkz.finish,
+                kkz=kkz,
+                num_tasks=num_tasks
+            )
+            competition.platoons.add(platoon)
+
+            if not all_tasks:
+                continue
+
+            if kkz.unified_tasks:
+                picked = random.sample(all_tasks, min(num_tasks, len(all_tasks)))
+                p_ids = [t.id for t in picked]
+
+                for user in users:
+                    preview = KkzPreview.objects.create(
+                        kkz=kkz,
+                        lab=lab,
+                        user=user
+                    )
+                    preview.tasks.set(p_ids)
+
+                    comp2user = Competition2User.objects.create(
+                        competition=competition,
+                        user=user
+                    )
+                    comp2user.tasks.set(p_ids)
+            else:
+                for user in users:
+                    sel = random.sample(all_tasks, min(num_tasks, len(all_tasks)))
+                    s_ids = [t.id for t in sel]
+
+                    preview = KkzPreview.objects.create(
+                        kkz=kkz,
+                        lab=lab,
+                        user=user
+                    )
+                    preview.tasks.set(s_ids)
+                    comp2user = Competition2User.objects.create(
+                        competition=competition,
+                        user=user
+                    )
+                    comp2user.tasks.set(s_ids)
+
+        return kkz

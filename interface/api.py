@@ -21,7 +21,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType, Kkz
+from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType, Kkz, Platoon, \
+    LabType, KkzPreview
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
@@ -942,3 +943,50 @@ def kkz_save_preview(request):
                 continue
 
     return JsonResponse({'status': 'ok'})
+
+
+def get_labs_for_platoon(request):
+    """Возвращает список лаб типа EXAM для выбранного взвода"""
+    platoon_id = request.GET.get('platoon_id')
+
+    print(f"get_labs_for_platoon called with platoon_id: {platoon_id}")
+
+    if not platoon_id:
+        return JsonResponse({'error': 'platoon_id required'}, status=400)
+
+    try:
+        platoon = Platoon.objects.get(id=platoon_id)
+        print(f"Found platoon: {platoon.number}, learning_year: {platoon.learning_year}")
+    except Platoon.DoesNotExist:
+        return JsonResponse({'error': 'Platoon not found'}, status=404)
+
+    labs = Lab.objects.filter(
+        lab_type=LabType.EXAM,
+        learning_years__contains=[platoon.learning_year]
+    )
+
+    print(f"Found {labs.count()} labs for learning_year {platoon.learning_year}")
+
+    # Формируем данные с заданиями
+    labs_data = []
+    for lab in labs:
+        tasks = LabTask.objects.filter(lab=lab)
+        tasks_data = [
+            {
+                'id': task.id,
+                'description': task.description
+            }
+            for task in tasks
+        ]
+
+        labs_data.append({
+            'id': lab.id,
+            'name': lab.name,
+            'slug': lab.slug,
+            'tasks': tasks_data,
+            'default_duration': str(lab.default_duration) if lab.default_duration else None
+        })
+
+        print(f"  Lab: {lab.name} with {len(tasks_data)} tasks")
+
+    return JsonResponse({'labs': labs_data})
