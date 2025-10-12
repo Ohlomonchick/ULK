@@ -5,38 +5,48 @@
 <style>
     .lab-item {
         border: 1px solid rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease;
+        transition: background 0.5s, border 0.5s;
+        margin-bottom: 1rem;
     }
-
     .lab-item.excluded {
         opacity: 0.5;
         background-color: #f5f5f5;
     }
-
     .lab-item.excluded .lab-name {
         text-decoration: line-through;
         color: #999;
     }
-
-    .task-checkbox {
-        margin-right: 0.5rem;
-    }
-
     .exclude-btn, .include-btn {
         cursor: pointer;
-        transition: transform 0.2s;
+        transition: transform 0.4s, opacity 0.25s;
+        display: inline-block;
     }
-
     .exclude-btn:hover, .include-btn:hover {
-        transform: scale(1.1);
+        transform: scale(1.2);
     }
-
-    #labs-container {
-        display: none;
+    .lab-item.excluded .exclude-btn {
+        transform: translateX(25px);
+        opacity: 0;
+        pointer-events: none;
     }
-
-    #labs-container.loaded {
-        display: block;
+    .lab-item:not(.excluded) .include-btn {
+        transform: translateX(-25px);
+        opacity: 0;
+        pointer-events: none;
+    }
+    .tasks-list {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        transition: max-height 0.75s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s, padding 0.4s;
+        max-height: 1500px;
+        opacity: 1;
+    }
+    .tasks-list.collapsed {
+        max-height: 0;
+        opacity: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        pointer-events: none;
     }
 </style>
 {% endblock %}
@@ -58,7 +68,7 @@
     {% csrf_token %}
 
     <div class="columns">
-        <div class="column is-one-third">
+        <div class="column is-two-thirds">
             <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
                 <h3 class="title is-4">Основные параметры</h3>
 
@@ -93,17 +103,7 @@
                     {% if form.duration.errors %}
                         <p class="help is-danger">{{ form.duration.errors.0 }}</p>
                     {% endif %}
-                    <p class="help">Время начнётся с момента создания ККЗ.</p>
-                </div>
-
-                <div class="field">
-                    <div class="control">
-                        <label class="checkbox">
-                            {{ form.unified_tasks }}
-                            {{ form.unified_tasks.label }}
-                        </label>
-                    </div>
-                    <p class="help">Если отмечено, все студенты получат одинаковые задания. Иначе - индивидуальные.</p>
+                    <p class="help">Внимание! Отчёт времени начнётся с момента создания работы.</p>
                 </div>
 
                 {{ form.labs_data }}
@@ -111,25 +111,49 @@
                 <div class="field">
                     <div class="control" style="display: flex; align-items: center;">
                         <button id="create-kkz-button" class="button is-info" type="submit">Создать ККЗ</button>
-                        <div id="loading-container" class="hidden" style="margin-left: 1rem;">
-                            <div id="loading-text" class="has-text-info" style="font-size: 1.1rem; font-weight: 500;"></div>
+                        <div id="video-container" class="hidden" style="margin-left: 1rem;">
+                            <video id="exam-video" style="width: auto; height: 62px; border-radius: 4px;" autoplay muted>
+                                <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4">
+                            </video>
+                        </div>
+                    </div>
+                </div>
+                <div class="column">
+                    <div id="platoon-prompt" class="box has-background-light">
+                        <p class="content">Выберите взвод, чтобы загрузить список доступных лабораторных работ.</p>
+                    </div>
+
+                    <div id="labs-container">
+                        <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1); margin-bottom: 1rem;">
+                            <h3 class="title is-4">Лабораторные работы для выдачи</h3>
+                            <p class="help mb-3">Вы можете исключить ненужные лабораторные работы.</p>
+
+                            <div id="labs-list"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="column is-two-thirds">
-            <div id="platoon-prompt" class="box has-background-light">
-                <p class="content">Выберите взвод, чтобы загрузить список доступных лабораторных работ.</p>
-            </div>
+        <div class="column is-one-third">
+            <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1); margin-bottom: 1rem;">
+                <h3 class="title is-4">Параметры</h3>
+                <div class="field">
+                    <div class="control">
+                        <label class="checkbox">
+                            {{ form.unified_tasks }}
+                            {{ form.unified_tasks.label }}
+                        </label>
+                    </div>
+                    <p class="help">Если отмечено, все студенты получат одинаковые задания.</p>
+                </div>
 
-            <div id="labs-container">
-                <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1); margin-bottom: 1rem;">
-                    <h3 class="title is-4">Лабораторные работы для выдачи</h3>
-                    <p class="help mb-3">Вы можете исключить ненужные лабы или снять отметку с ненужных заданий.</p>
-
-                    <div id="labs-list"></div>
+                <div class="field">
+                    <label >Ограничить количество заданий</label>
+                    <div class="control">
+                        <input type="number" class="input is-small" style="width: 150px;" id="max-tasks-limit" min="1" placeholder="Без ограничений">
+                    </div>
+                    <p class="help">Если указано, суммарно будет выдано не более этого количества заданий.</p>
                 </div>
             </div>
         </div>
@@ -138,6 +162,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    
     const platoonSelect = document.querySelector('select[name="platoon"]') || document.getElementById('id_platoon');
     const labsContainer = document.getElementById('labs-container');
     const labsList = document.getElementById('labs-list');
@@ -145,6 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const labsDataInput = document.querySelector('input[name="labs_data"]') || document.getElementById('id_labs_data');
     const form = document.getElementById('kkz-form');
 
+    
     if (!platoonSelect || !labsContainer || !labsList || !platoonPrompt || !labsDataInput || !form) {
         console.error('Some required elements not found:', {
             platoonSelect: !!platoonSelect,
@@ -155,6 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
             form: !!form
         });
 
+        
         console.log('Form HTML:', document.querySelector('.box').innerHTML);
         return;
     }
@@ -164,9 +191,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentLabs = [];
 
     {% if creating_from_lab %}
+    
     const initialLabId = {{ lab.id }};
     {% endif %}
 
+    
     platoonSelect.addEventListener('change', function() {
         const platoonId = this.value;
         if (!platoonId) {
@@ -178,10 +207,12 @@ document.addEventListener('DOMContentLoaded', function() {
         loadLabsForPlatoon(platoonId);
     });
 
+    
     if (platoonSelect.value) {
         loadLabsForPlatoon(platoonSelect.value);
     }
 
+    
     const maxTasksInput = document.getElementById('max-tasks-limit');
     if (maxTasksInput) {
         maxTasksInput.addEventListener('input', function() {
@@ -279,25 +310,65 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
 
             labsList.appendChild(labBox);
+
+            const tasksList = labBox.querySelector('.tasks-list');
+            if (!lab.included) {
+                tasksList.classList.add('collapsed');
+            } else {
+                tasksList.classList.remove('collapsed');
+            }
+
         });
 
         document.querySelectorAll('.exclude-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const index = parseInt(this.dataset.index);
-                currentLabs[index].included = false;
-                renderLabs();
-                updateHiddenField();
+                const labBox = this.closest('.lab-item');
+                const tasksList = labBox.querySelector('.tasks-list');
+
+                
+                tasksList.style.maxHeight = tasksList.scrollHeight + "px";
+                tasksList.offsetHeight; 
+                tasksList.style.maxHeight = "0";
+                tasksList.style.opacity = "0";
+
+                
+                tasksList.addEventListener('transitionend', function handler() {
+                    tasksList.removeEventListener('transitionend', handler);
+                    currentLabs[index].included = false;
+                    renderLabs();
+                    updateHiddenField();
+                });
             });
         });
 
         document.querySelectorAll('.include-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const index = parseInt(this.dataset.index);
+                const labBox = this.closest('.lab-item');
+                const tasksList = labBox.querySelector('.tasks-list');
+
+                
                 currentLabs[index].included = true;
                 renderLabs();
                 updateHiddenField();
+
+                
+                requestAnimationFrame(() => {
+                    const newLabBox = labsList.querySelectorAll('.lab-item')[index];
+                    const newTasksList = newLabBox.querySelector('.tasks-list');
+                    newTasksList.style.maxHeight = "0";
+                    newTasksList.style.opacity = "0";
+                    newTasksList.offsetHeight; 
+                    newTasksList.style.maxHeight = newTasksList.scrollHeight + "px";
+                    newTasksList.style.opacity = "1";
+                    setTimeout(() => {
+                        newTasksList.style.maxHeight = "1500px"; 
+                    }, 450);
+                });
             });
         });
+
 
         document.querySelectorAll('.task-checkbox').forEach(checkbox => {
             checkbox.addEventListener('change', function() {
@@ -321,6 +392,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateHiddenField() {
         const maxTasksInput = document.getElementById('max-tasks-limit');
         const maxTasks = maxTasksInput && maxTasksInput.value ? parseInt(maxTasksInput.value) : null;
+
+        
         const labsDataWithLimit = currentLabs.map(lab => ({
             ...lab,
             max_tasks_limit: maxTasks
@@ -331,24 +404,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     form.addEventListener('submit', function(e) {
         const button = document.getElementById('create-kkz-button');
-        const loadingContainer = document.getElementById('loading-container');
-        const loadingText = document.getElementById('loading-text');
+        const videoContainer = document.getElementById('video-container');
+        const video = document.getElementById('exam-video');
 
         button.disabled = true;
-        loadingContainer.classList.remove('hidden');
-
-        let dots = 0;
-        const messages = ['Создание ККЗ', 'Распределение заданий', 'Подготовка ресурсов'];
-        let messageIndex = 0;
-
-        const interval = setInterval(() => {
-            dots = (dots + 1) % 4;
-            loadingText.textContent = messages[messageIndex] + '.'.repeat(dots);
-
-            if (dots === 0) {
-                messageIndex = (messageIndex + 1) % messages.length;
-            }
-        }, 500);
+        videoContainer.classList.remove('hidden');
+        video.classList.remove('is-hidden');
+        video.play();
     });
 });
 </script>

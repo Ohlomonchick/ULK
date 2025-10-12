@@ -662,6 +662,10 @@ class SimpleKkzForm(forms.Form):
         platoon = self.cleaned_data["platoon"]
         duration = self.cleaned_data["duration"]
         labs_data = self.cleaned_data["labs_data"]
+        max_tasks_limit = None
+        if labs_data and len(labs_data) > 0:
+            max_tasks_limit = labs_data[0].get('max_tasks_limit')
+
         kkz = Kkz.objects.create(
             name=self.cleaned_data["name"],
             start=timezone.now(),
@@ -672,75 +676,114 @@ class SimpleKkzForm(forms.Form):
         kkz.platoons.add(platoon)
         users = list(kkz.get_users())
 
+        if not users:
+            kkz.delete()
+            raise ValidationError("Во взводе нет пользователей")
+
+        all_available_tasks = []
+        labs_info = []
+
         for lab_info in labs_data:
             if not lab_info.get('included', True):
                 continue
 
             lab_id = lab_info['lab_id']
             task_ids = lab_info.get('task_ids', [])
-            num_tasks = lab_info.get('num_tasks', len(task_ids))
 
             try:
                 lab = Lab.objects.get(id=lab_id)
             except Lab.DoesNotExist:
                 continue
 
+            if task_ids:
+                tasks = list(LabTask.objects.filter(id__in=task_ids))
+            else:
+                tasks = list(LabTask.objects.filter(lab=lab))
+
+            all_available_tasks.extend(tasks)
+            labs_info.append({
+                'lab': lab,
+                'task_ids': task_ids,
+                'tasks': tasks
+            })
+
+        if max_tasks_limit and max_tasks_limit > 0:
+            total_tasks_to_assign = min(max_tasks_limit, len(all_available_tasks))
+        else:
+            total_tasks_to_assign = len(all_available_tasks)
+
+        for lab_data in labs_info:
+            lab = lab_data['lab']
+            task_ids = lab_data['task_ids']
+
             kkz_lab = KkzLab.objects.create(
                 kkz=kkz,
                 lab=lab,
-                num_tasks=num_tasks
+                num_tasks=len(lab_data['tasks'])
             )
 
             if task_ids:
-                all_tasks = list(LabTask.objects.filter(id__in=task_ids))
-                kkz_lab.tasks.set(all_tasks)
-            else:
-                all_tasks = list(LabTask.objects.filter(lab=lab))
+                kkz_lab.tasks.set(LabTask.objects.filter(id__in=task_ids))
 
             competition = Competition.objects.create(
                 lab=lab,
                 start=kkz.start,
                 finish=kkz.finish,
                 kkz=kkz,
-                num_tasks=num_tasks
+                num_tasks=len(lab_data['tasks'])
             )
             competition.platoons.add(platoon)
 
-            if not all_tasks:
-                continue
+        if kkz.unified_tasks:
+            picked = random.sample(all_available_tasks, min(total_tasks_to_assign, len(all_available_tasks)))
 
-            if kkz.unified_tasks:
-                picked = random.sample(all_tasks, min(num_tasks, len(all_tasks)))
-                p_ids = [t.id for t in picked]
+            for user in users:
+                tasks_by_lab = {}
+                for task in picked:
+                    if task.lab_id not in tasks_by_lab:
+                        tasks_by_lab[task.lab_id] = []
+                    tasks_by_lab[task.lab_id].append(task)
 
-                for user in users:
-                    preview = KkzPreview.objects.create(
-                        kkz=kkz,
-                        lab=lab,
-                        user=user
-                    )
-                    preview.tasks.set(p_ids)
-
-                    comp2user = Competition2User.objects.create(
-                        competition=competition,
-                        user=user
-                    )
-                    comp2user.tasks.set(p_ids)
-            else:
-                for user in users:
-                    sel = random.sample(all_tasks, min(num_tasks, len(all_tasks)))
-                    s_ids = [t.id for t in sel]
+                for lab_id, tasks in tasks_by_lab.items():
+                    lab = Lab.objects.get(id=lab_id)
 
                     preview = KkzPreview.objects.create(
                         kkz=kkz,
                         lab=lab,
                         user=user
                     )
-                    preview.tasks.set(s_ids)
-                    comp2user = Competition2User.objects.create(
+                    preview.tasks.set(tasks)
+
+                    competition = Competition.objects.get(kkz=kkz, lab=lab)
+                    comp2user, _ = Competition2User.objects.get_or_create(
                         competition=competition,
                         user=user
                     )
-                    comp2user.tasks.set(s_ids)
+                    comp2user.tasks.set(tasks)
+        else:
+            for user in users:
+                user_tasks = random.sample(all_available_tasks, min(total_tasks_to_assign, len(all_available_tasks)))
+                tasks_by_lab = {}
+                for task in user_tasks:
+                    if task.lab_id not in tasks_by_lab:
+                        tasks_by_lab[task.lab_id] = []
+                    tasks_by_lab[task.lab_id].append(task)
+
+                for lab_id, tasks in tasks_by_lab.items():
+                    lab = Lab.objects.get(id=lab_id)
+
+                    preview = KkzPreview.objects.create(
+                        kkz=kkz,
+                        lab=lab,
+                        user=user
+                    )
+                    preview.tasks.set(tasks)
+
+                    competition = Competition.objects.get(kkz=kkz, lab=lab)
+                    comp2user, _ = Competition2User.objects.get_or_create(
+                        competition=competition,
+                        user=user
+                    )
+                    comp2user.tasks.set(tasks)
 
         return kkz
