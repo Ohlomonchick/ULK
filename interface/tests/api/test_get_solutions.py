@@ -139,7 +139,8 @@ class GetSolutionsAPITestCase(TestCase):
             start=timezone.now() - timedelta(hours=1),
             finish=timezone.now() + timedelta(hours=1),
             lab=lab,
-            participants=5
+            participants=5,
+            num_tasks=2
         )
         comp.tasks.set([task1, task2])  # total_tasks = 2
 
@@ -157,6 +158,8 @@ class GetSolutionsAPITestCase(TestCase):
                 last_name="User"
             )
             platoon_users.append(u)
+            issue = Competition2User.objects.create(competition=comp, user=u)
+            issue.tasks.add(task1, task2)
         non_platoon_users = []
         for i in range(2):
             u = User.objects.create_user(
@@ -166,6 +169,9 @@ class GetSolutionsAPITestCase(TestCase):
                 last_name="User"
             )
             non_platoon_users.append(u)
+            issue = Competition2User.objects.create(competition=comp, user=u)
+            issue.tasks.add(task1, task2)
+            
 
         comp.non_platoon_users.add(*non_platoon_users)
         comp.save()
@@ -295,9 +301,7 @@ class GetSolutionsAPITestCase(TestCase):
         TeamCompetition2Team.objects.create(competition=comp, team=team)
 
         now = timezone.now()
-        # Create two team answers.
         Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=20))
-        Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=10))
 
         url = reverse("interface_api:get_solutions", kwargs={"slug": comp.slug})
         response = self.client.get(url)
@@ -351,10 +355,9 @@ class GetSolutionsAPITestCase(TestCase):
         team.users.add(team_user)
         TeamCompetition2Team.objects.create(competition=comp, team=team)
         now = timezone.now()
-        # Create answers: individual gets 1 answer; team gets 2 answers.
+        # Create answers: individual gets 1 answer; team gets 1 answer.
         Answers.objects.create(user=indiv, lab=lab, datetime=now - timedelta(minutes=40))
         Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=30))
-        Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=20))
 
         url = reverse("interface_api:get_solutions", kwargs={"slug": comp.slug})
         response = self.client.get(url)

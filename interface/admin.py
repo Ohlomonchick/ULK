@@ -195,7 +195,7 @@ class CompetitionAdmin(admin.ModelAdmin):
     actions = [set_all_users_to_competition_level]
 
     class Media:
-        js = ('admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
+        js = ('admin/js/jquery-3.7.1.min.js', 'admin/js/load_levels.js', 'admin/js/update_num_tasks.js')
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

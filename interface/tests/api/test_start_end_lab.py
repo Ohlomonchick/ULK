@@ -627,7 +627,7 @@ class LabTypePriorityTests(TestCase):
         )
         self.competition_pz_team = TeamCompetition.objects.create(
             lab=self.lab_pz,
-            start=timezone.now(),
+            start=timezone.now() + timedelta(minutes=1),
             finish=timezone.now() + timedelta(hours=2)
         )
         
@@ -731,6 +731,7 @@ class LabTasksTypeTests(APITestCase):
             competition=competition,
             user=self.user
         )
+        issue.tasks.add(task1, task2)
         
         # Выполняем запрос
         request_data = {
@@ -806,6 +807,7 @@ class LabTasksTypeTests(APITestCase):
             competition=competition,
             user=self.user
         )
+        issue.tasks.add(task1, task2)
         
         # Выполняем запрос
         request_data = {
