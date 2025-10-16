@@ -837,13 +837,13 @@ def kkz_preview_random(request):
     else:
         user_ids = None
 
+    lab = get_object_or_404(Lab, id=lab_id)
     if selected_task_ids:
         selected_task_ids = [int(x) for x in selected_task_ids.split(",") if x.strip()]
+        all_tasks = list(LabTask.objects.filter(lab=lab, id__in=selected_task_ids).order_by('id'))
     else:
-        selected_task_ids = None
+        all_tasks = list(LabTask.objects.filter(lab=lab).order_by('id'))
 
-    lab = get_object_or_404(Lab, id=lab_id)
-    all_tasks = list(LabTask.objects.filter(lab=lab, id__in=selected_task_ids).order_by('id'))
     tasks_json = [{"id": t.id, "description": getattr(t, "description", str(t))} for t in all_tasks]
     task_ids_set = {t.id for t in all_tasks}
 
@@ -941,12 +941,10 @@ def kkz_save_preview(request):
                 preview.tasks.set(task_ids)
             except (ValueError, User.DoesNotExist):
                 continue
-
     return JsonResponse({'status': 'ok'})
 
 
 def get_labs_for_platoon(request):
-    """Возвращает список лаб типа EXAM для выбранного взвода"""
     platoon_id = request.GET.get('platoon_id')
 
     print(f"get_labs_for_platoon called with platoon_id: {platoon_id}")
@@ -967,7 +965,6 @@ def get_labs_for_platoon(request):
 
     print(f"Found {labs.count()} labs for learning_year {platoon.learning_year}")
 
-    # Формируем данные с заданиями
     labs_data = []
     for lab in labs:
         tasks = LabTask.objects.filter(lab=lab)
