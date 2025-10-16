@@ -107,6 +107,7 @@
                 </div>
 
                 {{ form.labs_data }}
+                <input type="hidden" name="preview_assignments" id="preview-assignments">
 
                 <div class="field">
                     <div class="control" style="display: flex; align-items: center;">
@@ -149,12 +150,32 @@
                 </div>
 
                 <div class="field">
-                    <label >Ограничить количество заданий</label>
+                    <label class="label">Ограничить количество заданий</label>
                     <div class="control">
-                        <input type="number" class="input is-small" style="width: 150px;" id="max-tasks-limit" min="1" placeholder="Без ограничений">
+                        <input type="number" class="input" id="max-tasks-limit" min="1" placeholder="Без ограничений">
                     </div>
-                    <p class="help">Если указано, суммарно будет выдано не более этого количества заданий.</p>
+                    <p class="help">Если указано, будет выдано не более этого количества заданий (суммарно из всех лаб).</p>
                 </div>
+
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" id="show-preview-checkbox">
+                        Показать распределение заданий
+                    </label>
+                </div>
+
+                <div id="preview-container" style="display: none; margin-top: 1rem;">
+                    <div class="tabs is-boxed" id="preview-tabs">
+                        <ul id="preview-tabs-list">
+                        </ul>
+                    </div>
+                    <button type="button" id="regenerate-btn" class="button is-small is-info mb-2">
+                        Перегенерировать
+                    </button>
+                    <div id="preview-content" class="box" style="background: #fafafa;">
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -162,7 +183,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
     const platoonSelect = document.querySelector('select[name="platoon"]') || document.getElementById('id_platoon');
     const labsContainer = document.getElementById('labs-container');
     const labsList = document.getElementById('labs-list');
@@ -170,7 +190,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const labsDataInput = document.querySelector('input[name="labs_data"]') || document.getElementById('id_labs_data');
     const form = document.getElementById('kkz-form');
 
-    
     if (!platoonSelect || !labsContainer || !labsList || !platoonPrompt || !labsDataInput || !form) {
         console.error('Some required elements not found:', {
             platoonSelect: !!platoonSelect,
@@ -181,7 +200,6 @@ document.addEventListener('DOMContentLoaded', function() {
             form: !!form
         });
 
-        
         console.log('Form HTML:', document.querySelector('.box').innerHTML);
         return;
     }
@@ -191,11 +209,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentLabs = [];
 
     {% if creating_from_lab %}
-    
     const initialLabId = {{ lab.id }};
     {% endif %}
 
-    
     platoonSelect.addEventListener('change', function() {
         const platoonId = this.value;
         if (!platoonId) {
@@ -207,12 +223,10 @@ document.addEventListener('DOMContentLoaded', function() {
         loadLabsForPlatoon(platoonId);
     });
 
-    
     if (platoonSelect.value) {
         loadLabsForPlatoon(platoonSelect.value);
     }
 
-    
     const maxTasksInput = document.getElementById('max-tasks-limit');
     if (maxTasksInput) {
         maxTasksInput.addEventListener('input', function() {
@@ -326,13 +340,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 const labBox = this.closest('.lab-item');
                 const tasksList = labBox.querySelector('.tasks-list');
 
-                
+                currentLabs[index].included = false;
+                updateHiddenField();
+                if (showPreviewCheckbox && showPreviewCheckbox.checked) {
+                    updatePreviewAfterLabChange();
+                }
+
+
                 tasksList.style.maxHeight = tasksList.scrollHeight + "px";
-                tasksList.offsetHeight; 
+                tasksList.offsetHeight;
                 tasksList.style.maxHeight = "0";
                 tasksList.style.opacity = "0";
 
-                
                 tasksList.addEventListener('transitionend', function handler() {
                     tasksList.removeEventListener('transitionend', handler);
                     currentLabs[index].included = false;
@@ -348,26 +367,57 @@ document.addEventListener('DOMContentLoaded', function() {
                 const labBox = this.closest('.lab-item');
                 const tasksList = labBox.querySelector('.tasks-list');
 
-                
-                currentLabs[index].included = true;
                 renderLabs();
-                updateHiddenField();
 
-                
+                if (showPreviewCheckbox && showPreviewCheckbox.checked) {
+                    updatePreviewAfterLabChange();
+                }
+
                 requestAnimationFrame(() => {
                     const newLabBox = labsList.querySelectorAll('.lab-item')[index];
                     const newTasksList = newLabBox.querySelector('.tasks-list');
                     newTasksList.style.maxHeight = "0";
                     newTasksList.style.opacity = "0";
-                    newTasksList.offsetHeight; 
+                    newTasksList.offsetHeight;
                     newTasksList.style.maxHeight = newTasksList.scrollHeight + "px";
                     newTasksList.style.opacity = "1";
                     setTimeout(() => {
-                        newTasksList.style.maxHeight = "1500px"; 
+                        newTasksList.style.maxHeight = "1500px";
                     }, 450);
                 });
             });
         });
+
+        function updatePreviewAfterLabChange() {
+            const includedLabs = currentLabs.filter(lab => lab.included);
+
+            if (includedLabs.length === 0) {
+                previewContainer.style.display = 'none';
+                showPreviewCheckbox.checked = false;
+                return;
+            }
+
+            const currentLabStillIncluded = includedLabs.some(lab => lab.lab_id === currentPreviewLabId);
+            if (!currentLabStillIncluded) {
+                currentPreviewLabId = includedLabs[0].lab_id;
+            }
+
+            previewTabsList.innerHTML = includedLabs.map((lab, index) => {
+                const isActive = lab.lab_id === currentPreviewLabId ? 'is-active' : '';
+                return `<li class="${isActive}" data-lab-id="${lab.lab_id}">
+                    <a>${lab.name}</a>
+                </li>`;
+            }).join('');
+
+            previewTabsList.querySelectorAll('li').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const labId = parseInt(this.dataset.labId);
+                    switchPreviewTab(labId);
+                });
+            });
+
+            loadCombinedPreview(includedLabs);
+        }
 
 
         document.querySelectorAll('.task-checkbox').forEach(checkbox => {
@@ -385,6 +435,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 currentLabs[labIndex].num_tasks = currentLabs[labIndex].task_ids.length;
                 updateHiddenField();
+
+                if (showPreviewCheckbox && showPreviewCheckbox.checked) {
+                    updatePreviewAfterLabChange();
+                }
             });
         });
     }
@@ -393,7 +447,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const maxTasksInput = document.getElementById('max-tasks-limit');
         const maxTasks = maxTasksInput && maxTasksInput.value ? parseInt(maxTasksInput.value) : null;
 
-        
         const labsDataWithLimit = currentLabs.map(lab => ({
             ...lab,
             max_tasks_limit: maxTasks
@@ -412,6 +465,320 @@ document.addEventListener('DOMContentLoaded', function() {
         video.classList.remove('is-hidden');
         video.play();
     });
+
+    const showPreviewCheckbox = document.getElementById('show-preview-checkbox');
+    const previewContainer = document.getElementById('preview-container');
+    const previewContent = document.getElementById('preview-content');
+    const previewTabsList = document.getElementById('preview-tabs-list');
+    const regenerateBtn = document.getElementById('regenerate-btn');
+
+    let previewAssignments = {};
+    let previewDataByLab = {};
+    let currentPreviewLabId = null;
+
+   
+    if (showPreviewCheckbox) {
+        showPreviewCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                previewContainer.style.display = 'block';
+                loadAllPreviews();
+            } else {
+                previewContainer.style.display = 'none';
+            }
+        });
+    }
+
+    if (regenerateBtn) {
+        regenerateBtn.addEventListener('click', function() {
+            if (currentPreviewLabId) {
+                loadPreviewForLab(currentPreviewLabId, true);
+            }
+        });
+    }
+
+   
+    function loadAllPreviews() {
+        const platoonId = platoonSelect.value;
+        if (!platoonId) {
+            previewContent.innerHTML = '<p class="help">Выберите взвод.</p>';
+            return;
+        }
+
+        const includedLabs = currentLabs.filter(lab => lab.included);
+        if (includedLabs.length === 0) {
+            previewContent.innerHTML = '<p class="help">Нет включенных лабораторных работ.</p>';
+            return;
+        }
+
+       
+        previewTabsList.innerHTML = includedLabs.map((lab, index) => {
+            const isActive = index === 0 ? 'is-active' : '';
+            return `<li class="${isActive}" data-lab-id="${lab.lab_id}">
+                <a>${lab.name}</a>
+            </li>`;
+        }).join('');
+
+       
+        previewTabsList.querySelectorAll('li').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const labId = parseInt(this.dataset.labId);
+                switchPreviewTab(labId);
+            });
+        });
+
+       
+        loadCombinedPreview(includedLabs);
+    }
+
+    function loadCombinedPreview(includedLabs) {
+    const platoonId = platoonSelect.value;
+    const maxTasksInput = document.getElementById('max-tasks-limit');
+    const maxTasks = maxTasksInput && maxTasksInput.value ? parseInt(maxTasksInput.value) : null;
+    const unified = document.querySelector('input[name="unified_tasks"]').checked;
+
+    const allTasksWithLab = [];
+    includedLabs.forEach(lab => {
+        if (lab.task_ids && lab.task_ids.length > 0) {
+            lab.task_ids.forEach(taskId => {
+                const task = lab.tasks.find(t => t.id === taskId);
+                if (task) {
+                    allTasksWithLab.push({
+                        ...task,
+                        lab_id: lab.lab_id,
+                        lab_name: lab.name
+                    });
+                }
+            });
+        }
+    });
+
+    if (allTasksWithLab.length === 0) {
+        previewContent.innerHTML = '<p class="help">Нет выбранных заданий.</p>';
+        return;
+    }
+
+    previewContent.innerHTML = '<p class="help">Загрузка...</p>';
+
+    const params = new URLSearchParams({
+        platoon_ids: platoonId
+    });
+
+    fetch(`/api/get_users_for_platoon/?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            const users = data.users || [];
+            if (users.length === 0) {
+                previewContent.innerHTML = '<p class="help">Нет студентов во взводе.</p>';
+                return;
+            }
+
+            const totalTasksToAssign = maxTasks && maxTasks > 0
+                ? Math.min(maxTasks, allTasksWithLab.length)
+                : allTasksWithLab.length;
+
+            const assignments = {};
+            if (unified) {
+                const selectedTasks = shuffleArray([...allTasksWithLab]).slice(0, totalTasksToAssign);
+                users.forEach(user => {
+                    assignments[user.id] = selectedTasks;
+                });
+            } else {
+                users.forEach(user => {
+                    const selectedTasks = shuffleArray([...allTasksWithLab]).slice(0, totalTasksToAssign);
+                    assignments[user.id] = selectedTasks;
+                });
+            }
+
+            previewAssignments = {};
+            previewDataByLab = {};
+
+            includedLabs.forEach(lab => {
+                const labId = lab.lab_id;
+                previewDataByLab[labId] = {
+                    lab: { id: labId, name: lab.name },
+                    tasks: lab.tasks,
+                    users: users.map(user => ({
+                        id: user.id,
+                        username: user.username,
+                        display: user.full_name || user.username
+                    }))
+                };
+
+                previewAssignments[labId] = {};
+                users.forEach(user => {
+                    const userTasks = assignments[user.id] || [];
+                    const labTaskIds = userTasks
+                        .filter(t => t.lab_id === labId)
+                        .map(t => t.id);
+                    previewAssignments[labId][user.id] = labTaskIds;
+                });
+            });
+
+            currentPreviewLabId = includedLabs[0].lab_id;
+            renderPreview(previewDataByLab[currentPreviewLabId], currentPreviewLabId);
+        })
+        .catch(error => {
+            console.error('Error loading preview:', error);
+            previewContent.innerHTML = '<p class="help has-text-danger">Ошибка загрузки превью.</p>';
+        });
+    }
+
+    function shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    if (regenerateBtn) {
+        regenerateBtn.addEventListener('click', function() {
+            const includedLabs = currentLabs.filter(lab => lab.included);
+            if (includedLabs.length > 0) {
+                loadCombinedPreview(includedLabs);
+            }
+        });
+    }
+
+   
+    function switchPreviewTab(labId) {
+       
+        previewTabsList.querySelectorAll('li').forEach(tab => {
+            if (parseInt(tab.dataset.labId) === labId) {
+                tab.classList.add('is-active');
+            } else {
+                tab.classList.remove('is-active');
+            }
+        });
+
+        currentPreviewLabId = labId;
+
+       
+        if (previewDataByLab[labId]) {
+            renderPreview(previewDataByLab[labId], labId);
+        } else {
+            loadPreviewForLab(labId);
+        }
+    }
+
+   
+    function loadPreviewForLab(labId, forceRegen = false) {
+        const platoonId = platoonSelect.value;
+        const lab = currentLabs.find(l => l.lab_id === labId);
+
+        if (!lab || !lab.included) {
+            previewContent.innerHTML = '<p class="help">Лаба не найдена или исключена.</p>';
+            return;
+        }
+
+        const taskIds = lab.task_ids || [];
+        if (taskIds.length === 0) {
+            previewContent.innerHTML = '<p class="help">Нет выбранных заданий для этой лабы.</p>';
+            return;
+        }
+
+        const maxTasksInput = document.getElementById('max-tasks-limit');
+        const maxTasks = maxTasksInput && maxTasksInput.value ? parseInt(maxTasksInput.value) : taskIds.length;
+        const unified = document.querySelector('input[name="unified_tasks"]').checked;
+
+        const params = new URLSearchParams({
+            lab_id: labId,
+            platoon_ids: platoonId,
+            num_tasks: maxTasks,
+            unified: unified ? 'true' : 'false',
+            selected_tasks: taskIds.join(',')
+        });
+
+        if (forceRegen) {
+            params.append('force_regen', 'true');
+        }
+
+        previewContent.innerHTML = '<p class="help">Загрузка...</p>';
+
+        fetch(`/api/kkz_preview_random/?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                previewDataByLab[labId] = data;
+
+                if (!previewAssignments[labId]) {
+                    previewAssignments[labId] = {};
+                }
+                previewAssignments[labId] = data.assignments || {};
+
+                renderPreview(data, labId);
+            })
+            .catch(error => {
+                console.error('Error loading preview:', error);
+                previewContent.innerHTML = '<p class="help has-text-danger">Ошибка загрузки превью.</p>';
+            });
+    }
+
+   
+    function renderPreview(data, labId) {
+        if (!data.users || data.users.length === 0) {
+            previewContent.innerHTML = '<p class="help">Нет студентов во взводе.</p>';
+            return;
+        }
+
+        const assignments = previewAssignments[labId] || data.assignments || {};
+        let html = `<p class="help mb-2"><strong>Студентов:</strong> ${data.users.length}</p>`;
+
+        data.users.forEach(user => {
+            const assigned = assignments[user.id] || [];
+            html += `
+                <div class="box" style="padding: 0.75rem; margin-bottom: 0.5rem; background: #f9f9f9;">
+                    <div style="font-weight: 600; margin-bottom: 0.5rem;">${user.display || user.username}</div>
+                    <div class="select is-multiple is-small" style="width: 100%;">
+                        <select multiple data-user-id="${user.id}" data-lab-id="${labId}" class="preview-task-select" style="width: 100%; height: 80px;">
+                            ${data.tasks.map(task => {
+                                const selected = assigned.includes(task.id) ? 'selected' : '';
+                                return `<option value="${task.id}" ${selected}>${task.description}</option>`;
+                            }).join('')}
+                        </select>
+                    </div>
+                </div>
+            `;
+        });
+
+        previewContent.innerHTML = html;
+
+       
+        document.querySelectorAll('.preview-task-select').forEach(select => {
+            select.addEventListener('change', function() {
+                const userId = this.dataset.userId;
+                const labId = parseInt(this.dataset.labId);
+                const selectedTasks = Array.from(this.selectedOptions).map(opt => parseInt(opt.value));
+
+                if (!previewAssignments[labId]) {
+                    previewAssignments[labId] = {};
+                }
+                previewAssignments[labId][userId] = selectedTasks;
+
+                console.log(`Updated assignments for lab ${labId}, user ${userId}:`, selectedTasks);
+            });
+        });
+    }
+
+   
+    const unifiedCheckbox = document.querySelector('input[name="unified_tasks"]');
+    if (unifiedCheckbox) {
+        unifiedCheckbox.addEventListener('change', function() {
+            if (showPreviewCheckbox.checked) {
+                previewDataByLab = {};
+                loadAllPreviews();
+            }
+        });
+    }
+
+    if (maxTasksInput) {
+        maxTasksInput.addEventListener('change', function() {
+            if (showPreviewCheckbox.checked) {
+                previewDataByLab = {};
+                loadAllPreviews();
+            }
+        });
+    }
 });
 </script>
 

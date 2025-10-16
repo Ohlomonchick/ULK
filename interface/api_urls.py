@@ -22,4 +22,5 @@ urlpatterns = [
     path('kkz_preview_random/', kkz_preview_random, name='kkz_preview_random'),
     path('kkz_save_preview/', kkz_save_preview, name='kkz_save_preview'),
     path('get_labs_for_platoon/', get_labs_for_platoon, name='get-labs-for-platoon'),
+    path('get_users_for_platoon/', get_users_for_platoon, name='get_users_for_platoon'),
 ]

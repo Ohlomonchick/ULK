@@ -987,3 +987,24 @@ def get_labs_for_platoon(request):
         print(f"  Lab: {lab.name} with {len(tasks_data)} tasks")
 
     return JsonResponse({'labs': labs_data})
+
+
+@require_GET
+def get_users_for_platoon(request):
+    platoon_ids = request.GET.get("platoon_ids")
+
+    if platoon_ids:
+        platoon_ids = [int(x) for x in platoon_ids.split(",") if x.strip()]
+    else:
+        return JsonResponse({'users': []})
+
+    users = User.objects.filter(platoon__in=platoon_ids).distinct()
+    users = sorted(users, key=lambda u: u.get_full_name() or u.username)
+
+    users_json = [{
+        "id": u.id,
+        "username": u.username,
+        "full_name": u.get_full_name() or u.username
+    } for u in users]
+
+    return JsonResponse({'users': users_json})
