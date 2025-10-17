@@ -340,23 +340,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 const labBox = this.closest('.lab-item');
                 const tasksList = labBox.querySelector('.tasks-list');
 
-                currentLabs[index].included = false;
-                updateHiddenField();
-                if (showPreviewCheckbox && showPreviewCheckbox.checked) {
-                    updatePreviewAfterLabChange();
-                }
-
-
                 tasksList.style.maxHeight = tasksList.scrollHeight + "px";
                 tasksList.offsetHeight;
-                tasksList.style.maxHeight = "0";
-                tasksList.style.opacity = "0";
 
-                tasksList.addEventListener('transitionend', function handler() {
-                    tasksList.removeEventListener('transitionend', handler);
-                    currentLabs[index].included = false;
-                    renderLabs();
-                    updateHiddenField();
+                requestAnimationFrame(() => {
+                    tasksList.style.maxHeight = "0";
+                    tasksList.style.opacity = "0";
+                    labBox.classList.add('excluded');
+                });
+
+                tasksList.addEventListener('transitionend', function handler(e) {
+                    if (e.target === tasksList && e.propertyName === 'max-height') {
+                        tasksList.removeEventListener('transitionend', handler);
+
+                        currentLabs[index].included = false;
+                        updateHiddenField();
+                        renderLabs();
+
+                        if (showPreviewCheckbox && showPreviewCheckbox.checked) {
+                            updatePreviewAfterLabChange();
+                        }
+                    }
                 });
             });
         });
@@ -364,9 +368,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.include-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const index = parseInt(this.dataset.index);
-                const labBox = this.closest('.lab-item');
-                const tasksList = labBox.querySelector('.tasks-list');
 
+                currentLabs[index].included = true;
+                updateHiddenField();
                 renderLabs();
 
                 if (showPreviewCheckbox && showPreviewCheckbox.checked) {
@@ -375,18 +379,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 requestAnimationFrame(() => {
                     const newLabBox = labsList.querySelectorAll('.lab-item')[index];
+                    if (!newLabBox) return;
+
                     const newTasksList = newLabBox.querySelector('.tasks-list');
+                    if (!newTasksList) return;
+
                     newTasksList.style.maxHeight = "0";
                     newTasksList.style.opacity = "0";
                     newTasksList.offsetHeight;
-                    newTasksList.style.maxHeight = newTasksList.scrollHeight + "px";
-                    newTasksList.style.opacity = "1";
-                    setTimeout(() => {
-                        newTasksList.style.maxHeight = "1500px";
-                    }, 450);
+
+                    requestAnimationFrame(() => {
+                        newTasksList.style.maxHeight = newTasksList.scrollHeight + "px";
+                        newTasksList.style.opacity = "1";
+
+                        newTasksList.addEventListener('transitionend', function handler(e) {
+                            if (e.target === newTasksList && e.propertyName === 'max-height') {
+                                newTasksList.removeEventListener('transitionend', handler);
+                                newTasksList.style.maxHeight = "1500px";
+                            }
+                        });
+                    });
                 });
             });
         });
+
 
         function updatePreviewAfterLabChange() {
             const includedLabs = currentLabs.filter(lab => lab.included);
@@ -722,7 +738,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const assignments = previewAssignments[labId] || data.assignments || {};
-        let html = `<p class="help mb-2"><strong>Студентов:</strong> ${data.users.length}</p>`;
+        let html = `<p class="help"><strong>Студентов: ${data.users.length}</strong></p>`;
 
         data.users.forEach(user => {
             const assigned = assignments[user.id] || [];
@@ -730,7 +746,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="box" style="padding: 0.75rem; margin-bottom: 0.5rem; background: #f9f9f9;">
                     <div style="font-weight: 600; margin-bottom: 0.5rem;">${user.display || user.username}</div>
                     <div class="select is-multiple is-small" style="width: 100%;">
-                        <select multiple data-user-id="${user.id}" data-lab-id="${labId}" class="preview-task-select" style="width: 100%; height: 80px;">
+                        <select multiple data-user-id="${user.id}" data-lab-id="${labId}" class="preview-task-select" style="width: 100%; height: 150px;">
                             ${data.tasks.map(task => {
                                 const selected = assigned.includes(task.id) ? 'selected' : '';
                                 return `<option value="${task.id}" ${selected}>${task.description}</option>`;
