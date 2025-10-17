@@ -21,8 +21,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType, Kkz, Platoon, \
-    LabType, KkzPreview
+from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
@@ -73,7 +72,7 @@ def get_solutions(request, slug):
         competition = TeamCompetition.objects.get(slug=slug)
     except TeamCompetition.DoesNotExist:
         competition = get_object_or_404(Competition, slug=slug)
-    total_tasks = competition.tasks.count()
+    total_tasks = competition.num_tasks
     is_team_competition = hasattr(competition, 'teams')
 
     all_individual_users = User.objects.filter(
@@ -322,9 +321,9 @@ def parse_request_data(request):
 
 def gey_lab_tasks(issue):
     if issue.competition.lab.tasks_type == LabTasksType.CLASSIC:
-        tasks = [task.task_id for task in issue.competition.tasks.all()]
+        tasks = [task.task_id for task in issue.tasks.all()]
     else:
-        tasks = [{'id': task.task_id, **task.json_config} for task in issue.competition.tasks.all()]
+        tasks = [{'id': task.task_id, **task.json_config} for task in issue.tasks.all()]
     return tasks
 
 
