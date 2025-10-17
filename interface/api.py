@@ -22,7 +22,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 
 from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType, Kkz, Platoon, \
-    LabType, KkzPreview, KkzPreview
+    LabType, KkzPreview, KkzPreview, KkzPreview
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
