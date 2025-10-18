@@ -3,6 +3,28 @@
 
 {% block extra_css %}
 <style>
+    #preview-toggle:hover {
+        background-color: #f5f5f5;
+        border-radius: 4px;
+    }
+
+    #preview-arrow.rotated {
+        transform: rotate(90deg);
+    }
+
+    #preview-container {
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition: max-height 0.8s ease, opacity 0.7s ease, margin-top 0.7s ease;
+    }
+
+    #preview-container.open {
+        max-height: 2000px;
+        opacity: 1;
+        margin-top: 1rem;
+    }
+
     .lab-item {
         border: 1px solid rgba(0, 0, 0, 0.1);
         transition: background 0.5s, border 0.5s;
@@ -157,11 +179,13 @@
                     <p class="help">Если указано, будет выдано не более этого количества заданий (суммарно из всех лаб).</p>
                 </div>
 
-                <div class="field">
-                    <label class="checkbox">
-                        <input type="checkbox" id="show-preview-checkbox">
+                <div id="preview-toggle" style="cursor: pointer; display: flex; align-items: center; padding: 0.5rem 0;">
+                    <span id="preview-arrow" style="transition: transform 0.3s; margin-right: 0.5rem;">
+                        <i class="fas fa-chevron-right"></i>
+                    </span>
+                    <span style="font-weight: 600;">
                         Показать распределение заданий
-                    </label>
+                    </span>
                 </div>
 
                 <div id="preview-container" style="display: none; margin-top: 1rem;">
@@ -335,73 +359,110 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         document.querySelectorAll('.exclude-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const index = parseInt(this.dataset.index);
-                const labBox = this.closest('.lab-item');
-                const tasksList = labBox.querySelector('.tasks-list');
+    btn.addEventListener('click', function() {
+        const index = parseInt(this.dataset.index);
+        const labBox = this.closest('.lab-item');
+        const tasksList = labBox.querySelector('.tasks-list');
 
-                tasksList.style.maxHeight = tasksList.scrollHeight + "px";
-                tasksList.offsetHeight;
+        
+        tasksList.style.maxHeight = tasksList.scrollHeight + "px";
+        tasksList.offsetHeight; 
 
-                requestAnimationFrame(() => {
-                    tasksList.style.maxHeight = "0";
-                    tasksList.style.opacity = "0";
-                    labBox.classList.add('excluded');
-                });
+        requestAnimationFrame(() => {
+            tasksList.style.maxHeight = "0";
+            tasksList.style.opacity = "0";
+            labBox.classList.add('excluded');
+        });
 
-                tasksList.addEventListener('transitionend', function handler(e) {
-                    if (e.target === tasksList && e.propertyName === 'max-height') {
-                        tasksList.removeEventListener('transitionend', handler);
+        
+        tasksList.addEventListener('transitionend', function handler(e) {
+            if (e.target === tasksList && e.propertyName === 'max-height') {
+                tasksList.removeEventListener('transitionend', handler);
 
-                        currentLabs[index].included = false;
-                        updateHiddenField();
-                        renderLabs();
+                
+                currentLabs[index].included = false;
+                updateHiddenField();
 
-                        if (showPreviewCheckbox && showPreviewCheckbox.checked) {
-                            updatePreviewAfterLabChange();
-                        }
+                
+                renderLabs();
+
+                
+                if (previewIsOpen) {
+                    updatePreviewAfterLabChange();
+                }
+            }
+        });
+    });
+});
+
+document.querySelectorAll('.include-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const index = parseInt(this.dataset.index);
+
+        
+        currentLabs[index].included = true;
+        updateHiddenField();
+
+        
+        renderLabs();
+
+        
+        if (previewIsOpen) {
+            updatePreviewAfterLabChange();
+        }
+
+        
+        requestAnimationFrame(() => {
+            const newLabBox = labsList.querySelectorAll('.lab-item')[index];
+            if (!newLabBox) return;
+
+            const newTasksList = newLabBox.querySelector('.tasks-list');
+            if (!newTasksList) return;
+
+            
+            newTasksList.style.maxHeight = "0";
+            newTasksList.style.opacity = "0";
+            newTasksList.offsetHeight; 
+
+            requestAnimationFrame(() => {
+                newTasksList.style.maxHeight = newTasksList.scrollHeight + "px";
+                newTasksList.style.opacity = "1";
+
+                
+                newTasksList.addEventListener('transitionend', function handler(e) {
+                    if (e.target === newTasksList && e.propertyName === 'max-height') {
+                        newTasksList.removeEventListener('transitionend', handler);
+                        newTasksList.style.maxHeight = "1500px";
                     }
                 });
             });
         });
+    });
+});
 
-        document.querySelectorAll('.include-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const index = parseInt(this.dataset.index);
+document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const labIndex = parseInt(this.dataset.labIndex);
+        const taskId = parseInt(this.dataset.taskId);
 
-                currentLabs[index].included = true;
-                updateHiddenField();
-                renderLabs();
+        if (this.checked) {
+            if (!currentLabs[labIndex].task_ids.includes(taskId)) {
+                currentLabs[labIndex].task_ids.push(taskId);
+            }
+        } else {
+            currentLabs[labIndex].task_ids = currentLabs[labIndex].task_ids.filter(id => id !== taskId);
+        }
 
-                if (showPreviewCheckbox && showPreviewCheckbox.checked) {
-                    updatePreviewAfterLabChange();
-                }
+        currentLabs[labIndex].num_tasks = currentLabs[labIndex].task_ids.length;
+        updateHiddenField();
 
-                requestAnimationFrame(() => {
-                    const newLabBox = labsList.querySelectorAll('.lab-item')[index];
-                    if (!newLabBox) return;
+        
+        if (previewIsOpen) {
+            updatePreviewAfterLabChange();
+        }
+    });
+});
 
-                    const newTasksList = newLabBox.querySelector('.tasks-list');
-                    if (!newTasksList) return;
-
-                    newTasksList.style.maxHeight = "0";
-                    newTasksList.style.opacity = "0";
-                    newTasksList.offsetHeight;
-
-                    requestAnimationFrame(() => {
-                        newTasksList.style.maxHeight = newTasksList.scrollHeight + "px";
-                        newTasksList.style.opacity = "1";
-
-                        newTasksList.addEventListener('transitionend', function handler(e) {
-                            if (e.target === newTasksList && e.propertyName === 'max-height') {
-                                newTasksList.removeEventListener('transitionend', handler);
-                                newTasksList.style.maxHeight = "1500px";
-                            }
-                        });
-                    });
-                });
-            });
-        });
 
 
         function updatePreviewAfterLabChange() {
@@ -434,7 +495,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             loadCombinedPreview(includedLabs);
         }
-
 
         document.querySelectorAll('.task-checkbox').forEach(checkbox => {
             checkbox.addEventListener('change', function() {
@@ -482,7 +542,8 @@ document.addEventListener('DOMContentLoaded', function() {
         video.play();
     });
 
-    const showPreviewCheckbox = document.getElementById('show-preview-checkbox');
+    const previewToggle = document.getElementById('preview-toggle');
+    const previewArrow = document.getElementById('preview-arrow');
     const previewContainer = document.getElementById('preview-container');
     const previewContent = document.getElementById('preview-content');
     const previewTabsList = document.getElementById('preview-tabs-list');
@@ -491,28 +552,44 @@ document.addEventListener('DOMContentLoaded', function() {
     let previewAssignments = {};
     let previewDataByLab = {};
     let currentPreviewLabId = null;
+    let previewIsOpen = false;
 
-   
-    if (showPreviewCheckbox) {
-        showPreviewCheckbox.addEventListener('change', function() {
-            if (this.checked) {
+    if (previewToggle) {
+        previewToggle.addEventListener('click', function() {
+            previewIsOpen = !previewIsOpen;
+
+            if (previewIsOpen) {
+
+                previewArrow.classList.add('rotated');
                 previewContainer.style.display = 'block';
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        previewContainer.classList.add('open');
+                    });
+                });
                 loadAllPreviews();
             } else {
-                previewContainer.style.display = 'none';
+
+                previewArrow.classList.remove('rotated');
+                previewContainer.classList.remove('open');
+                setTimeout(() => {
+                    if (!previewIsOpen) {
+                        previewContainer.style.display = 'none';
+                    }
+                }, 400);
             }
         });
     }
 
     if (regenerateBtn) {
         regenerateBtn.addEventListener('click', function() {
-            if (currentPreviewLabId) {
-                loadPreviewForLab(currentPreviewLabId, true);
+            const includedLabs = currentLabs.filter(lab => lab.included);
+            if (includedLabs.length > 0) {
+                loadCombinedPreview(includedLabs);
             }
         });
     }
 
-   
     function loadAllPreviews() {
         const platoonId = platoonSelect.value;
         if (!platoonId) {
@@ -526,7 +603,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-       
         previewTabsList.innerHTML = includedLabs.map((lab, index) => {
             const isActive = index === 0 ? 'is-active' : '';
             return `<li class="${isActive}" data-lab-id="${lab.lab_id}">
@@ -534,7 +610,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </li>`;
         }).join('');
 
-       
         previewTabsList.querySelectorAll('li').forEach(tab => {
             tab.addEventListener('click', function() {
                 const labId = parseInt(this.dataset.labId);
@@ -542,101 +617,25 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-       
         loadCombinedPreview(includedLabs);
     }
 
-    function loadCombinedPreview(includedLabs) {
-    const platoonId = platoonSelect.value;
-    const maxTasksInput = document.getElementById('max-tasks-limit');
-    const maxTasks = maxTasksInput && maxTasksInput.value ? parseInt(maxTasksInput.value) : null;
-    const unified = document.querySelector('input[name="unified_tasks"]').checked;
-
-    const allTasksWithLab = [];
-    includedLabs.forEach(lab => {
-        if (lab.task_ids && lab.task_ids.length > 0) {
-            lab.task_ids.forEach(taskId => {
-                const task = lab.tasks.find(t => t.id === taskId);
-                if (task) {
-                    allTasksWithLab.push({
-                        ...task,
-                        lab_id: lab.lab_id,
-                        lab_name: lab.name
-                    });
-                }
-            });
-        }
-    });
-
-    if (allTasksWithLab.length === 0) {
-        previewContent.innerHTML = '<p class="help">Нет выбранных заданий.</p>';
-        return;
-    }
-
-    previewContent.innerHTML = '<p class="help">Загрузка...</p>';
-
-    const params = new URLSearchParams({
-        platoon_ids: platoonId
-    });
-
-    fetch(`/api/get_users_for_platoon/?${params.toString()}`)
-        .then(response => response.json())
-        .then(data => {
-            const users = data.users || [];
-            if (users.length === 0) {
-                previewContent.innerHTML = '<p class="help">Нет студентов во взводе.</p>';
-                return;
-            }
-
-            const totalTasksToAssign = maxTasks && maxTasks > 0
-                ? Math.min(maxTasks, allTasksWithLab.length)
-                : allTasksWithLab.length;
-
-            const assignments = {};
-            if (unified) {
-                const selectedTasks = shuffleArray([...allTasksWithLab]).slice(0, totalTasksToAssign);
-                users.forEach(user => {
-                    assignments[user.id] = selectedTasks;
-                });
+    function switchPreviewTab(labId) {
+        previewTabsList.querySelectorAll('li').forEach(tab => {
+            if (parseInt(tab.dataset.labId) === labId) {
+                tab.classList.add('is-active');
             } else {
-                users.forEach(user => {
-                    const selectedTasks = shuffleArray([...allTasksWithLab]).slice(0, totalTasksToAssign);
-                    assignments[user.id] = selectedTasks;
-                });
+                tab.classList.remove('is-active');
             }
-
-            previewAssignments = {};
-            previewDataByLab = {};
-
-            includedLabs.forEach(lab => {
-                const labId = lab.lab_id;
-                previewDataByLab[labId] = {
-                    lab: { id: labId, name: lab.name },
-                    tasks: lab.tasks,
-                    users: users.map(user => ({
-                        id: user.id,
-                        username: user.username,
-                        display: user.full_name || user.username
-                    }))
-                };
-
-                previewAssignments[labId] = {};
-                users.forEach(user => {
-                    const userTasks = assignments[user.id] || [];
-                    const labTaskIds = userTasks
-                        .filter(t => t.lab_id === labId)
-                        .map(t => t.id);
-                    previewAssignments[labId][user.id] = labTaskIds;
-                });
-            });
-
-            currentPreviewLabId = includedLabs[0].lab_id;
-            renderPreview(previewDataByLab[currentPreviewLabId], currentPreviewLabId);
-        })
-        .catch(error => {
-            console.error('Error loading preview:', error);
-            previewContent.innerHTML = '<p class="help has-text-danger">Ошибка загрузки превью.</p>';
         });
+
+        currentPreviewLabId = labId;
+
+        if (previewDataByLab[labId]) {
+            renderPreview(previewDataByLab[labId], labId);
+        } else {
+            loadPreviewForLab(labId);
+        }
     }
 
     function shuffleArray(array) {
@@ -648,81 +647,93 @@ document.addEventListener('DOMContentLoaded', function() {
         return shuffled;
     }
 
-    if (regenerateBtn) {
-        regenerateBtn.addEventListener('click', function() {
-            const includedLabs = currentLabs.filter(lab => lab.included);
-            if (includedLabs.length > 0) {
-                loadCombinedPreview(includedLabs);
-            }
-        });
-    }
-
-   
-    function switchPreviewTab(labId) {
-       
-        previewTabsList.querySelectorAll('li').forEach(tab => {
-            if (parseInt(tab.dataset.labId) === labId) {
-                tab.classList.add('is-active');
-            } else {
-                tab.classList.remove('is-active');
-            }
-        });
-
-        currentPreviewLabId = labId;
-
-       
-        if (previewDataByLab[labId]) {
-            renderPreview(previewDataByLab[labId], labId);
-        } else {
-            loadPreviewForLab(labId);
-        }
-    }
-
-   
-    function loadPreviewForLab(labId, forceRegen = false) {
+    function loadCombinedPreview(includedLabs) {
         const platoonId = platoonSelect.value;
-        const lab = currentLabs.find(l => l.lab_id === labId);
-
-        if (!lab || !lab.included) {
-            previewContent.innerHTML = '<p class="help">Лаба не найдена или исключена.</p>';
-            return;
-        }
-
-        const taskIds = lab.task_ids || [];
-        if (taskIds.length === 0) {
-            previewContent.innerHTML = '<p class="help">Нет выбранных заданий для этой лабы.</p>';
-            return;
-        }
-
         const maxTasksInput = document.getElementById('max-tasks-limit');
-        const maxTasks = maxTasksInput && maxTasksInput.value ? parseInt(maxTasksInput.value) : taskIds.length;
+        const maxTasks = maxTasksInput && maxTasksInput.value ? parseInt(maxTasksInput.value) : null;
         const unified = document.querySelector('input[name="unified_tasks"]').checked;
 
-        const params = new URLSearchParams({
-            lab_id: labId,
-            platoon_ids: platoonId,
-            num_tasks: maxTasks,
-            unified: unified ? 'true' : 'false',
-            selected_tasks: taskIds.join(',')
+        const allTasksWithLab = [];
+        includedLabs.forEach(lab => {
+            if (lab.task_ids && lab.task_ids.length > 0) {
+                lab.task_ids.forEach(taskId => {
+                    const task = lab.tasks.find(t => t.id === taskId);
+                    if (task) {
+                        allTasksWithLab.push({
+                            ...task,
+                            lab_id: lab.lab_id,
+                            lab_name: lab.name
+                        });
+                    }
+                });
+            }
         });
 
-        if (forceRegen) {
-            params.append('force_regen', 'true');
+        if (allTasksWithLab.length === 0) {
+            previewContent.innerHTML = '<p class="help">Нет выбранных заданий.</p>';
+            return;
         }
 
         previewContent.innerHTML = '<p class="help">Загрузка...</p>';
 
-        fetch(`/api/kkz_preview_random/?${params.toString()}`)
+        const params = new URLSearchParams({
+            platoon_ids: platoonId
+        });
+
+        fetch(`/api/get_users_for_platoon/?${params.toString()}`)
             .then(response => response.json())
             .then(data => {
-                previewDataByLab[labId] = data;
-
-                if (!previewAssignments[labId]) {
-                    previewAssignments[labId] = {};
+                const users = data.users || [];
+                if (users.length === 0) {
+                    previewContent.innerHTML = '<p class="help">Нет студентов во взводе.</p>';
+                    return;
                 }
-                previewAssignments[labId] = data.assignments || {};
 
-                renderPreview(data, labId);
+                const totalTasksToAssign = maxTasks && maxTasks > 0
+                    ? Math.min(maxTasks, allTasksWithLab.length)
+                    : allTasksWithLab.length;
+
+                const assignments = {};
+
+                if (unified) {
+                    const selectedTasks = shuffleArray([...allTasksWithLab]).slice(0, totalTasksToAssign);
+                    users.forEach(user => {
+                        assignments[user.id] = selectedTasks;
+                    });
+                } else {
+                    users.forEach(user => {
+                        const selectedTasks = shuffleArray([...allTasksWithLab]).slice(0, totalTasksToAssign);
+                        assignments[user.id] = selectedTasks;
+                    });
+                }
+
+                previewAssignments = {};
+                previewDataByLab = {};
+
+                includedLabs.forEach(lab => {
+                    const labId = lab.lab_id;
+                    previewDataByLab[labId] = {
+                        lab: { id: labId, name: lab.name },
+                        tasks: lab.tasks,
+                        users: users.map(user => ({
+                            id: user.id,
+                            username: user.username,
+                            display: user.full_name || user.username
+                        }))
+                    };
+
+                    previewAssignments[labId] = {};
+                    users.forEach(user => {
+                        const userTasks = assignments[user.id] || [];
+                        const labTaskIds = userTasks
+                            .filter(t => t.lab_id === labId)
+                            .map(t => t.id);
+                        previewAssignments[labId][user.id] = labTaskIds;
+                    });
+                });
+
+                currentPreviewLabId = includedLabs[0].lab_id;
+                renderPreview(previewDataByLab[currentPreviewLabId], currentPreviewLabId);
             })
             .catch(error => {
                 console.error('Error loading preview:', error);
@@ -730,7 +741,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-   
     function renderPreview(data, labId) {
         if (!data.users || data.users.length === 0) {
             previewContent.innerHTML = '<p class="help">Нет студентов во взводе.</p>';
@@ -738,7 +748,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const assignments = previewAssignments[labId] || data.assignments || {};
-        let html = `<p class="help"><strong>Студентов: ${data.users.length}</strong></p>`;
+
+        let html = `<p class="help mb-2"><strong>Студентов:</strong> ${data.users.length}</p>`;
 
         data.users.forEach(user => {
             const assigned = assignments[user.id] || [];
@@ -746,7 +757,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="box" style="padding: 0.75rem; margin-bottom: 0.5rem; background: #f9f9f9;">
                     <div style="font-weight: 600; margin-bottom: 0.5rem;">${user.display || user.username}</div>
                     <div class="select is-multiple is-small" style="width: 100%;">
-                        <select multiple data-user-id="${user.id}" data-lab-id="${labId}" class="preview-task-select" style="width: 100%; height: 150px;">
+                        <select multiple data-user-id="${user.id}" data-lab-id="${labId}" class="preview-task-select" style="width: 100%; height: 86px;">
                             ${data.tasks.map(task => {
                                 const selected = assigned.includes(task.id) ? 'selected' : '';
                                 return `<option value="${task.id}" ${selected}>${task.description}</option>`;
@@ -759,7 +770,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         previewContent.innerHTML = html;
 
-       
         document.querySelectorAll('.preview-task-select').forEach(select => {
             select.addEventListener('change', function() {
                 const userId = this.dataset.userId;
@@ -776,11 +786,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-   
     const unifiedCheckbox = document.querySelector('input[name="unified_tasks"]');
     if (unifiedCheckbox) {
         unifiedCheckbox.addEventListener('change', function() {
-            if (showPreviewCheckbox.checked) {
+            if (previewIsOpen) {
                 previewDataByLab = {};
                 loadAllPreviews();
             }
@@ -789,7 +798,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (maxTasksInput) {
         maxTasksInput.addEventListener('change', function() {
-            if (showPreviewCheckbox.checked) {
+            if (previewIsOpen) {
                 previewDataByLab = {};
                 loadAllPreviews();
             }
