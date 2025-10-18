@@ -243,7 +243,7 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
         if self.request.user.is_authenticated:
             try:
                 competition2user = Competition2User.objects.get(competition=competition, user=self.request.user)
-                assigned_tasks = competition2user.tasks.all()
+                assigned_tasks = list(competition2user.tasks.all())
                 for task in assigned_tasks:
                     if Answers.objects.filter(
                         lab=competition.lab,
@@ -253,9 +253,14 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
                         datetime__gte=competition.start
                     ).exists():
                         task.done = True
+                    else:
+                        task.done = False
             except Competition2User.DoesNotExist:
                 if self.request.user.is_staff:
-                    assigned_tasks = competition.tasks.all()
+                    assigned_tasks = list(competition.tasks.all())
+                    # Для супер-юзеров показываем статус всех заданий
+                    for task in assigned_tasks:
+                        task.done = False
                 else:
                     assigned_tasks = []
 

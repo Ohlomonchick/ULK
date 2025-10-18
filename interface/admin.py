@@ -75,8 +75,12 @@ class LabTaskInline(admin.TabularInline):
         base_fields = ['task_id', 'description']
 
         # Добавляем json_config только для JSON_CONFIGURED типа
-        if parent_lab and parent_lab.tasks_type == 'JSON_CONFIGURED':
-            base_fields.append('json_config')
+        if parent_lab:
+            if parent_lab.tasks_type == 'JSON_CONFIGURED':
+                base_fields.append('json_config')
+            elif parent_lab.tasks_type == 'TESTING':
+                base_fields.append('question')
+                base_fields.append('answer')
 
         return base_fields
 

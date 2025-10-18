@@ -15,29 +15,59 @@
 {% endcomment %}
 
 {% if tasks %}
-    <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
-        <h3 class="title is-3">{% if title %}{{ title }}{% else %}Задания{% endif %}</h3>
-        {% for task in tasks %}
-            <article class="media" style="margin-bottom: 1.5rem;">
-                <div class="media-content">
-                    <div class="content">
-                        <p>
-                            <strong class="title is-5">Задание {{ forloop.counter }}</strong>
-                            {% if task.done %}  
-                                <span class="tag is-success ml-2 has-text-white title is-6">
-                                    <span class="icon is-medium">
-                                        <i class="fas fa-check"></i>
-                                    </span>
-                                    &nbsp;Выполнено
-                                </span>
-                            {% endif %}
-                            <div class="mt-1">
-                                {{ task.description }}
+    <div class="box" id="tasks-list-box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 class="title is-4 mb-0">{% if title %}{{ title }}{% else %}Задания{% endif %}</h3>
+            {% if not is_superuser %}
+                <button id="check-tasks-btn" class="button is-primary is-small" data-competition-slug="{{ competition_slug }}">
+                    <span class="icon">
+                        <i class="fas fa-check"></i>
+                    </span>
+                    <span class="title is-6 has-text-light">Проверить</span>
+                </button>
+            {% endif %}
+        </div>
+        
+        <div id="tasks-container">
+            {% for task in tasks %}
+                <article class="media task-item" style="margin-bottom: 1.5rem;" data-task-id="{{ task.id }}">
+                    <div class="media-content">
+                        <div class="content">
+                            <div>
+                                <strong class="title is-5">Задание {{ forloop.counter }}</strong>
+                                <span class="task-status-tag ml-2"></span>
+                                
+                                <div class="mt-3">
+                                    {{ task.description|safe }}
+                                </div>
+                                
+                                {% if not is_superuser and task.question and task.question != '' %}
+                                    <div class="mt-3" style="background-color: #fff4e6; padding: 1rem; border-radius: 6px; border-left: 4px solid #ffb03b;">
+                                        <p class="has-text-weight-semibold mb-2" style="color: #ad6800;">
+                                            <span class="icon">
+                                                <i class="fas fa-question-circle"></i>
+                                            </span>
+                                            Вопрос:
+                                        </p>
+                                        <p class="mb-3" style="color: #5c5c5c;">{{ task.question|safe }}</p>
+                                        
+                                        {% if not task.done %}
+                                            <div class="field">
+                                                <div class="control">
+                                                    <input type="text" 
+                                                           class="input task-answer-input" 
+                                                           placeholder="Введите ваш ответ" 
+                                                           data-task-id="{{ task.id }}">
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
                             </div>
-                        </p>
+                        </div>
                     </div>
-                </div>
-            </article>
-        {% endfor %}
+                </article>
+            {% endfor %}
+        </div>
     </div>
-{% endif %} 
+{% endif %}

@@ -54,6 +54,7 @@ class LearningYear(models.IntegerChoices):
 class LabTasksType(models.TextChoices):
     CLASSIC = "CLASSIC", "Обычные"
     JSON_CONFIGURED = "JSON_CONFIGURED", "C JSON-конфигурацией"
+    TESTING = "TESTING", "В форме тестирования"
 
 
 class Lab(models.Model):
@@ -139,6 +140,8 @@ class LabTask(models.Model):
         validators=[validate_lab_task_json_config],
         help_text="JSON-конфигурация с полями: task_type ('input' или 'state'), answer, regex"
     )
+    question = models.TextField("Вопрос", blank=True, null=True)
+    answer = models.TextField("Ответ", blank=True, null=True, help_text="Правильный ответ на вопрос или регулярное выражение для проверки ответа")
 
     class Meta:
         verbose_name = "Задание"

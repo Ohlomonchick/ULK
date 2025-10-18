@@ -23,4 +23,6 @@ urlpatterns = [
     path('kkz_save_preview/', kkz_save_preview, name='kkz_save_preview'),
     path('get_labs_for_platoon/', get_labs_for_platoon, name='get-labs-for-platoon'),
     path('get_users_for_platoon/', get_users_for_platoon, name='get_users_for_platoon'),
+    path('check_task_answers/', check_task_answers, name='check_task_answers'),
+    path('get_user_tasks_status/', get_user_tasks_status, name='get_user_tasks_status'),
 ]

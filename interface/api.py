@@ -21,7 +21,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview
+from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
@@ -1007,3 +1007,156 @@ def get_users_for_platoon(request):
     } for u in users]
 
     return JsonResponse({'users': users_json})
+
+
+@require_POST
+def check_task_answers(request):
+    """Проверяет ответы пользователя на задания"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+    
+    try:
+        data = json.loads(request.body)
+        competition_slug = data.get('competition_slug')
+        answers = data.get('answers', {})  # {task_id: answer_text}
+        
+        if not competition_slug:
+            return JsonResponse({'error': 'Competition slug required'}, status=400)
+        
+        # Получаем соревнование
+        try:
+            competition = Competition.objects.get(slug=competition_slug)
+        except Competition.DoesNotExist:
+            return JsonResponse({'error': 'Competition not found'}, status=404)
+        
+        # Получаем задания пользователя через Competition2User
+        try:
+            competition_user = Competition2User.objects.get(
+                competition=competition,
+                user=request.user
+            )
+        except Competition2User.DoesNotExist:
+            return JsonResponse({'error': 'User is not a participant of this competition'}, status=403)
+        
+        user_tasks = competition_user.tasks.all()
+        
+        # Результаты проверки
+        results = {}
+        
+        for task in user_tasks:
+            task_id = str(task.id)
+            
+            # Проверяем, есть ли вопрос у задания
+            if not task.question or task.question.strip() == '':
+                continue
+            
+            # Получаем ответ пользователя
+            user_answer = answers.get(task_id, '').strip()
+            
+            # Если ответ не предоставлен, пропускаем
+            if not user_answer:
+                results[task_id] = {
+                    'status': 'skipped',
+                    'message': 'Ответ не предоставлен'
+                }
+                continue
+            
+            # Проверяем ответ
+            correct_answer = task.answer.strip() if task.answer else ''
+            is_correct = user_answer.lower() == correct_answer.lower()
+            
+            results[task_id] = {
+                'status': 'correct' if is_correct else 'incorrect',
+                'message': 'Верно!' if is_correct else 'Неверно'
+            }
+            
+            # Если ответ правильный, создаем объект Answers
+            if is_correct:
+                Answers.objects.get_or_create(
+                    lab=competition.lab,
+                    user=request.user,
+                    lab_task=task,
+                    defaults={'datetime': timezone.now()}
+                )
+        
+        return JsonResponse({
+            'success': True,
+            'results': results
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error checking task answers: {str(e)}')
+        return JsonResponse({'error': f'Server error: {str(e)}'}, status=500)
+
+
+@require_GET
+def get_user_tasks_status(request):
+    """Возвращает статус выполнения заданий пользователя"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+    
+    competition_slug = request.GET.get('competition_slug')
+    
+    if not competition_slug:
+        return JsonResponse({'error': 'Competition slug required'}, status=400)
+    
+    try:
+        # Получаем соревнование
+        try:
+            competition = Competition.objects.get(slug=competition_slug)
+        except Competition.DoesNotExist:
+            return JsonResponse({'error': 'Competition not found'}, status=404)
+        
+        # Получаем задания пользователя
+        try:
+            competition_user = Competition2User.objects.get(
+                competition=competition,
+                user=request.user
+            )
+        except Competition2User.DoesNotExist:
+            return JsonResponse({'error': 'User is not a participant of this competition'}, status=403)
+        
+        user_tasks = competition_user.tasks.all()
+        
+        # Получаем выполненные задания
+        completed_task_ids = set(
+            Answers.objects.filter(
+                lab=competition.lab,
+                user=request.user,
+                lab_task__in=user_tasks
+            ).values_list('lab_task_id', flat=True)
+        )
+        
+        # Формируем данные о заданиях
+        tasks_data = []
+        has_questions = False
+        
+        for idx, task in enumerate(user_tasks, 1):
+            is_completed = task.id in completed_task_ids
+            has_question = bool(task.question and task.question.strip())
+            
+            if has_question:
+                has_questions = True
+            
+            tasks_data.append({
+                'id': task.id,
+                'number': idx,
+                'description': task.description or '',
+                'question': task.question or '',
+                'has_question': has_question,
+                'done': is_completed
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'tasks': tasks_data,
+            'has_questions': has_questions
+        })
+        
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error getting user tasks status: {str(e)}')
+        return JsonResponse({'error': f'Server error: {str(e)}'}, status=500)
