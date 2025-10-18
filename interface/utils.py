@@ -1,6 +1,7 @@
 import hashlib
 
 from interface.config import get_web_url
+import jinja2
 
 def get_pnet_password(user_password):
     return hashlib.md5((user_password + '42').encode()).hexdigest()[:8]
@@ -38,3 +39,16 @@ def get_database_type():
 
 def get_kibana_url():
     return 'http:' + get_web_url().split(':')[1] + ':5601'
+
+
+def patch_lab_description(competition, user):
+    if competition.lab.description:
+        template = jinja2.Template(competition.lab.description)
+        competition.lab.description = template.render(
+            username=user.username, 
+            pnet_login=user.pnet_login, 
+            username_uppercase=user.username.upper(), 
+            pnet_login_uppercase=user.pnet_login.upper()
+        )
+    else:
+        return ''

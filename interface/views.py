@@ -20,7 +20,7 @@ from rest_framework import viewsets
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
-from interface.utils import get_kibana_url, get_pnet_password
+from interface.utils import get_kibana_url, get_pnet_password, patch_lab_description
 
 
 class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
@@ -261,7 +261,7 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
 
             context["assigned_tasks"] = assigned_tasks
 
-        context["object"] = competition
+        patch_lab_description(context["object"], self.request.user)
         context["button_start_now"] = (timezone.now() - competition.start).total_seconds() < 0
         context["button_end_now"] = not context["button_start_now"] and (competition.finish - timezone.now()).total_seconds() > 0
         context["button_resume"] = not context["button_start_now"] and not context["button_end_now"]
