@@ -1,4 +1,5 @@
 import json
+import re
 import requests
 import urllib3
 import logging
@@ -1063,7 +1064,11 @@ def check_task_answers(request):
             
             # Проверяем ответ
             correct_answer = task.answer.strip() if task.answer else ''
-            is_correct = user_answer.lower() == correct_answer.lower()
+
+            try:
+                is_correct = bool(re.fullmatch(correct_answer, user_answer, re.IGNORECASE))
+            except re.error:
+                is_correct = user_answer.lower() == correct_answer.lower()
             
             results[task_id] = {
                 'status': 'correct' if is_correct else 'incorrect',

@@ -1,6 +1,7 @@
 import hashlib
 
 from interface.config import get_web_url
+from slugify import slugify
 import jinja2
 
 def get_pnet_password(user_password):
@@ -48,7 +49,11 @@ def patch_lab_description(competition, user):
             username=user.username, 
             pnet_login=user.pnet_login, 
             username_uppercase=user.username.upper(), 
-            pnet_login_uppercase=user.pnet_login.upper()
+            pnet_login_uppercase=user.pnet_login.upper(),
+            last_name=user.last_name,
+            last_name_uppercase=user.last_name.upper(),
+            last_name_latin=slugify(user.last_name),
+            last_name_latin_uppercase=slugify(user.last_name).upper()
         )
     else:
         return ''
