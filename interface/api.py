@@ -29,6 +29,31 @@ from .config import get_pnet_base_dir, get_pnet_url, get_web_url
 from .utils import get_pnet_lab_name
 
 
+def get_lab_type_code_from_display(lab_type_display):
+    if not lab_type_display:
+        return None
+    
+    for code, display in LabType.choices:
+        if display == lab_type_display:
+            return code
+    return None
+
+
+def find_lab_by_name_and_type(lab_name, lab_type_code=None):
+    try:
+        # Сначала пытаемся найти по slug
+        if lab_type_code:
+            return Lab.objects.get(slug=lab_name, lab_type=lab_type_code)
+        else:
+            return Lab.objects.get(slug=lab_name)
+    except Lab.DoesNotExist:
+        # Если не найдено по slug, пытаемся по name
+        if lab_type_code:
+            return Lab.objects.get(name=lab_name, lab_type=lab_type_code)
+        else:
+            return Lab.objects.get(name=lab_name)
+
+
 @api_view(['GET'])
 def get_time(request, competition_id):  # pragma: no cover
     try:
@@ -207,13 +232,13 @@ def get_solutions(request, slug):
 @api_view(['GET'])
 def load_levels(request, lab_name):  # pragma: no cover
     try:
-        # Сначала пытаемся найти по slug, затем по name
-        try:
-            lab = Lab.objects.get(slug=lab_name)
-        except Lab.DoesNotExist:
-            lab = Lab.objects.get(name=lab_name)
+        lab_type_display = request.GET.get('lab_type_display')
+        lab_type_code = get_lab_type_code_from_display(lab_type_display)
+        
+        lab = find_lab_by_name_and_type(lab_name, lab_type_code)
         levels = LabLevel.objects.filter(lab=lab)
         serializer = LabLevelSerializer(levels, many=True)
+        
         return Response(serializer.data)
     except Lab.DoesNotExist:
         return Response({"error": "Lab not found"}, status=404)
@@ -222,13 +247,13 @@ def load_levels(request, lab_name):  # pragma: no cover
 @api_view(['GET'])
 def load_tasks(request, lab_name):  # pragma: no cover
     try:
-        # Сначала пытаемся найти по slug, затем по name
-        try:
-            lab = Lab.objects.get(slug=lab_name)
-        except Lab.DoesNotExist:
-            lab = Lab.objects.get(name=lab_name)
+        lab_type_display = request.GET.get('lab_type_display')
+        lab_type_code = get_lab_type_code_from_display(lab_type_display)
+        
+        lab = find_lab_by_name_and_type(lab_name, lab_type_code)
         tasks = LabTask.objects.filter(lab=lab)
         serializer = LabTaskSerializer(tasks, many=True)
+        
         return Response(serializer.data)
     except Lab.DoesNotExist:
         return Response({"error": "Lab not found"}, status=404)

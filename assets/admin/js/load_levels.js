@@ -99,9 +99,17 @@ $(document).ready(function() {
 
 
     function loadLevels(labSlug, levelsSelector) {
+        // Извлекаем lab_type_display из labSlug (формат: "Name - LabTypeDisplay")
+        const parts = labSlug.split(' - ');
+        const labName = parts.slice(0, -1).join(' - '); // Всё до последнего " - "
+        const labTypeDisplay = parts[parts.length - 1]; // Последний элемент
+        
         $.ajax({
-            url: `/api/get_lab_levels/${encodeURIComponent(labSlug)}/`,
+            url: `/api/get_lab_levels/${encodeURIComponent(labName)}/`,
             type: 'GET',
+            data: {
+                lab_type_display: labTypeDisplay
+            },
             success: function(response) {
                 const $field = $(levelsSelector);
                 $field.empty().append('<option value="">---------</option>');
@@ -120,9 +128,17 @@ $(document).ready(function() {
         const $tasksField = $(tasksSelector);
         const selectedTasks = $tasksField.val() || [];
 
+        // Извлекаем lab_type_display из labSlug (формат: "Name - LabTypeDisplay")
+        const parts = labSlug.split(' - ');
+        const labName = parts.slice(0, -1).join(' - '); // Всё до последнего " - "
+        const labTypeDisplay = parts[parts.length - 1]; // Последний элемент
+
         $.ajax({
-            url: `/api/lab_tasks/${encodeURIComponent(labSlug)}/`,
+            url: `/api/lab_tasks/${encodeURIComponent(labName)}/`,
             type: 'GET',
+            data: {
+                lab_type_display: labTypeDisplay
+            },
             success: function(response) {
                 $tasksField.html('');
                 const uniqueTasks = new Map();

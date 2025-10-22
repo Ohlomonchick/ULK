@@ -85,7 +85,7 @@ class Lab(models.Model):
     PnetSSHNodeName = models.CharField('Имя ноды в Pnet для открытия консоли', max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return str(self.name)
+        return f"{self.name} - {self.get_lab_type_display()}"
 
     class Meta:
         verbose_name = 'Лабораторная работа'
