@@ -22,7 +22,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User
+from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
@@ -1047,6 +1047,19 @@ def get_users_for_platoon(request):
     return JsonResponse({'users': users_json})
 
 
+def get_team_or_user_issue(competition, user):
+    issue = None
+    try:
+        issue = Competition2User.objects.get(competition=competition, user=user)
+    except Competition2User.DoesNotExist:
+        issue = None
+    if issue is None:
+        try:
+            issue = TeamCompetition2Team.objects.get(competition=competition, team__users=user)
+        except TeamCompetition2Team.DoesNotExist:
+            issue = None
+    return issue
+
 @require_POST
 def check_task_answers(request):
     """Проверяет ответы пользователя на задания"""
@@ -1063,25 +1076,20 @@ def check_task_answers(request):
         
         # Получаем соревнование
         try:
-            competition, _ = get_competition_by_slug(competition_slug)
+            competition, is_team_competition = get_competition_by_slug(competition_slug)
         except Competition.DoesNotExist:
             return JsonResponse({'error': 'Competition not found'}, status=404)
         
-        # Получаем задания пользователя через Competition2User
-        try:
-            competition_user = Competition2User.objects.get(
-                competition=competition,
-                user=request.user
-            )
-        except Competition2User.DoesNotExist:
+        issue = get_team_or_user_issue(competition, request.user)
+        if issue is None:
             return JsonResponse({'error': 'User is not a participant of this competition'}, status=403)
         
-        user_tasks = competition_user.tasks.all()
+        tasks = issue.tasks.all()
         
         # Результаты проверки
         results = {}
         
-        for task in user_tasks:
+        for task in tasks:
             task_id = str(task.id)
             
             # Проверяем, есть ли вопрос у задания
@@ -1112,13 +1120,14 @@ def check_task_answers(request):
                 'message': 'Верно!' if is_correct else 'Неверно'
             }
             
-            # Если ответ правильный, создаем объект Answers
+            # Если ответ правильный, создаем объект Answers]
+            answer_filters = {'team':issue.team} if is_team_competition else {'user':request.user} 
             if is_correct:
                 Answers.objects.get_or_create(
                     lab=competition.lab,
-                    user=request.user,
                     lab_task=task,
-                    defaults={'datetime': timezone.now()}
+                    defaults={'datetime': timezone.now()},
+                    **answer_filters
                 )
         
         return JsonResponse({
@@ -1146,29 +1155,20 @@ def get_user_tasks_status(request):
         return JsonResponse({'error': 'Competition slug required'}, status=400)
     
     try:
-        # Получаем соревнование
-        try:
-            competition = Competition.objects.get(slug=competition_slug)
-        except Competition.DoesNotExist:
-            return JsonResponse({'error': 'Competition not found'}, status=404)
-        
-        # Получаем задания пользователя
-        try:
-            competition_user = Competition2User.objects.get(
-                competition=competition,
-                user=request.user
-            )
-        except Competition2User.DoesNotExist:
+        competition, is_team_competition = get_competition_by_slug(competition_slug)
+        issue = get_team_or_user_issue(competition, request.user)
+        if issue is None:
             return JsonResponse({'error': 'User is not a participant of this competition'}, status=403)
         
-        user_tasks = competition_user.tasks.all()
+        tasks = issue.tasks.all()
         
         # Получаем выполненные задания
+        answer_filters = {'team':issue.team} if is_team_competition else {'user':request.user} 
         completed_task_ids = set(
             Answers.objects.filter(
                 lab=competition.lab,
-                user=request.user,
-                lab_task__in=user_tasks
+                lab_task__in=tasks,
+                **answer_filters
             ).values_list('lab_task_id', flat=True)
         )
         
@@ -1176,7 +1176,7 @@ def get_user_tasks_status(request):
         tasks_data = []
         has_questions = False
         
-        for idx, task in enumerate(user_tasks, 1):
+        for idx, task in enumerate(tasks, 1):
             is_completed = task.id in completed_task_ids
             has_question = bool(task.question and task.question.strip())
             
