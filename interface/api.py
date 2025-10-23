@@ -92,14 +92,17 @@ def make_solution_data(solution, competition):
     }
 
 
+def get_competition_by_slug(slug):
+    try:
+        return TeamCompetition.objects.get(slug=slug), True
+    except TeamCompetition.DoesNotExist:
+        return get_object_or_404(Competition, slug=slug), False
+
+
 @api_view(['GET'])
 def get_solutions(request, slug):
-    try:
-        competition = TeamCompetition.objects.get(slug=slug)
-    except TeamCompetition.DoesNotExist:
-        competition = get_object_or_404(Competition, slug=slug)
+    competition, is_team_competition = get_competition_by_slug(slug)
     total_tasks = competition.num_tasks
-    is_team_competition = hasattr(competition, 'teams')
 
     all_individual_users = User.objects.filter(
         platoon__in=competition.platoons.all()) | competition.non_platoon_users.all()
@@ -630,6 +633,17 @@ def get_kibana_auth(request):
         return JsonResponse({'error': f'Kibana authentication error: {str(e)}'}, status=500)
 
 
+def get_lab_path(competition, user):
+    base_path = get_pnet_base_dir()
+    lab_name = get_pnet_lab_name(competition)
+    lab_file_name = lab_name + '.unl'
+
+    if isinstance(competition, TeamCompetition):
+        return f"/{base_path.rstrip('/').lstrip('/')}/{get_user_team(competition, user).slug}/{lab_file_name}"
+    else:
+        return f"/{base_path.rstrip('/').lstrip('/')}/{user.pnet_login}/{lab_file_name}"
+
+
 @csrf_exempt
 @api_view(['POST'])
 def create_pnet_lab_session(request):
@@ -642,16 +656,14 @@ def create_pnet_lab_session(request):
         return JsonResponse({'error': 'Competition slug required'}, status=400)
 
     try:
-        competition = Competition.objects.get(slug=slug)
+        competition, _ = get_competition_by_slug(slug)
         user = request.user
 
         if not user.pnet_login:
             return JsonResponse({'error': 'User PNET login not configured'}, status=400)
 
-        base_path = get_pnet_base_dir()
-        lab_name = get_pnet_lab_name(competition)
-        lab_file_name = lab_name + '.unl'
-        lab_path = f"/{base_path.rstrip('/').lstrip('/')}/{user.pnet_login}/{lab_file_name}"
+        
+        lab_path = get_lab_path(competition, user)
 
         # Отправляем запрос на создание сессии лабы
         pnet_url = f"{get_web_url()}/pnetlab"
@@ -687,6 +699,10 @@ def create_pnet_lab_session(request):
         return JsonResponse({'error': f'Session creation error: {str(e)}'}, status=500)
 
 
+def get_user_team(team_competition, user):
+    return team_competition.competition_teams.get(team__users=user).team
+
+
 @csrf_exempt
 @api_view(['POST'])
 def create_pnet_lab_session_with_console(request):
@@ -709,7 +725,7 @@ def create_pnet_lab_session_with_console(request):
         logger = logging.getLogger(__name__)
         logger.info(f'Creating CMD console session for slug: {slug}, username: {username}')
         
-        competition = Competition.objects.get(slug=slug)
+        competition, _ = get_competition_by_slug(slug)
         
         # Получаем пользователя по username
         try:
@@ -745,11 +761,7 @@ def create_pnet_lab_session_with_console(request):
         # Логинимся в PNET
         cookies, xsrf_token = pf_login(pnet_url, user.pnet_login, user.pnet_password)
         
-        # Получаем путь до лабы пользователя
-        base_path = get_pnet_base_dir()
-        lab_name = get_pnet_lab_name(competition)
-        lab_file_name = lab_name + '.unl'
-        lab_path = f"/{base_path.rstrip('/').lstrip('/')}/{user.pnet_login}/{lab_file_name}"
+        lab_path = get_lab_path(competition, user)
 
         # Создаем сессию лабы
         success, message = create_pnet_lab_session_common(pnet_url, user.pnet_login, lab_path, cookies)
@@ -1051,7 +1063,7 @@ def check_task_answers(request):
         
         # Получаем соревнование
         try:
-            competition = Competition.objects.get(slug=competition_slug)
+            competition, _ = get_competition_by_slug(competition_slug)
         except Competition.DoesNotExist:
             return JsonResponse({'error': 'Competition not found'}, status=404)
         

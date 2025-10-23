@@ -47,7 +47,12 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         if form.is_valid():
             competition = form.create_competition()
             sleep(2)
-            return redirect('interface:competition-detail', slug=competition.slug)
+
+            if self.object.lab_type == LabType.COMPETITION:
+                return redirect('interface:team-competition-detail', slug=competition.slug)
+            else:
+                return redirect('interface:competition-detail', slug=competition.slug)
+                
         context = self.get_context_data(object=self.object)
         context["simple_form"] = form
         return render(request, self.get_template_names(), context)
@@ -291,6 +296,8 @@ class TeamCompetitionDetailView(CompetitionDetailView):
         self.team_relation = competition.competition_teams.filter(team__users=user).first()
 
         if self.team_relation:
+            context["form"] = LabAnswerForm()
+            context["submitted"] = False
             lab = competition.lab
             context["available"] = competition.finish > timezone.now()
             # Check if an answer from this team already exists.
