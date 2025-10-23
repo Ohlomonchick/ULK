@@ -2,7 +2,7 @@
 {% extends 'interface/base.html' %}
 
 {% block content %}
-{% if user.is_superuser %}
+{% if request.user.is_superuser %}
     <div class="columns is-centered">
         <div class="column is-two-thirds">
             <h1 class="title is-2">{{ object.last_name }} {{ object.first_name }}</h1>
@@ -16,7 +16,7 @@
             {%endif%}
             <h1 class="title is-3">Назначенные лабораторные работы</h1>
                 <ul>
-                {% for issue in object_list %}
+                {% for issue in issues %}
                     <div class="box">
                         <h2 class="title is-3">{{ issue.competition.lab }}</h2>
                         <h2> Срок выполнения работы: {{ issue.competition.finish }}</h2>

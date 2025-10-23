@@ -1,4 +1,4 @@
-from django.test import TestCase, TransactionTestCase
+from django.test import TransactionTestCase
 from django.utils import timezone
 from unittest.mock import patch
 from datetime import timedelta
@@ -10,14 +10,42 @@ from interface.models import (
 
 
 class CompetitionFormTest(TransactionTestCase):
-    """
-    Используем TransactionTestCase, так как не создает одну транзакцию на весь тест,
-    а позволяет операциям выполниться в своей транзакции, как в реальной ситуации, 
-    что не приводит к блокировке БД на SQLite при выполнении операций в соседнем потоке.
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        
+        cls.patcher_login = patch("interface.pnet_session_manager.PNetSessionManager.login")
+        cls.patcher_create_lab = patch("interface.pnet_session_manager.PNetSessionManager.create_lab_for_user")
+        cls.patcher_create_nodes = patch("interface.pnet_session_manager.PNetSessionManager.create_lab_nodes_and_connectors")
+        cls.patcher_logout = patch("interface.pnet_session_manager.PNetSessionManager.logout")
+        cls.patcher_delete_lab = patch("interface.pnet_session_manager.PNetSessionManager.delete_lab_for_user")
+        cls.patcher_elastic_client = patch("interface.elastic_utils.get_elastic_client", return_value=None)
+        
+        cls.mock_login = cls.patcher_login.start()
+        cls.mock_create_lab = cls.patcher_create_lab.start()
+        cls.mock_create_nodes = cls.patcher_create_nodes.start()
+        cls.mock_logout = cls.patcher_logout.start()
+        cls.mock_delete_lab = cls.patcher_delete_lab.start()
+        cls.mock_elastic_client = cls.patcher_elastic_client.start()
 
-    см. https://stackoverflow.com/questions/44450533/difference-between-testcase-and-transactiontestcase-classes-in-django-test
-    """
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        
+        cls.patcher_login.stop()
+        cls.patcher_create_lab.stop()
+        cls.patcher_create_nodes.stop()
+        cls.patcher_logout.stop()
+        cls.patcher_delete_lab.stop()
+        cls.patcher_elastic_client.stop()
+
     def setUp(self):
+        self.mock_login.reset_mock()
+        self.mock_create_lab.reset_mock()
+        self.mock_create_nodes.reset_mock()
+        self.mock_logout.reset_mock()
+        self.mock_delete_lab.reset_mock()
+        self.mock_elastic_client.reset_mock()
         # Create a Lab that uses "PN" platform to trigger external calls
         self.lab = Lab.objects.create(
             name="PN Lab",
@@ -80,19 +108,7 @@ class CompetitionFormTest(TransactionTestCase):
             "tasks": [self.task1.pk, self.task2.pk]
         }
 
-    @patch("interface.pnet_session_manager.PNetSessionManager.delete_lab_for_user")
-    @patch("interface.pnet_session_manager.PNetSessionManager.logout")
-    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_nodes_and_connectors")
-    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_for_user")
-    @patch("interface.pnet_session_manager.PNetSessionManager.login")
-    def test_competition_form_creation_and_deletion(
-        self,
-        mock_pf_login_models,  # 8th decorator is 1st argument
-        mock_create_lab_models,
-        mock_create_nodes_models,
-        mock_logout_models,
-        mock_delete_lab
-    ):
+    def test_competition_form_creation_and_deletion(self):
         """
         1) Submit data through the CompetitionForm to create a Competition.
         2) Confirm IssuedLabs are created for platoon users and non-platoon users.
@@ -105,14 +121,12 @@ class CompetitionFormTest(TransactionTestCase):
         form = CompetitionForm(data=self.form_data)
         self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
 
-        # Save the form
         competition = form.save()
 
-        # Make sure external calls were triggered (optional check)
-        mock_pf_login_models.assert_called()
-        mock_create_lab_models.assert_called()
-        mock_create_nodes_models.assert_called()
-        mock_logout_models.assert_called()
+        self.mock_login.assert_called()
+        self.mock_create_lab.assert_called()
+        self.mock_create_nodes.assert_called()
+        self.mock_logout.assert_called()
 
         # Verify that the competition is actually created in DB
         self.assertIsInstance(competition, Competition)
@@ -127,14 +141,13 @@ class CompetitionFormTest(TransactionTestCase):
                 f"Competition2User not found for user {user.username} in this competition"
             )
 
-        # More complex asserts on pnet calls
         self.assertEqual(
-            mock_create_lab_models.call_count,
+            self.mock_create_lab.call_count,
             len(self.users_in_platoon) + len(self.non_platoon_users),
             "Expected `create_lab` to be called once for each user."
         )
         self.assertEqual(
-            mock_create_nodes_models.call_count,
+            self.mock_create_nodes.call_count,
             len(self.users_in_platoon) + len(self.non_platoon_users),
             "Expected `create_all_lab_nodes_and_connectors` to be called once for each user."
         )
@@ -146,7 +159,7 @@ class CompetitionFormTest(TransactionTestCase):
         competition.delete()
 
         self.assertEqual(
-            mock_delete_lab.call_count,
+            self.mock_delete_lab.call_count,
             len(self.non_platoon_users) + len(self.users_in_platoon),
             "Expected `delete_lab_with_session_destroy` to be called once for each user."
         )
@@ -158,19 +171,7 @@ class CompetitionFormTest(TransactionTestCase):
                 f"IssuedLabs with pk={pk} should have been deleted after competition deletion."
             )
 
-    @patch("interface.pnet_session_manager.PNetSessionManager.delete_lab_for_user", return_value=None)
-    @patch("interface.pnet_session_manager.PNetSessionManager.logout", return_value=None)
-    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_nodes_and_connectors", return_value=None)
-    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_for_user", return_value=None)
-    @patch("interface.pnet_session_manager.PNetSessionManager.login", return_value=("mock_cookie", "mock_xsrf"))
-    def test_competition_form_update(
-            self,
-            mock_pf_login_models,
-            mock_create_lab_models,
-            mock_create_nodes_models,
-            mock_logout_models,
-            mock_delete_lab
-    ):
+    def test_competition_form_update(self):
         """
         1) Create a Competition with an initial set of users & platoons (form create).
         2) Update the same Competition (form edit) to remove some users and add others

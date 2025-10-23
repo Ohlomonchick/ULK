@@ -50,10 +50,10 @@ def patch_lab_description(competition, user):
             pnet_login=user.pnet_login, 
             username_uppercase=user.username.upper(), 
             pnet_login_uppercase=user.pnet_login.upper(),
-            last_name=user.last_name,
-            last_name_uppercase=user.last_name.upper(),
-            last_name_latin=slugify(user.last_name),
-            last_name_latin_uppercase=slugify(user.last_name).upper()
+            last_name=user.last_name if user.last_name else user.username,
+            last_name_uppercase=user.last_name.upper() if user.last_name else user.username.upper(),
+            last_name_latin=slugify(user.last_name) if user.last_name else user.username,
+            last_name_latin_uppercase=slugify(user.last_name).upper() if user.last_name else user.username.upper()
         )
     else:
         return ''
