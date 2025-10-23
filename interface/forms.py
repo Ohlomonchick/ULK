@@ -430,17 +430,45 @@ class TeamCompetitionForm(CompetitionForm):
             instance.save()
 
         teams = self.cleaned_data.get('teams', [])
-        # Clear any existing through-relations.
-        instance.teams.clear()
 
-        for team in teams:
-            through_instance = TeamCompetition2Team(
+        with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_teams(instance, teams))
+
+        team_ids = set(teams.values_list('id', flat=True))
+        existing_team_records = TeamCompetition2Team.objects.filter(competition=instance)
+        
+        def _delete_teams_operation():
+            for team_record in existing_team_records:
+                if team_record.team_id not in team_ids:
+                    team_record.delete()
+
+        with_pnet_session_if_needed(instance.lab, _delete_teams_operation)
+
+        return instance
+
+    def _create_competition_teams(self, instance, teams: List[Team]):
+        """
+        Последовательное создание TeamCompetition2Team записей.
+        """
+        def _create_single_competition_team(team):
+            """Создание одной записи TeamCompetition2Team"""
+
+            team_competition2team, created = TeamCompetition2Team.objects.update_or_create(
                 competition=instance,
                 team=team
             )
-            through_instance.save()
 
-        return instance
+            if created:
+                tasks = list(instance.tasks.all() or instance.lab.options.all())
+                team_competition2team.tasks.set(tasks)
+
+            return team_competition2team
+
+        created_competition_teams = []
+
+        for team in teams:
+            created_competition_teams.append(_create_single_competition_team(team))
+
+        return created_competition_teams
 
 
 class SimpleCompetitionForm(forms.Form):

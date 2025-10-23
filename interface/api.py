@@ -348,7 +348,7 @@ def parse_request_data(request):
         raise
 
 
-def gey_lab_tasks(issue):
+def get_issue_tasks(issue):
     if issue.competition.lab.tasks_type == LabTasksType.CLASSIC:
         tasks = [task.task_id for task in issue.tasks.all()]
     else:
@@ -368,7 +368,7 @@ def start_lab(request):
             return error_response
 
         response_data = {
-            "tasks": gey_lab_tasks(issue)
+            "tasks": get_issue_tasks(issue)
         }
         if hasattr(issue, 'user'):
             response_data["task"] = create_var_text(issue.user.last_name),
