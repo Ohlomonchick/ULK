@@ -185,10 +185,15 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             return True
         return competition.start <= timezone.now() <= (competition.finish + datetime.timedelta(minutes=10))
 
-    def set_submitted(self, context):
+    def set_submitted(self, context: dict, answer_filters: dict = None):
         context["form"] = LabAnswerForm()
         context["submitted"] = False
         lab = self.object.lab
+
+        if answer_filters is None:
+            answer_filters = {
+                'user':self.request.user,
+            }
 
         if self.request.user.is_authenticated:
             competition = context["object"]
@@ -200,26 +205,18 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             
             answers = Answers.objects.filter(
                 lab=competition.lab,
-                user=self.request.user,
                 lab_task=None,
                 datetime__lte=competition.finish,
-                datetime__gte=competition.start
+                datetime__gte=competition.start,
+                **answer_filters
             ).first()
             
             if answers is None:
                 answer = self.request.GET.get("answer_flag")
                 if answer:
                     if answer == lab.answer_flag:
-                        print('USER: ', self.request.user)
-                        competition2user = Competition2User.objects.get(
-                            competition=competition,
-                            user=self.request.user
-                        )
-                        competition2user.done = True
-                        context["done"] = True
-                        competition2user.save()
                         context["submitted"] = True
-                        answer_object = Answers(lab=lab, user=self.request.user, datetime=timezone.now())
+                        answer_object = Answers(lab=lab, datetime=timezone.now(), **answer_filters)
                         answer_object.save()
                     else:
                         context["form"].fields["answer_flag"].label = "Неверный флаг!"
@@ -283,58 +280,18 @@ class TeamCompetitionDetailView(CompetitionDetailView):
     model = TeamCompetition
     template_name = "interface/competition_detail.html"
 
-    def set_submitted(self, context):
-        """
-        Extends parent's set_submitted() to support team participants.
-        If the user is part of a team in the competition, use the team branch;
-        otherwise, fallback to the single-user branch.
-        """
-        user = self.request.user
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
         competition = self.object
 
         # Try to find a team record in which the user is a member.
-        self.team_relation = competition.competition_teams.filter(team__users=user).first()
-
+        self.team_relation = competition.competition_teams.filter(team__users=self.request.user).first()
         if self.team_relation:
-            context["form"] = LabAnswerForm()
-            context["submitted"] = False
-            lab = competition.lab
-            context["available"] = competition.finish > timezone.now()
-            # Check if an answer from this team already exists.
-            team_answer = Answers.objects.filter(
-                lab=lab,
-                team=self.team_relation.team,
-                lab_task=None,
-                datetime__lte=competition.finish,
-                datetime__gte=competition.start
-            ).first()
-
-            if team_answer:
-                context["submitted"] = True
-            else:
-                # Look for answer flag from GET parameters.
-                answer_flag = self.request.GET.get("answer_flag")
-                if answer_flag:
-                    if answer_flag == lab.answer_flag:
-                        # Create an Answer with the team field set.
-                        answer_object = Answers(lab=lab, team=self.team_relation.team, datetime=timezone.now())
-                        answer_object.save()
-                        context["submitted"] = True
-                    else:
-                        # Optionally, you can change the form field label to notify about an incorrect flag.
-                        context["form"].fields["answer_flag"].label = "Неверный флаг!"
+            answer_filters = {'team':self.team_relation.team}
         else:
-            # Fallback: use the parent implementation (for single user participation)
-            context = super().set_submitted(context)
+            answer_filters = {'user':self.request.user}
 
-        if context.get("submitted"):
-            context["available"] = False
-
-        return context
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context = self.set_submitted(context)
+        context = self.set_submitted(context, answer_filters)
         if context.get("assigned_tasks", []) == [] and self.team_relation:
             context["assigned_tasks"] = self.team_relation.tasks.all()
         context["is_team_competition"] = True
@@ -466,18 +423,22 @@ class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):  # pr
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["user"] = User.objects.filter(username="admin").first()
-        issues = Competition2User.objects.filter(user=context["object"])
-        object_list = issues
-        context["object_list"] = object_list
-        total = len(issues)
+        context["issues"] = Competition2User.objects.filter(user=context["object"]).all().prefetch_related('tasks')
+        
+        for issue in context["issues"]:
+            assigned_tasks = issue.tasks.count()
+            submitted_tasks = Answers.objects.filter(user=context["object"], lab_task__in=issue.tasks.all()).count()
+            has_none_task_answer = Answers.objects.filter(user=context["object"], lab=issue.competition.lab, lab_task=None).exists()
+            if has_none_task_answer or (submitted_tasks == assigned_tasks and submitted_tasks > 0):
+                issue.done = True
+            else:
+                issue.done = False
+
+        submitted_labs = Answers.objects.filter(user=context["object"]).values("lab").distinct()
+        context["submitted"] = submitted_labs.count()
+        all_labs = set([issue.competition.lab.id for issue in context["issues"]] + list(submitted_labs.values_list('id', flat=True))) 
+        total = len(all_labs)
         context["total"] = total
-        context["submitted"] = (
-            Answers.objects.filter(user=context["object"])
-            .values("lab")
-            .distinct()
-            .count()
-        )
         if total == 0:
             progress = 100
         else:
