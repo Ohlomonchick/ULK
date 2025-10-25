@@ -946,7 +946,8 @@ def kkz_save_preview(request):
     lab_id = data.get('lab_id')
     assignments = data.get('assignments', {})
 
-    print(f"kkz_save_preview called: kkz_id={kkz_id}, lab_id={lab_id}, assignments={assignments}")
+    logger = logging.getLogger(__name__)
+    logger.debug(f"kkz_save_preview called: kkz_id={kkz_id}, lab_id={lab_id}, assignments={assignments}")
 
     kkz = get_object_or_404(Kkz, id=kkz_id)
     lab = get_object_or_404(Lab, id=lab_id)
@@ -984,14 +985,15 @@ def kkz_save_preview(request):
 def get_labs_for_platoon(request):
     platoon_id = request.GET.get('platoon_id')
 
-    print(f"get_labs_for_platoon called with platoon_id: {platoon_id}")
+    logger = logging.getLogger(__name__)
+    logger.debug(f"get_labs_for_platoon called with platoon_id: {platoon_id}")
 
     if not platoon_id:
         return JsonResponse({'error': 'platoon_id required'}, status=400)
 
     try:
         platoon = Platoon.objects.get(id=platoon_id)
-        print(f"Found platoon: {platoon.number}, learning_year: {platoon.learning_year}")
+        logger.debug(f"Found platoon: {platoon.number}, learning_year: {platoon.learning_year}")
     except Platoon.DoesNotExist:
         return JsonResponse({'error': 'Platoon not found'}, status=404)
 
@@ -1000,7 +1002,7 @@ def get_labs_for_platoon(request):
         learning_years__contains=[platoon.learning_year]
     )
 
-    print(f"Found {labs.count()} labs for learning_year {platoon.learning_year}")
+    logger.debug(f"Found {labs.count()} labs for learning_year {platoon.learning_year}")
 
     labs_data = []
     for lab in labs:
@@ -1021,7 +1023,7 @@ def get_labs_for_platoon(request):
             'default_duration': str(lab.default_duration) if lab.default_duration else None
         })
 
-        print(f"  Lab: {lab.name} with {len(tasks_data)} tasks")
+        logger.debug(f"Lab: {lab.name} with {len(tasks_data)} tasks")
 
     return JsonResponse({'labs': labs_data})
 
