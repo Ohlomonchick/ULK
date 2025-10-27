@@ -19,4 +19,5 @@ urlpatterns = [
     path("utils/console/<slug:slug>/<str:node_name>/", utils_console, name="utils-console"),
     path('kkz/create/', CreateKkzView.as_view(), name='kkz-create'),
     path('kkz/create-from-lab/<str:lab_type>/<slug:slug>/', CreateKkzFromLabView.as_view(), name='kkz-create-from-lab'),
+    path('kkz_detail/<int:pk>/', KkzDetailView.as_view(), name='kkz-detail'),
 ]

@@ -63,6 +63,12 @@
                     {% endif %}
                 </div>
                 {% for kkz, comps in kkz_groups.items %}
+                    {% if user.is_superuser %}
+                    <div class="box clickable-box" style="border: thin solid darkslategray; margin-bottom: 1rem;">
+                        <a href="{% url 'interface:kkz-detail' pk=kkz.id %}">
+                            <h2 class="title is-3 is-link">{{ kkz.name }}</h2>
+                        </a>
+                    {% else %}
                     <div class="box" style="border: thin solid darkslategray; margin-bottom: 1rem;">
                         <h2 class="title is-3">{{ kkz.name }}</h2>
                         <ul>
@@ -78,6 +84,8 @@
                                 {% endif %}
                             {% endfor %}
                         </ul>
+                    </div>
+                    {% endif %}
 
                         {% if kkz.start > now %}
                             <h4 class="subtitle is-5 has-text-warning">

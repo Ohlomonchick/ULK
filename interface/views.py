@@ -276,6 +276,80 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
         return context
 
 
+class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    model = Kkz
+    template_name = 'interface/kkz_detail.html'
+    context_object_name = 'kkz'
+    pk_url_kwarg = 'pk'
+
+    def test_func(self):
+        return self.request.user.is_staff
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        kkz = self.object
+        competitions = Competition.objects.filter(kkz=kkz).select_related('lab').order_by('lab__name')
+
+        labs_data = []
+        total_tasks = 0
+
+        for comp in competitions:
+            lab = comp.lab
+            assigned_tasks = []
+
+            if kkz.unified_tasks:
+                first_comp2user = Competition2User.objects.filter(competition=comp).prefetch_related('tasks').first()
+                if first_comp2user:
+                    assigned_tasks = list(first_comp2user.tasks.all())
+                    total_tasks += len(assigned_tasks)
+            else:
+                total_tasks += comp.num_tasks
+
+            labs_data.append({
+                'lab': lab,
+                'competition': comp,
+                'assigned_tasks': assigned_tasks
+            })
+
+        context['labs_data'] = labs_data
+
+        remaining_time = kkz.finish - timezone.now()
+        if remaining_time < timedelta(0):
+            remaining_time = timedelta(0)
+
+        hours, remainder = divmod(remaining_time.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        context['delta'] = {
+            'hours': f'{hours:02d}',
+            'minutes': f'{minutes:02d}',
+            'seconds': f'{seconds:02d}'
+        }
+
+        users = list(kkz.get_users())
+        total_possible = len(users) * total_tasks if total_tasks > 0 else len(users)
+
+        total_completed = 0
+        for comp in competitions:
+            total_completed += Answers.objects.filter(
+                lab=comp.lab,
+                user__in=users,
+                datetime__gte=kkz.start,
+                datetime__lte=kkz.finish
+            ).count()
+
+        context['total_progress'] = total_completed
+        context['max_progress'] = total_possible
+        context['progress_percent'] = int((total_completed / total_possible * 100)) if total_possible > 0 else 0
+        context['now'] = timezone.now()
+        context["button_start_now"] = (timezone.now() - kkz.start).total_seconds() < 0
+        context["button_end_now"] = not context["button_start_now"] and (
+                    kkz.finish - timezone.now()).total_seconds() > 0
+        context["button_resume"] = not context["button_start_now"] and not context["button_end_now"]
+
+        return context
+
+
 class TeamCompetitionDetailView(CompetitionDetailView):
     model = TeamCompetition
     template_name = "interface/competition_detail.html"
