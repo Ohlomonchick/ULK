@@ -521,6 +521,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     form.addEventListener('submit', function(e) {
+        const previewAssignmentsInput = document.getElementById('preview-assignments');
+        if (previewAssignmentsInput && Object.keys(previewAssignments).length > 0) {
+            previewAssignmentsInput.value = JSON.stringify(previewAssignments);
+            console.log('Saving preview assignments:', previewAssignments);
+        }
+
         const button = document.getElementById('create-kkz-button');
         const videoContainer = document.getElementById('video-container');
         const video = document.getElementById('exam-video');

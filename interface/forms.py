@@ -657,6 +657,12 @@ class SimpleKkzForm(forms.Form):
         initial='[]'
     )
 
+    preview_assignments = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=False,
+        initial='{}'
+    )
+
     def __init__(self, *args, **kwargs):
         self.lab = kwargs.pop("lab", None)
         self.platoon_id = kwargs.pop("platoon_id", None)
@@ -690,6 +696,13 @@ class SimpleKkzForm(forms.Form):
         platoon = self.cleaned_data["platoon"]
         duration = self.cleaned_data["duration"]
         labs_data = self.cleaned_data["labs_data"]
+        preview_assignments_json = self.cleaned_data.get("preview_assignments", "{}")
+
+        try:
+            preview_assignments = json.loads(preview_assignments_json) if preview_assignments_json else {}
+        except json.JSONDecodeError:
+            preview_assignments = {}
+
         max_tasks_limit = None
         if labs_data and len(labs_data) > 0:
             max_tasks_limit = labs_data[0].get('max_tasks_limit')
@@ -731,6 +744,7 @@ class SimpleKkzForm(forms.Form):
             all_available_tasks.extend(tasks)
             labs_info.append({
                 'lab': lab,
+                'lab_id': lab_id,
                 'task_ids': task_ids,
                 'tasks': tasks
             })
@@ -762,7 +776,36 @@ class SimpleKkzForm(forms.Form):
             )
             competition.platoons.add(platoon)
 
-        if kkz.unified_tasks:
+        if preview_assignments:
+            for user in users:
+                user_id_str = str(user.id)
+
+                for lab_data in labs_info:
+                    lab = lab_data['lab']
+                    lab_id_str = str(lab_data['lab_id'])
+
+                    if lab_id_str in preview_assignments and user_id_str in preview_assignments[lab_id_str]:
+                        task_ids_for_user = preview_assignments[lab_id_str][user_id_str]
+                        tasks_for_user = list(LabTask.objects.filter(id__in=task_ids_for_user))
+                    else:
+                        tasks_for_user = []
+
+                    if tasks_for_user:
+                        preview = KkzPreview.objects.create(
+                            kkz=kkz,
+                            lab=lab,
+                            user=user
+                        )
+                        preview.tasks.set(tasks_for_user)
+
+                        competition = Competition.objects.get(kkz=kkz, lab=lab)
+                        comp2user, _ = Competition2User.objects.get_or_create(
+                            competition=competition,
+                            user=user
+                        )
+                        comp2user.tasks.set(tasks_for_user)
+
+        elif kkz.unified_tasks:
             picked = random.sample(all_available_tasks, min(total_tasks_to_assign, len(all_available_tasks)))
 
             for user in users:

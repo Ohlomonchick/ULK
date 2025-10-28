@@ -293,7 +293,6 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         competitions = Competition.objects.filter(kkz=kkz).select_related('lab').order_by('lab__name')
 
         labs_data = []
-        total_tasks = 0
 
         for comp in competitions:
             lab = comp.lab
@@ -303,9 +302,6 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
                 first_comp2user = Competition2User.objects.filter(competition=comp).prefetch_related('tasks').first()
                 if first_comp2user:
                     assigned_tasks = list(first_comp2user.tasks.all())
-                    total_tasks += len(assigned_tasks)
-            else:
-                total_tasks += comp.num_tasks
 
             labs_data.append({
                 'lab': lab,
@@ -329,7 +325,16 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         }
 
         users = list(kkz.get_users())
-        total_possible = len(users) * total_tasks if total_tasks > 0 else len(users)
+        total_possible = 0
+
+        for user in users:
+            for comp in competitions:
+                comp2user = Competition2User.objects.filter(
+                    competition=comp,
+                    user=user
+                ).first()
+                if comp2user:
+                    total_possible += comp2user.tasks.count()
 
         total_completed = 0
         for comp in competitions:

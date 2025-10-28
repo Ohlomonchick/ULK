@@ -261,24 +261,20 @@ def get_kkz_solutions(request, kkz_id):
             'solutions': [],
             'total_tasks': 0,
             'max_total_progress': 0,
-            'total_progress': 0,
+            'total_progress': 0
         })
 
-    # Агрегируем данные по пользователям
     user_aggregated = defaultdict(lambda: {
         'user_id': None,
         'user': None,
         'progress': 0,
+        'max_tasks': 0,
         'latest_datetime': None
     })
-
-    total_tasks_all = 0
 
     for competition in competitions:
         is_team_competition = hasattr(competition, 'teamcompetition')
         comp_data = get_competition_solutions_data(competition, is_team_competition)
-
-        total_tasks_all += comp_data['total_tasks']
 
         for uid, user_data in comp_data['individual_data'].items():
             if user_aggregated[uid]['user_id'] is None:
@@ -287,6 +283,12 @@ def get_kkz_solutions(request, kkz_id):
                 user_aggregated[uid]['user'] = user
 
             user_aggregated[uid]['progress'] += user_data['progress']
+            comp2user = Competition2User.objects.filter(
+                competition=competition,
+                user_id=uid
+            ).first()
+            if comp2user:
+                user_aggregated[uid]['max_tasks'] += comp2user.tasks.count()
 
             if user_data['raw_datetime']:
                 if not user_aggregated[uid]['latest_datetime'] or user_data['raw_datetime'] > user_aggregated[uid][
@@ -304,14 +306,26 @@ def get_kkz_solutions(request, kkz_id):
 
                     user_aggregated[uid]['progress'] += t_data['progress']
 
+                    comp2user = Competition2User.objects.filter(
+                        competition=competition,
+                        user_id=uid
+                    ).first()
+                    if comp2user:
+                        user_aggregated[uid]['max_tasks'] += comp2user.tasks.count()
+
                     if t_data['raw_datetime']:
                         if not user_aggregated[uid]['latest_datetime'] or t_data['raw_datetime'] > user_aggregated[uid][
                             'latest_datetime']:
                             user_aggregated[uid]['latest_datetime'] = t_data['raw_datetime']
 
     solutions_data = []
+    total_max_tasks = 0
+
     for uid, data in user_aggregated.items():
         user = data['user']
+        max_tasks = data['max_tasks']
+        total_max_tasks += max_tasks
+
         solutions_data.append({
             'pos': 0,
             'user_id': uid,
@@ -319,6 +333,7 @@ def get_kkz_solutions(request, kkz_id):
             'user_last_name': user.last_name,
             'user_platoon': str(user.platoon),
             'progress': data['progress'],
+            'max_tasks': max_tasks,
             'datetime': data['latest_datetime'].strftime("%H:%M:%S") if data['latest_datetime'] else "",
             'raw_datetime': data['latest_datetime'],
             'team_name': ''
@@ -329,14 +344,10 @@ def get_kkz_solutions(request, kkz_id):
     for pos, sol in enumerate(solutions_data, 1):
         sol['pos'] = pos
 
-    all_users = list(kkz.get_users())
-
-
     return JsonResponse({
         'solutions': solutions_data,
-        'total_tasks': total_tasks_all,
-        'max_total_progress': len(all_users) * total_tasks_all,
-        'total_progress': sum(s['progress'] for s in solutions_data),
+        'max_total_progress': total_max_tasks,
+        'total_progress': sum(s['progress'] for s in solutions_data)
     })
 
 

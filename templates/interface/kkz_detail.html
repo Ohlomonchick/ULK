@@ -264,8 +264,8 @@
                             <td>${solution.user_first_name}</td>
                             <td>${solution.user_last_name}</td>
                             <td>${solution.user_platoon}</td>
-                            <td>${solution.progress}/${response.total_tasks}</td>
-                            <td><progress class="progress is-success" value="${solution.progress}" max="${response.total_tasks}">${solution.progress}</progress></td>
+                            <td style="text-align: center;">${solution.progress}/${solution.max_tasks}</td>
+                            <td><progress class="progress is-success" value="${solution.progress}" max="${solution.max_tasks}">${solution.progress}</progress></td>
                             <td>${solution.datetime}</td>
                         `;
                         newRows.push(row);
