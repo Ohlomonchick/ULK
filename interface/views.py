@@ -125,8 +125,10 @@ class CompetitionListView(LoginRequiredMixin, ListView):  # pragma: no cover
         queryset = Competition.objects.order_by("-start").filter(finish__gt=timezone.now())
         if not self.request.user.is_staff:
             queryset = queryset.filter(
-                competition_users__user=self.request.user
-            )
+                Q(competition_users__user=self.request.user) |
+                Q(kkz__platoons=self.request.user.platoon) |
+                Q(kkz__non_platoon_users=self.request.user)
+            ).distinct()
         return queryset.exclude(teamcompetition__isnull=False)
 
     def get_context_data(self, **kwargs):
