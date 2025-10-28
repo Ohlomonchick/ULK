@@ -134,17 +134,9 @@
                     </div>
                 </div>
             </div>
-
-            {% if not user.is_superuser and not kkz.unified_tasks %}
-                <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
-                    <h4 class="title is-5">Ваши задания индивидуальны</h4>
-                    <p class="help">Перейдите в каждую лабораторную работу, чтобы увидеть свои задания.</p>
-                </div>
-            {% endif %}
         </div>
     </div>
 
-    <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
     <script src="{% static 'js/gsap.min.js' %}"></script>
     <script src="{% static 'js/Flip.min.js' %}"></script>
 

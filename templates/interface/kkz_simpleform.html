@@ -59,9 +59,9 @@
     .tasks-list {
         padding-top: 0.5rem;
         padding-bottom: 0.5rem;
-        transition: max-height 0.75s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s, padding 0.4s;
         max-height: 1500px;
         opacity: 1;
+        overflow: visible;
     }
     .tasks-list.collapsed {
         max-height: 0;
@@ -69,6 +69,7 @@
         padding-top: 0;
         padding-bottom: 0;
         pointer-events: none;
+        overflow: hidden;
     }
 </style>
 {% endblock %}
@@ -204,6 +205,8 @@
         </div>
     </div>
 </form>
+
+<script src="{% static 'js/gsap.min.js' %}"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -359,110 +362,96 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         document.querySelectorAll('.exclude-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const index = parseInt(this.dataset.index);
-        const labBox = this.closest('.lab-item');
-        const tasksList = labBox.querySelector('.tasks-list');
+            btn.addEventListener('click', function() {
+                const index = parseInt(this.dataset.index);
+                const labBox = this.closest('.lab-item');
+                const tasksList = labBox.querySelector('.tasks-list');
 
-        
-        tasksList.style.maxHeight = tasksList.scrollHeight + "px";
-        tasksList.offsetHeight; 
+                // Используем GSAP для анимации закрытия
+                gsap.to(tasksList, {
+                    maxHeight: 0,
+                    opacity: 0,
+                    duration: 0.5,
+                    ease: "power2.inOut",
+                    onStart: () => {
+                        labBox.classList.add('excluded');
+                    },
+                    onComplete: () => {
+                        currentLabs[index].included = false;
+                        updateHiddenField();
+                        renderLabs();
 
-        requestAnimationFrame(() => {
-            tasksList.style.maxHeight = "0";
-            tasksList.style.opacity = "0";
-            labBox.classList.add('excluded');
-        });
-
-        
-        tasksList.addEventListener('transitionend', function handler(e) {
-            if (e.target === tasksList && e.propertyName === 'max-height') {
-                tasksList.removeEventListener('transitionend', handler);
-
-                
-                currentLabs[index].included = false;
-                updateHiddenField();
-
-                
-                renderLabs();
-
-                
-                if (previewIsOpen) {
-                    updatePreviewAfterLabChange();
-                }
-            }
-        });
-    });
-});
-
-document.querySelectorAll('.include-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const index = parseInt(this.dataset.index);
-
-        
-        currentLabs[index].included = true;
-        updateHiddenField();
-
-        
-        renderLabs();
-
-        
-        if (previewIsOpen) {
-            updatePreviewAfterLabChange();
-        }
-
-        
-        requestAnimationFrame(() => {
-            const newLabBox = labsList.querySelectorAll('.lab-item')[index];
-            if (!newLabBox) return;
-
-            const newTasksList = newLabBox.querySelector('.tasks-list');
-            if (!newTasksList) return;
-
-            
-            newTasksList.style.maxHeight = "0";
-            newTasksList.style.opacity = "0";
-            newTasksList.offsetHeight; 
-
-            requestAnimationFrame(() => {
-                newTasksList.style.maxHeight = newTasksList.scrollHeight + "px";
-                newTasksList.style.opacity = "1";
-
-                
-                newTasksList.addEventListener('transitionend', function handler(e) {
-                    if (e.target === newTasksList && e.propertyName === 'max-height') {
-                        newTasksList.removeEventListener('transitionend', handler);
-                        newTasksList.style.maxHeight = "1500px";
+                        if (previewIsOpen) {
+                            updatePreviewAfterLabChange();
+                        }
                     }
                 });
             });
         });
-    });
-});
 
-document.querySelectorAll('.task-checkbox').forEach(checkbox => {
-    checkbox.addEventListener('change', function() {
-        const labIndex = parseInt(this.dataset.labIndex);
-        const taskId = parseInt(this.dataset.taskId);
+        document.querySelectorAll('.include-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const index = parseInt(this.dataset.index);
 
-        if (this.checked) {
-            if (!currentLabs[labIndex].task_ids.includes(taskId)) {
-                currentLabs[labIndex].task_ids.push(taskId);
-            }
-        } else {
-            currentLabs[labIndex].task_ids = currentLabs[labIndex].task_ids.filter(id => id !== taskId);
-        }
+                currentLabs[index].included = true;
+                updateHiddenField();
+                renderLabs();
 
-        currentLabs[labIndex].num_tasks = currentLabs[labIndex].task_ids.length;
-        updateHiddenField();
+                if (previewIsOpen) {
+                    updatePreviewAfterLabChange();
+                }
 
-        
-        if (previewIsOpen) {
-            updatePreviewAfterLabChange();
-        }
-    });
-});
+                // Анимация открытия с GSAP
+                requestAnimationFrame(() => {
+                    const newLabBox = labsList.querySelectorAll('.lab-item')[index];
+                    if (!newLabBox) return;
 
+                    const newTasksList = newLabBox.querySelector('.tasks-list');
+                    if (!newTasksList) return;
+
+                    // Устанавливаем начальное состояние
+                    gsap.set(newTasksList, {
+                        maxHeight: 0,
+                        opacity: 0
+                    });
+
+                    // Анимируем открытие
+                    gsap.to(newTasksList, {
+                        maxHeight: newTasksList.scrollHeight,
+                        opacity: 1,
+                        duration: 0.5,
+                        ease: "power2.inOut",
+                        onComplete: () => {
+                            // Убираем фиксированную высоту после анимации
+                            gsap.set(newTasksList, { maxHeight: "1500px" });
+                        }
+                    });
+                });
+            });
+        });
+
+        document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const labIndex = parseInt(this.dataset.labIndex);
+                const taskId = parseInt(this.dataset.taskId);
+
+                if (this.checked) {
+                    if (!currentLabs[labIndex].task_ids.includes(taskId)) {
+                        currentLabs[labIndex].task_ids.push(taskId);
+                    }
+                } else {
+                    currentLabs[labIndex].task_ids = currentLabs[labIndex].task_ids.filter(id => id !== taskId);
+                }
+
+                currentLabs[labIndex].num_tasks = currentLabs[labIndex].task_ids.length;
+                updateHiddenField();
+
+
+                if (previewIsOpen) {
+                    updatePreviewAfterLabChange();
+                }
+            });
+        });
 
 
         function updatePreviewAfterLabChange() {

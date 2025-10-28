@@ -61,49 +61,51 @@
                             <span>Создать ККЗ</span>
                         </a>
                     {% endif %}
-                </div>
-                {% for kkz, comps in kkz_groups.items %}
-                    {% if user.is_superuser %}
-                    <div class="box clickable-box" style="border: thin solid darkslategray; margin-bottom: 1rem;">
-                        <a href="{% url 'interface:kkz-detail' pk=kkz.id %}">
-                            <h2 class="title is-3 is-link">{{ kkz.name }}</h2>
-                        </a>
-                    {% else %}
-                    <div class="box" style="border: thin solid darkslategray; margin-bottom: 1rem;">
-                        <h2 class="title is-3">{{ kkz.name }}</h2>
-                        <ul>
-                            {% for comp in comps %}
-                                {% if comp.start < now and now < comp.finish or user.is_superuser %}
-                                    <div class="box kkz-inner-box" data-href="{% url 'interface:competition-detail' slug=comp.slug %}?utm_source={{ comp|get_utm_source_regular }}">
-                                        <h3 class="title is-4 is-link">{{ comp.lab.name }}</h3>
-                                    </div>
-                                {% else %}
-                                    <div class="box" style="border: thin solid gray; margin-bottom: 1rem;">
-                                        <h3 class="title is-4">{{ comp.lab.name }}</h3>
-                                    </div>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                    </div>
-                    {% endif %}
 
-                        {% if kkz.start > now %}
-                            <h4 class="subtitle is-5 has-text-warning">
-                                Экзамен станет доступен: {{ kkz.start|date:"H:i" }}
-                            </h4>
-                        {% elif kkz.finish < now %}
-                            <h4 class="subtitle is-5 has-text-danger">
-                                Экзамен был завершён: {{ kkz.finish }}
-                            </h4>
-                        {% else %}
-                            <h4 class="subtitle is-5 has-text-success">
-                                Экзамен доступен для выполнения до {{ kkz.finish|date:"H:i" }}!
-                            </h4>
-                        {% endif %}
-                    </div>
-                {% empty %}
-                    <p>Нет доступных контрольно-квалификационных заданий.</p>
-                {% endfor %}
+                    {% for kkz, comps in kkz_groups.items %}
+                        <div class="box {% if user.is_superuser %}clickable-box{% endif %}" style="border: thin solid darkslategray; margin-bottom: 1rem;">
+                            {% if user.is_superuser %}
+                                <a href="{% url 'interface:kkz-detail' pk=kkz.id %}">
+                                    <h2 class="title is-3 is-link">{{ kkz.name }}</h2>
+                                </a>
+                            {% else %}
+                                <h2 class="title is-3">{{ kkz.name }}</h2>
+                            {% endif %}
+
+                            {% if kkz.start > now %}
+                                <h4 class="subtitle is-5 has-text-warning mb-3">
+                                    Экзамен станет доступен: {{ kkz.start|date:"H:i" }}
+                                </h4>
+                            {% elif kkz.finish < now %}
+                                <h4 class="subtitle is-5 has-text-danger mb-3">
+                                    Экзамен был завершён: {{ kkz.finish|date:"H:i d.m.Y" }}
+                                </h4>
+                            {% else %}
+                                <h4 class="subtitle is-5 has-text-success mb-3">
+                                    Экзамен доступен для выполнения до {{ kkz.finish|date:"H:i" }}!
+                                </h4>
+                            {% endif %}
+
+                            {% if not user.is_superuser %}
+                                <ul>
+                                    {% for comp in comps %}
+                                        {% if comp.start < now and now < comp.finish %}
+                                            <div class="box kkz-inner-box" data-href="{% url 'interface:competition-detail' slug=comp.slug %}?utm_source={{ comp|get_utm_source_regular }}">
+                                                <h3 class="title is-4 is-link">{{ comp.lab.name }}</h3>
+                                            </div>
+                                        {% else %}
+                                            <div class="box" style="border: thin solid gray; margin-bottom: 1rem;">
+                                                <h3 class="title is-4">{{ comp.lab.name }}</h3>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <p>Нет доступных контрольно-квалификационных заданий.</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     {% endif %}
