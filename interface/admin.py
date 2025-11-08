@@ -31,6 +31,19 @@ class CustomJSONEditorWidget(JSONEditorWidget):
         }
 
 
+class TabularInlineWithDescription(admin.TabularInline):
+    """
+    Базовый класс TabularInline с поддержкой описания.
+    Для добавления описания установите атрибут 'description' в дочернем классе.
+    """
+    description = None
+    template = 'admin/edit_inline/tabular_with_description.html'
+    
+    def get_description(self):
+        """Возвращает описание для отображения"""
+        return self.description
+
+
 class LabLevelInline(admin.TabularInline):
     model = LabLevel
     extra = 1  # Display one empty level form by default
@@ -93,6 +106,13 @@ class LabTaskInline(admin.TabularInline):
         return super().get_formset(request, obj, **kwargs)
 
 
+class LabNodeInline(TabularInlineWithDescription):
+    model = LabNode
+    extra = 1
+    fields = ['node_name', 'login', 'password']
+    description = "Здесь можно настроить SSH-ноды для флагов. Укажите имя ноды, логин и пароль для подключения."
+
+
 class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     form = LabForm
     summernote_fields = 'description'
@@ -106,7 +126,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
             'widget': TimeDurationWidget(show_days=True, show_hours=True, show_minutes=True, show_seconds=False, attrs={'style': 'width:5em;'})
         }
     }
-    inlines = [LabLevelInline, LabTaskInline]
+    inlines = [LabLevelInline, LabTaskInline, LabNodeInline]
 
     class Media:
         js = ('admin/js/jquery-3.7.1.min.js', "admin/js/load_lab_type.js")

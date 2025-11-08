@@ -521,6 +521,15 @@ class TeamCompetition2Team(models.Model):
 
 
 
+class LabNode(models.Model):
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='nodes')
+    node_name = models.CharField(max_length=255, verbose_name="Имя Ноды")
+    login = models.CharField(max_length=255, verbose_name="Логин")
+    password = models.CharField(max_length=255, verbose_name="Пароль")
+
+    class Meta:
+        verbose_name = "Нода для SSH флагов"
+        verbose_name_plural = "Ноды для SSH флагов"
 
 
 post_save.connect(Competition2User.post_create, sender=Competition2User)
