@@ -1,6 +1,7 @@
 from collections import defaultdict
 import datetime
 from time import sleep
+import logging
 
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
@@ -12,7 +13,13 @@ from django.contrib.auth import login, authenticate
 from interface.forms import SignUpForm, ChangePasswordForm
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
-from django.views.generic import FormView
+from django.views.generic import FormView, View
+from django.http import JsonResponse, HttpResponse
+from django.template.loader import render_to_string
+from django.utils.translation import gettext as _
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_sameorigin
+from django import forms
 
 from interface.pnet_session_manager import ensure_admin_pnet_session
 from interface.serializers import *
@@ -21,16 +28,19 @@ from rest_framework import viewsets
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
 from interface.utils import get_kibana_url, get_pnet_password, patch_lab_description
+from django_summernote.utils import get_attachment_model, get_config
+
+logger = logging.getLogger(__name__)
 
 
 class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Lab
     slug_url_kwarg = 'slug'
-    
+
     def test_func(self):
         # Allow only admin users
         return self.request.user.is_staff
-    
+
     def get_queryset(self):
         """
         Фильтруем queryset по slug и lab_type из URL
@@ -38,7 +48,7 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         queryset = super().get_queryset()
         slug = self.kwargs.get('slug')
         lab_type = self.kwargs.get('lab_type')
-        
+
         return queryset.filter(slug=slug, lab_type=lab_type)
 
     def post(self, request, *args, **kwargs):
@@ -52,7 +62,7 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
                 return redirect('interface:team-competition-detail', slug=competition.slug)
             else:
                 return redirect('interface:competition-detail', slug=competition.slug)
-                
+
         context = self.get_context_data(object=self.object)
         context["simple_form"] = form
         return render(request, self.get_template_names(), context)
@@ -80,19 +90,19 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         labs = self.get_queryset().order_by('slug', 'lab_type')
-        
+
         # Group labs by program
         programs_data = {}
         for program_value, program_label in LabProgram.choices:
             program_labs = labs.filter(program=program_value)
             bundle_dict = {}
-            
+
             for lab in program_labs:
                 slug = lab.slug
                 if slug not in bundle_dict:
                     bundle_dict[slug] = {LabType.HW: None, LabType.EXAM: None, LabType.PZ: None}
                 bundle_dict[slug][lab.lab_type] = lab
-            
+
             lab_bundles = []
             for slug, labs_by_type in bundle_dict.items():
                 available_labs = [lab for lab in labs_by_type.values() if lab is not None]
@@ -104,15 +114,15 @@ class LabListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                         "labs": labs_by_type,
                         "cover": covers_with_images[0] if covers_with_images else None
                     })
-            
+
             programs_data[program_value] = {
                 "label": program_label,
                 "bundles": lab_bundles
             }
-        
+
         context['programs_data'] = programs_data
         context['initial_program'] = self.request.GET.get("program", LabProgram.choices[0][0] if LabProgram.choices else None)
-        
+
         return context
 
 
@@ -201,10 +211,10 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             competition = context["object"]
             context["available"] = competition.finish > timezone.now()
             context["issue"] = competition
-            
+
             if not self.request.user.is_staff and competition.finish <= timezone.now():
                 competition.lab.description = ''
-            
+
             answers = Answers.objects.filter(
                 lab=competition.lab,
                 lab_task=None,
@@ -212,7 +222,7 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
                 datetime__gte=competition.start,
                 **answer_filters
             ).first()
-            
+
             if answers is None:
                 answer = self.request.GET.get("answer_flag")
                 if answer:
@@ -505,7 +515,7 @@ class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):  # pr
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["issues"] = Competition2User.objects.filter(user=context["object"]).all().prefetch_related('tasks')
-        
+
         for issue in context["issues"]:
             assigned_tasks = issue.tasks.count()
             submitted_tasks = Answers.objects.filter(user=context["object"], lab_task__in=issue.tasks.all()).count()
@@ -517,7 +527,7 @@ class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):  # pr
 
         submitted_labs = Answers.objects.filter(user=context["object"]).values("lab").distinct()
         context["submitted"] = submitted_labs.count()
-        all_labs = set([issue.competition.lab.id for issue in context["issues"]] + list(submitted_labs.values_list('id', flat=True))) 
+        all_labs = set([issue.competition.lab.id for issue in context["issues"]] + list(submitted_labs.values_list('id', flat=True)))
         total = len(all_labs)
         context["total"] = total
         if total == 0:
@@ -569,7 +579,7 @@ def change_password(request):  # pragma: no cover
             login(request, user)
 
             session_manager = ensure_admin_pnet_session()
-            with session_manager:             
+            with session_manager:
                 session_manager.change_user_password(user.pnet_login, user.pnet_password)
 
             return redirect('/cyberpolygon/competitions')
@@ -587,7 +597,7 @@ class AnswerAPIView(viewsets.ModelViewSet):
 def utils_console(request, slug, node_name):
     # Получаем username из параметра запроса, если не передан - используем текущего пользователя
     username = request.GET.get('username', request.user.username)
-    
+
     data = {
         'lab_slug': slug,
         'username': username,
@@ -596,12 +606,126 @@ def utils_console(request, slug, node_name):
         data,
         {'competition__finish__gt': timezone.now()}
     )
-    
+
     if error_response:
         return error_response
-    
+
     return render(request, 'interface/utils_console.html', {'competition': issue.competition, 'node_name': node_name, 'username': username})
 
 
 def kibana_dashboard(request, slug):
     return render(request, 'interface/kibana_dashboard.html', {'slug': slug, 'kibana_url': get_kibana_url()})
+
+
+# Кастомная форма для загрузки файлов (не только изображений)
+class CustomUploadForm(forms.Form):
+    file = forms.FileField(required=True)
+
+
+# Кастомный view для загрузки файлов в summernote (поддерживает не только изображения)
+class CustomSummernoteUploadAttachment(UserPassesTestMixin, View):
+    def test_func(self):
+        return get_config()['test_func_upload_view'](self.request)
+
+    def __init__(self):
+        super().__init__()
+        self.config = get_config()
+
+    @method_decorator(xframe_options_sameorigin)
+    def dispatch(self, *args, **kwargs):
+        return super(CustomSummernoteUploadAttachment, self).dispatch(*args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        return JsonResponse({
+            'status': 'false',
+            'message': _('Only POST method is allowed'),
+        }, status=400)
+
+    def post(self, request, *args, **kwargs):
+        authenticated = request.user.is_authenticated
+
+        if self.config['disable_attachment']:
+            logger.error(
+                'User<%s:%s> tried to use disabled attachment module.',
+                getattr(request.user, 'pk', None),
+                request.user
+            )
+            return JsonResponse({
+                'status': 'false',
+                'message': _('Attachment module is disabled'),
+            }, status=403)
+
+        if self.config['attachment_require_authentication'] and \
+                not authenticated:
+            return JsonResponse({
+                'status': 'false',
+                'message': _('Only authenticated users are allowed'),
+            }, status=403)
+
+        if not request.FILES.getlist('files'):
+            return JsonResponse({
+                'status': 'false',
+                'message': _('No files were requested'),
+            }, status=400)
+
+        # remove unnecessary CSRF token, if found
+        kwargs = request.POST.copy()
+        kwargs.pop('csrfmiddlewaretoken', None)
+
+        # Валидация файлов с помощью FileField вместо ImageField
+        for file in request.FILES.getlist('files'):
+            form = CustomUploadForm(
+                files={
+                    'file': file,
+                }
+            )
+            if not form.is_valid():
+                logger.error(
+                    'User<%s:%s> tried to upload invalid file.',
+                    getattr(request.user, 'pk', None),
+                    request.user
+                )
+
+                return JsonResponse(
+                    {
+                        'status': 'false',
+                        'message': ''.join(form.errors['file']),
+                    },
+                    status=400
+                )
+
+        try:
+            attachments = []
+
+            for file in request.FILES.getlist('files'):
+
+                # create instance of appropriate attachment class
+                klass = get_attachment_model()
+                attachment = klass()
+                attachment.file = file
+
+                if file.size > self.config['attachment_filesize_limit']:
+                    return JsonResponse({
+                        'status': 'false',
+                        'message': _('File size exceeds the limit allowed and cannot be saved'),
+                    }, status=400)
+
+                # calling save method with attachment parameters as kwargs
+                attachment.save(**kwargs)
+
+                # choose relative/absolute url by config
+                attachment.url = attachment.file.url
+
+                if self.config['attachment_absolute_uri']:
+                    attachment.url = request.build_absolute_uri(attachment.url)
+
+                attachments.append(attachment)
+
+            return HttpResponse(render_to_string('django_summernote/upload_attachment.json', {
+                'attachments': attachments,
+            }), content_type='application/json')
+        except IOError:
+            return JsonResponse({
+                'status': 'false',
+                'message': _('Failed to save attachment'),
+            }, status=500)

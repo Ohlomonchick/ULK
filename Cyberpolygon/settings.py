@@ -182,6 +182,8 @@ SUMMERNOTE_CONFIG = {
     },
 
     'attachment_model': 'interface.MyAttachment',
+    # Максимальный размер файла в байтах (500 МБ)
+    'attachment_filesize_limit': 500 * 1024 * 1024,
 }
 
 LOGIN_REDIRECT_URL = "interface:lab-menu"

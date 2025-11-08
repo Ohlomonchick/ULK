@@ -4,6 +4,7 @@ import logging
 
 from django.contrib import admin
 from django_summernote.admin import SummernoteModelAdmin
+from django_summernote.utils import get_attachment_model
 from django.contrib.auth.admin import UserAdmin
 from django_json_widget.widgets import JSONEditorWidget
 from durationwidget.widgets import TimeDurationWidget
@@ -16,6 +17,7 @@ from .forms import (
     KkzLabInlineForm,
     Competition2UserInlineForm,
     LabForm,
+    MyAttachmentAdminForm,
 )
 from django.db.models import DurationField, JSONField
 from django.db import transaction
@@ -408,6 +410,12 @@ class PlatoonAdmin(admin.ModelAdmin):
     list_display = ('number', 'learning_year')
 
 
+class MyAttachmentAdmin(admin.ModelAdmin):
+    form = MyAttachmentAdminForm
+    list_display = ('name', 'file', 'uploaded')
+    readonly_fields = ('uploaded',)
+
+
 admin.site.register(Lab, LabModelAdmin)
 admin.site.register(Platoon, PlatoonAdmin)
 admin.site.register(Competition, CompetitionAdmin)
@@ -419,3 +427,9 @@ admin.site.register(TeamCompetition, TeamCompetitionAdmin)
 admin.site.unregister(DjangoJob)
 admin.site.unregister(DjangoJobExecution)
 admin.site.register(Kkz, KkzAdmin)
+# Отменяем автоматическую регистрацию django-summernote и регистрируем с нашей формой
+try:
+    admin.site.unregister(get_attachment_model())
+except admin.sites.NotRegistered:
+    pass
+admin.site.register(MyAttachment, MyAttachmentAdmin)

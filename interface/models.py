@@ -6,7 +6,9 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.signals import post_save, post_delete
 from django_summernote.models import AbstractAttachment
+from django_summernote.utils import get_attachment_upload_to, get_attachment_storage
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import FileExtensionValidator
 
 from slugify import slugify
 from rest_framework import serializers
@@ -168,6 +170,16 @@ class Platoon(models.Model):
 
 
 class MyAttachment(AbstractAttachment):
+    file = models.FileField(
+        upload_to=get_attachment_upload_to(),
+        storage=get_attachment_storage(),
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'zip', 'rar', 'txt']
+            )
+        ]
+    )
+
     class Meta:
         verbose_name = 'Прикрепленный файл'
         verbose_name_plural = 'Прикрепленные файлы'

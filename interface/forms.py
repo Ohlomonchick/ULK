@@ -25,6 +25,7 @@ from .models import (
     Team,
     TeamCompetition2Team,
     LearningYear,
+    MyAttachment,
 )
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
@@ -435,7 +436,7 @@ class TeamCompetitionForm(CompetitionForm):
 
         team_ids = set(teams.values_list('id', flat=True))
         existing_team_records = TeamCompetition2Team.objects.filter(competition=instance)
-        
+
         def _delete_teams_operation():
             for team_record in existing_team_records:
                 if team_record.team_id not in team_ids:
@@ -858,3 +859,12 @@ class SimpleKkzForm(forms.Form):
                     comp2user.tasks.set(tasks)
 
         return kkz
+
+
+# Кастомная форма для MyAttachment в админке (поддержка не только изображений)
+class MyAttachmentAdminForm(forms.ModelForm):
+    file = forms.FileField(required=True)
+
+    class Meta:
+        model = MyAttachment
+        fields = '__all__'
