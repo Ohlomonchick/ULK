@@ -1,26 +1,31 @@
+import logging
 from datetime import timedelta
 from hashlib import md5
-import logging
 
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models import Q
 from django.db.models.signals import post_save, post_delete, m2m_changed
+from django.utils import timezone
 from django_summernote.models import AbstractAttachment
 from django_summernote.utils import get_attachment_upload_to, get_attachment_storage
-from django.contrib.auth.models import AbstractUser
-from django.core.validators import FileExtensionValidator
-
-from slugify import slugify
 from rest_framework import serializers
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from django.conf import settings
-from interface.eveFunctions import pf_login, logout, create_directory, get_user_workspace_relative_path
+from slugify import slugify
+
 from interface.config import get_pnet_url, get_pnet_base_dir
+from interface.eveFunctions import pf_login, logout, create_directory, get_user_workspace_relative_path
+from interface.flag_deployment import (
+    generate_and_save_flags,
+    get_flag_deployment_queue,
+    create_flag_deployment_task
+)
 from interface.utils import get_pnet_lab_name
-from .validators import validate_top_level_array, validate_lab_task_json_config
-from .pnet_session_manager import ensure_admin_pnet_session, execute_pnet_operation_if_needed
 from .elastic_utils import delete_elastic_user
+from .pnet_session_manager import ensure_admin_pnet_session, execute_pnet_operation_if_needed
+from .validators import validate_top_level_array, validate_lab_task_json_config
 logger = logging.getLogger(__name__)
 
 
@@ -458,18 +463,26 @@ class Competition2User(models.Model):
         if action != 'post_add' or not pk_set:
             return
         
-        from interface.flag_deployment import generate_and_save_flags, _deploy_flags_to_lab
-        
         tasks = instance.tasks.all()
         if not tasks.exists():
             return
         
-        user = instance.user if hasattr(instance, 'user') else None
-        if not user or not user.pnet_login or not user.pnet_password:
+        user = instance.user
+        if not user.pnet_login or not user.pnet_password:
             return
         
         generate_and_save_flags(instance, tasks)
-        _deploy_flags_to_lab(instance, user, instance.competition, instance.competition.lab)
+        
+        task = create_flag_deployment_task(
+            instance=instance,
+            user=user,
+            lab=instance.competition.lab,
+            competition_slug=instance.competition.slug,
+            instance_type='Competition2User'
+        )
+        
+        if task:
+            get_flag_deployment_queue().submit_task(task)
 
 
 class TeamCompetition(Competition):
@@ -542,22 +555,26 @@ class TeamCompetition2Team(models.Model):
         if action != 'post_add' or not pk_set:
             return
         
-        from interface.flag_deployment import generate_and_save_flags, _deploy_flags_to_lab
-        
         tasks = instance.tasks.all()
         if not tasks.exists():
             return
         
-        team_users = instance.team.users.all()
-        if not team_users.exists():
-            return
-        
-        user = team_users.first()
-        if not user.pnet_login or not user.pnet_password:
+        user = instance.team.users.first()
+        if not user or not user.pnet_login or not user.pnet_password:
             return
         
         generate_and_save_flags(instance, tasks)
-        _deploy_flags_to_lab(instance, user, instance.competition, instance.competition.lab)
+        
+        task = create_flag_deployment_task(
+            instance=instance,
+            user=user,
+            lab=instance.competition.lab,
+            competition_slug=instance.competition.slug,
+            instance_type='TeamCompetition2Team'
+        )
+        
+        if task:
+            get_flag_deployment_queue().submit_task(task)
 
     def delete_from_platform(self, final=False):
         if self.deleted and not final:
