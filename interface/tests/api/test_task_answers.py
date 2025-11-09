@@ -7,7 +7,7 @@ import json
 
 from interface.models import (
     Competition, Platoon, User, Lab, LabTask, Answers,
-    Competition2User
+    Competition2User, TeamCompetition, Team, TeamCompetition2Team
 )
 
 
@@ -311,6 +311,116 @@ class CheckTaskAnswersAPITestCase(BaseTaskAnswersTestCase):
         self.assertEqual(data['results'][str(task.id)]['status'], 'skipped')
         self.assertEqual(self._count_answers(), 0)
 
+    def test_check_answers_with_flag_correct(self):
+        """
+        Тест: Проверка флага как правильного ответа для отдельного пользователя
+        Флаг должен засчитываться как правильный ответ
+        """
+        task = self._create_task('task_1', question='What is the answer?', answer='42')
+        self._add_tasks_to_user(task)
+        
+        # Устанавливаем флаг для задания
+        self.competition_user.generated_flags = [
+            {'task_id': 'task_1', 'flag': 'FLAG_TestFlag123'}
+        ]
+        self.competition_user.save()
+        
+        # Отправляем флаг как ответ
+        response = self._post_answers({str(task.id): 'FLAG_TestFlag123'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+        self.assertEqual(data['results'][str(task.id)]['message'], 'Верно!')
+        self._assert_answer_exists(task, should_exist=True)
+        self.assertEqual(self._count_answers(), 1)
+
+    def test_check_answers_with_flag_case_insensitive(self):
+        """
+        Тест: Проверка флага регистронезависимо
+        """
+        task = self._create_task('task_1', question='What is the answer?', answer='42')
+        self._add_tasks_to_user(task)
+        
+        self.competition_user.generated_flags = [
+            {'task_id': 'task_1', 'flag': 'FLAG_TestFlag123'}
+        ]
+        self.competition_user.save()
+        
+        # Отправляем флаг в другом регистре
+        response = self._post_answers({str(task.id): 'flag_testflag123'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+
+    def test_check_answers_flag_only_for_correct_task(self):
+        """
+        Тест: Флаг засчитывается только для соответствующего задания
+        """
+        task1 = self._create_task('task_1', question='Q1?', answer='A1')
+        task2 = self._create_task('task_2', question='Q2?', answer='A2')
+        self._add_tasks_to_user(task1, task2)
+        
+        # Устанавливаем флаг только для task_1
+        self.competition_user.generated_flags = [
+            {'task_id': 'task_1', 'flag': 'FLAG_FlagForTask1'}
+        ]
+        self.competition_user.save()
+        
+        # Пытаемся использовать флаг task_1 для task_2
+        response = self._post_answers({
+            str(task1.id): 'FLAG_FlagForTask1',  # Правильно
+            str(task2.id): 'FLAG_FlagForTask1'   # Неправильно (флаг для другого задания)
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task1.id)]['status'], 'correct')
+        self.assertEqual(data['results'][str(task2.id)]['status'], 'incorrect')
+        self.assertEqual(self._count_answers(), 1)
+
+    def test_check_answers_regular_answer_has_priority(self):
+        """
+        Тест: Обычный ответ проверяется первым, флаг - только если обычный не подошел
+        """
+        task = self._create_task('task_1', question='What is 2+2?', answer='4')
+        self._add_tasks_to_user(task)
+        
+        self.competition_user.generated_flags = [
+            {'task_id': 'task_1', 'flag': 'FLAG_TestFlag123'}
+        ]
+        self.competition_user.save()
+        
+        # Отправляем правильный обычный ответ
+        response = self._post_answers({str(task.id): '4'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+        self._assert_answer_exists(task, should_exist=True)
+
+    def test_check_answers_flag_when_regular_answer_wrong(self):
+        """
+        Тест: Флаг засчитывается, если обычный ответ неправильный
+        """
+        task = self._create_task('task_1', question='What is 2+2?', answer='4')
+        self._add_tasks_to_user(task)
+        
+        self.competition_user.generated_flags = [
+            {'task_id': 'task_1', 'flag': 'FLAG_TestFlag123'}
+        ]
+        self.competition_user.save()
+        
+        # Отправляем неправильный обычный ответ, но правильный флаг
+        response = self._post_answers({str(task.id): 'FLAG_TestFlag123'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+        self._assert_answer_exists(task, should_exist=True)
+
     def test_check_answers_unauthenticated(self):
         """Тест: Неавторизованный пользователь должен получить 401"""
         self.client.logout()
@@ -412,4 +522,199 @@ class GetUserTasksStatusAPITestCase(BaseTaskAnswersTestCase):
         """Тест: Несуществующее соревнование - должен получить 404"""
         response = self._get_status('non-existent-slug')
         self.assertEqual(response.status_code, 404)
+
+
+class CheckTaskAnswersWithFlagsTeamTestCase(TestCase):
+    """
+    Тесты для проверки флагов в командных соревнованиях
+    """
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='teamuser',
+            password='testpass123',
+            first_name='Team',
+            last_name='User',
+            pnet_login='teamuser'
+        )
+        self.lab = Lab.objects.create(
+            name='Team Lab',
+            platform='NO',
+            slug='team-lab',
+            description='Team lab description'
+        )
+        self.competition = TeamCompetition.objects.create(
+            slug='team-competition',
+            start=timezone.now() - timedelta(hours=1),
+            finish=timezone.now() + timedelta(hours=2),
+            lab=self.lab,
+            participants=5
+        )
+        self.team = Team.objects.create(name='Test Team', slug='test-team')
+        self.team.users.add(self.user)
+        
+        self.team_competition = TeamCompetition2Team.objects.create(
+            competition=self.competition,
+            team=self.team
+        )
+        self.client.login(username='teamuser', password='testpass123')
+        self.url = reverse('interface_api:check_task_answers')
+    
+    def _create_task(self, task_id, description='Task', question='', answer=''):
+        """Создает задание с указанными параметрами"""
+        return LabTask.objects.create(
+            lab=self.lab,
+            task_id=task_id,
+            description=description,
+            question=question,
+            answer=answer
+        )
+    
+    def _add_tasks_to_team(self, *tasks):
+        """Добавляет задания команде"""
+        self.team_competition.tasks.add(*tasks)
+    
+    def _post_answers(self, answers_dict):
+        """Отправляет ответы на проверку"""
+        return self.client.post(
+            self.url,
+            data=json.dumps({
+                'competition_slug': self.competition.slug,
+                'answers': answers_dict
+            }),
+            content_type='application/json'
+        )
+    
+    def _assert_answer_exists(self, task, should_exist=True):
+        """Проверяет наличие/отсутствие ответа для команды"""
+        exists = Answers.objects.filter(
+            team=self.team,
+            lab=self.lab,
+            lab_task=task
+        ).exists()
+        if should_exist:
+            self.assertTrue(exists, f'Answer for task {task.task_id} not found')
+        else:
+            self.assertFalse(exists, f'Answer for task {task.task_id} should not exist')
+    
+    def test_team_flag_correct(self):
+        """
+        Тест: Проверка флага как правильного ответа для команды
+        """
+        task = self._create_task('team_task_1', question='What is the answer?', answer='42')
+        self._add_tasks_to_team(task)
+        
+        # Устанавливаем флаг для задания
+        self.team_competition.generated_flags = [
+            {'task_id': 'team_task_1', 'flag': 'FLAG_TeamFlag123'}
+        ]
+        self.team_competition.save()
+        
+        # Отправляем флаг как ответ
+        response = self._post_answers({str(task.id): 'FLAG_TeamFlag123'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+        self.assertEqual(data['results'][str(task.id)]['message'], 'Верно!')
+        self._assert_answer_exists(task, should_exist=True)
+    
+    def test_team_flag_case_insensitive(self):
+        """
+        Тест: Проверка флага регистронезависимо для команды
+        """
+        task = self._create_task('team_task_1', question='What is the answer?', answer='42')
+        self._add_tasks_to_team(task)
+        
+        self.team_competition.generated_flags = [
+            {'task_id': 'team_task_1', 'flag': 'FLAG_TeamFlag123'}
+        ]
+        self.team_competition.save()
+        
+        # Отправляем флаг в другом регистре
+        response = self._post_answers({str(task.id): 'flag_teamflag123'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+        self._assert_answer_exists(task, should_exist=True)
+    
+    def test_team_flag_only_for_correct_task(self):
+        """
+        Тест: Флаг засчитывается только для соответствующего задания в команде
+        """
+        task1 = self._create_task('team_task_1', question='Q1?', answer='A1')
+        task2 = self._create_task('team_task_2', question='Q2?', answer='A2')
+        self._add_tasks_to_team(task1, task2)
+        
+        # Устанавливаем флаг только для task_1
+        self.team_competition.generated_flags = [
+            {'task_id': 'team_task_1', 'flag': 'FLAG_FlagForTask1'}
+        ]
+        self.team_competition.save()
+        
+        # Пытаемся использовать флаг task_1 для task_2
+        response = self._post_answers({
+            str(task1.id): 'FLAG_FlagForTask1',  # Правильно
+            str(task2.id): 'FLAG_FlagForTask1'   # Неправильно
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task1.id)]['status'], 'correct')
+        self.assertEqual(data['results'][str(task2.id)]['status'], 'incorrect')
+    
+    def test_team_regular_answer_has_priority(self):
+        """
+        Тест: Обычный ответ проверяется первым, флаг - только если обычный не подошел (команда)
+        """
+        task = self._create_task('team_task_1', question='What is 2+2?', answer='4')
+        self._add_tasks_to_team(task)
+        
+        self.team_competition.generated_flags = [
+            {'task_id': 'team_task_1', 'flag': 'FLAG_TeamFlag123'}
+        ]
+        self.team_competition.save()
+        
+        # Отправляем правильный обычный ответ
+        response = self._post_answers({str(task.id): '4'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+        self._assert_answer_exists(task, should_exist=True)
+    
+    def test_team_multiple_flags(self):
+        """
+        Тест: Несколько заданий с разными флагами для команды
+        """
+        task1 = self._create_task('team_task_1', question='Q1?', answer='A1')
+        task2 = self._create_task('team_task_2', question='Q2?', answer='A2')
+        task3 = self._create_task('team_task_3', question='Q3?', answer='A3')
+        self._add_tasks_to_team(task1, task2, task3)
+        
+        self.team_competition.generated_flags = [
+            {'task_id': 'team_task_1', 'flag': 'FLAG_Flag1'},
+            {'task_id': 'team_task_2', 'flag': 'FLAG_Flag2'},
+            {'task_id': 'team_task_3', 'flag': 'FLAG_Flag3'}
+        ]
+        self.team_competition.save()
+        
+        # Отправляем правильные флаги для всех заданий
+        response = self._post_answers({
+            str(task1.id): 'FLAG_Flag1',
+            str(task2.id): 'FLAG_Flag2',
+            str(task3.id): 'FLAG_Flag3'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task1.id)]['status'], 'correct')
+        self.assertEqual(data['results'][str(task2.id)]['status'], 'correct')
+        self.assertEqual(data['results'][str(task3.id)]['status'], 'correct')
+        
+        # Проверяем, что все ответы сохранены
+        self.assertEqual(Answers.objects.filter(team=self.team, lab=self.lab).count(), 3)
 

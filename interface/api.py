@@ -14,7 +14,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from django.core.cache import cache
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
@@ -1238,6 +1238,18 @@ def check_task_answers(request):
         # Результаты проверки
         results = {}
         
+        # Извлекаем флаги из generated_flags
+        flags_dict = {}
+        if issue.generated_flags:
+            if isinstance(issue.generated_flags, dict):
+                flags_dict = issue.generated_flags
+            elif isinstance(issue.generated_flags, list):
+                flags_dict = {
+                    item.get('task_id'): item.get('flag')
+                    for item in issue.generated_flags
+                    if isinstance(item, dict) and item.get('task_id') and item.get('flag')
+                }
+        
         for task in tasks:
             task_id = str(task.id)
             
@@ -1256,20 +1268,30 @@ def check_task_answers(request):
                 }
                 continue
             
-            # Проверяем ответ
+            # Получаем флаг для этого задания (если есть)
+            task_flag = flags_dict.get(task.task_id) if task.task_id else None
+            
+            # Проверяем ответ: сначала обычный ответ, затем флаг
             correct_answer = task.answer.strip() if task.answer else ''
-
-            try:
-                is_correct = bool(re.fullmatch(correct_answer, user_answer, re.IGNORECASE))
-            except re.error:
-                is_correct = user_answer.lower() == correct_answer.lower()
+            is_correct = False
+            
+            # Проверяем обычный ответ
+            if correct_answer:
+                try:
+                    is_correct = bool(re.fullmatch(correct_answer, user_answer, re.IGNORECASE))
+                except re.error:
+                    is_correct = user_answer.lower() == correct_answer.lower()
+            
+            # Если обычный ответ не подошел, проверяем флаг
+            if not is_correct and task_flag:
+                is_correct = user_answer.strip().lower() == task_flag.strip().lower()
             
             results[task_id] = {
                 'status': 'correct' if is_correct else 'incorrect',
                 'message': 'Верно!' if is_correct else 'Неверно'
             }
             
-            # Если ответ правильный, создаем объект Answers]
+            # Если ответ правильный, создаем объект Answers
             answer_filters = {'team':issue.team} if is_team_competition else {'user':request.user} 
             if is_correct:
                 Answers.objects.get_or_create(
@@ -1347,6 +1369,8 @@ def get_user_tasks_status(request):
             'has_questions': has_questions
         })
         
+    except Http404:
+        return JsonResponse({'error': 'Competition not found'}, status=404)
     except Exception as e:
         logger = logging.getLogger(__name__)
         logger.error(f'Error getting user tasks status: {str(e)}')

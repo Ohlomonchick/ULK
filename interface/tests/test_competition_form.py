@@ -1,6 +1,6 @@
 from django.test import TransactionTestCase
 from django.utils import timezone
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from datetime import timedelta
 
 from interface.forms import CompetitionForm
@@ -20,6 +20,7 @@ class CompetitionFormTest(TransactionTestCase):
         cls.patcher_logout = patch("interface.pnet_session_manager.PNetSessionManager.logout")
         cls.patcher_delete_lab = patch("interface.pnet_session_manager.PNetSessionManager.delete_lab_for_user")
         cls.patcher_elastic_client = patch("interface.elastic_utils.get_elastic_client", return_value=None)
+        cls.patcher_flag_queue = patch("interface.models.get_flag_deployment_queue")
         
         cls.mock_login = cls.patcher_login.start()
         cls.mock_create_lab = cls.patcher_create_lab.start()
@@ -27,6 +28,11 @@ class CompetitionFormTest(TransactionTestCase):
         cls.mock_logout = cls.patcher_logout.start()
         cls.mock_delete_lab = cls.patcher_delete_lab.start()
         cls.mock_elastic_client = cls.patcher_elastic_client.start()
+        
+        # Mock flag deployment queue
+        cls.mock_queue = MagicMock()
+        cls.mock_flag_queue = cls.patcher_flag_queue.start()
+        cls.mock_flag_queue.return_value = cls.mock_queue
 
     @classmethod
     def tearDownClass(cls):
@@ -38,6 +44,7 @@ class CompetitionFormTest(TransactionTestCase):
         cls.patcher_logout.stop()
         cls.patcher_delete_lab.stop()
         cls.patcher_elastic_client.stop()
+        cls.patcher_flag_queue.stop()
 
     def setUp(self):
         self.mock_login.reset_mock()
@@ -46,6 +53,8 @@ class CompetitionFormTest(TransactionTestCase):
         self.mock_logout.reset_mock()
         self.mock_delete_lab.reset_mock()
         self.mock_elastic_client.reset_mock()
+        self.mock_queue.reset_mock()
+        
         # Create a Lab that uses "PN" platform to trigger external calls
         self.lab = Lab.objects.create(
             name="PN Lab",
@@ -76,7 +85,9 @@ class CompetitionFormTest(TransactionTestCase):
                 first_name=f"Platoon_{i}",
                 last_name="User",
                 password="testpass",
-                platoon=self.platoon
+                platoon=self.platoon,
+                pnet_login=f"pnet_user_platoon_{i}",
+                pnet_password="pnetpass123"
             )
             self.users_in_platoon.append(user)
 
@@ -88,7 +99,9 @@ class CompetitionFormTest(TransactionTestCase):
                 first_name=f"NoPlatoon_{i}",
                 last_name="User",
                 password="testpass",
-                platoon=None
+                platoon=None,
+                pnet_login=f"pnet_user_nop_{i}",
+                pnet_password="pnetpass123"
             )
             self.non_platoon_users.append(user)
 
@@ -171,6 +184,89 @@ class CompetitionFormTest(TransactionTestCase):
                 f"IssuedLabs with pk={pk} should have been deleted after competition deletion."
             )
 
+    def test_flag_generation_on_task_assignment(self):
+        """
+        Проверяет, что при назначении задач:
+        1) Генерируются флаги и сохраняются в Competition2User.generated_flags
+        2) Создается задача развертывания флагов и отправляется в очередь
+        """
+        # Создаем лабораторию с нодами для развертывания флагов
+        from interface.models import LabNode
+        LabNode.objects.create(
+            lab=self.lab,
+            node_name="test_node",
+            login="admin",
+            password="admin123"
+        )
+        
+        form = CompetitionForm(data=self.form_data)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+        
+        competition = form.save()
+        
+        # Проверяем, что для каждого Competition2User сгенерированы флаги
+        for comp2user in competition.competition_users.all():
+            # Проверяем, что задачи назначены
+            self.assertTrue(
+                comp2user.tasks.exists(),
+                f"Tasks should be assigned to Competition2User for user {comp2user.user.username}"
+            )
+            
+            # Проверяем, что флаги сгенерированы
+            self.assertIsNotNone(
+                comp2user.generated_flags,
+                f"Generated flags should be set for user {comp2user.user.username}"
+            )
+            
+            # Проверяем формат флагов (должен быть список или словарь)
+            self.assertIsInstance(
+                comp2user.generated_flags,
+                (list, dict),
+                f"Generated flags should be list or dict for user {comp2user.user.username}"
+            )
+            
+            # Если это список, проверяем структуру
+            if isinstance(comp2user.generated_flags, list):
+                for flag_item in comp2user.generated_flags:
+                    self.assertIn('task_id', flag_item, "Flag item should have task_id")
+                    self.assertIn('flag', flag_item, "Flag item should have flag")
+                    self.assertTrue(
+                        flag_item['flag'].startswith('FLAG_'),
+                        f"Flag should start with 'FLAG_': {flag_item['flag']}"
+                    )
+            
+            # Проверяем, что количество флагов соответствует количеству задач
+            assigned_tasks = comp2user.tasks.all()
+            if isinstance(comp2user.generated_flags, list):
+                self.assertEqual(
+                    len(comp2user.generated_flags),
+                    assigned_tasks.count(),
+                    f"Number of flags should match number of tasks for user {comp2user.user.username}"
+                )
+        
+        # Проверяем, что очередь развертывания флагов была вызвана
+        # (для каждого Competition2User с задачами должна быть создана задача)
+        comp2users_with_tasks = [
+            comp2user for comp2user in competition.competition_users.all()
+            if comp2user.tasks.exists() and comp2user.user.pnet_login and comp2user.user.pnet_password
+        ]
+        
+        # Проверяем, что submit_task был вызван (если есть ноды в лаборатории)
+        if self.lab.nodes.exists() and comp2users_with_tasks:
+            self.assertGreaterEqual(
+                self.mock_queue.submit_task.call_count,
+                1,
+                f"Flag deployment task should be submitted for {len(comp2users_with_tasks)} Competition2User records with tasks and pnet credentials"
+            )
+            
+            # Проверяем, что каждая задача была отправлена с правильными параметрами
+            submitted_tasks = self.mock_queue.submit_task.call_args_list
+            self.assertEqual(
+                len(submitted_tasks),
+                len(comp2users_with_tasks),
+                f"Expected {len(comp2users_with_tasks)} flag deployment tasks to be submitted"
+            )
+
     def test_competition_form_update(self):
         """
         1) Create a Competition with an initial set of users & platoons (form create).
@@ -202,7 +298,9 @@ class CompetitionFormTest(TransactionTestCase):
             username="user_nop_2",
             password="testpass",
             first_name="NoPlatoon_2",
-            last_name="User"
+            last_name="User",
+            pnet_login="pnet_user_nop_2",
+            pnet_password="pnetpass123"
         )
 
         # Also let's remove user_platoon_0 from the competition by changing that user's platoon

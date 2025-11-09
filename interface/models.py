@@ -1,26 +1,31 @@
+import logging
 from datetime import timedelta
 from hashlib import md5
-import logging
 
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models import Q
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, m2m_changed
+from django.utils import timezone
 from django_summernote.models import AbstractAttachment
 from django_summernote.utils import get_attachment_upload_to, get_attachment_storage
-from django.contrib.auth.models import AbstractUser
-from django.core.validators import FileExtensionValidator
-
-from slugify import slugify
 from rest_framework import serializers
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from django.conf import settings
-from interface.eveFunctions import pf_login, logout, create_directory, get_user_workspace_relative_path
+from slugify import slugify
+
 from interface.config import get_pnet_url, get_pnet_base_dir
+from interface.eveFunctions import pf_login, logout, create_directory, get_user_workspace_relative_path
+from interface.flag_deployment import (
+    generate_and_save_flags,
+    get_flag_deployment_queue,
+    create_flag_deployment_task
+)
 from interface.utils import get_pnet_lab_name
-from .validators import validate_top_level_array, validate_lab_task_json_config
-from .pnet_session_manager import ensure_admin_pnet_session, execute_pnet_operation_if_needed
 from .elastic_utils import delete_elastic_user
+from .pnet_session_manager import ensure_admin_pnet_session, execute_pnet_operation_if_needed
+from .validators import validate_top_level_array, validate_lab_task_json_config
 logger = logging.getLogger(__name__)
 
 
@@ -406,6 +411,13 @@ class Competition2User(models.Model):
         blank=True,
         verbose_name="Задания"
     )
+    generated_flags = models.JSONField(
+        "Сгенерированные флаги",
+        blank=True,
+        null=True,
+        default=list,
+        validators=[validate_top_level_array]
+    )
 
     deleted = models.BooleanField(default=False)
 
@@ -437,10 +449,40 @@ class Competition2User(models.Model):
         lab = instance.competition.lab
 
         def _create_operation(session_manager):
-            session_manager.create_lab_for_user(get_pnet_lab_name(instance.competition), instance.user.username)
-            session_manager.create_lab_nodes_and_connectors(lab, get_pnet_lab_name(instance.competition), instance.user.username)
+            lab_name = get_pnet_lab_name(instance.competition)
+            username = instance.user.username
+            
+            session_manager.create_lab_for_user(lab_name, username)
+            session_manager.create_lab_nodes_and_connectors(lab, lab_name, username)
 
         execute_pnet_operation_if_needed(lab, _create_operation)
+    
+    @classmethod
+    def tasks_changed(cls, sender, instance, action, pk_set, **kwargs):
+        """Обработчик сигнала m2m_changed для отслеживания назначения задач"""
+        if action != 'post_add' or not pk_set:
+            return
+        
+        tasks = instance.tasks.all()
+        if not tasks.exists():
+            return
+        
+        user = instance.user
+        if not user.pnet_login or not user.pnet_password:
+            return
+        
+        generate_and_save_flags(instance, tasks)
+        
+        task = create_flag_deployment_task(
+            instance=instance,
+            user=user,
+            lab=instance.competition.lab,
+            competition_slug=instance.competition.slug,
+            instance_type='Competition2User'
+        )
+        
+        if task:
+            get_flag_deployment_queue().submit_task(task)
 
 
 class TeamCompetition(Competition):
@@ -472,6 +514,13 @@ class TeamCompetition2Team(models.Model):
         blank=True,
         verbose_name="Задания"
     )
+    generated_flags = models.JSONField(
+        "Сгенерированные флаги",
+        blank=True,
+        null=True,
+        default=list,
+        validators=[validate_top_level_array]
+    )
     deleted = models.BooleanField(default=False)
 
     def __str__(self):
@@ -484,11 +533,14 @@ class TeamCompetition2Team(models.Model):
         lab = instance.competition.lab
 
         def _create_operation(session_manager):
-            session_manager.create_lab_for_user(get_pnet_lab_name(instance.competition), instance.team.slug)
-            session_manager.create_lab_nodes_and_connectors(lab, get_pnet_lab_name(instance.competition), instance.team.slug)
+            lab_name = get_pnet_lab_name(instance.competition)
+            team_slug = instance.team.slug
+            
+            session_manager.create_lab_for_user(lab_name, team_slug)
+            session_manager.create_lab_nodes_and_connectors(lab, lab_name, team_slug)
 
-            relative_path = f'{get_user_workspace_relative_path()}/{instance.team.slug}'
-            logger.debug(f'competition created for team {instance.team.slug}')
+            relative_path = f'{get_user_workspace_relative_path()}/{team_slug}'
+            logger.debug(f'competition created for team {team_slug}')
             for user in instance.team.users.all():
                 logger.debug(f'change workspace for {user.pnet_login} to {relative_path}')
                 session_manager.change_user_workspace(
@@ -496,6 +548,33 @@ class TeamCompetition2Team(models.Model):
                 )
 
         execute_pnet_operation_if_needed(lab, _create_operation)
+    
+    @classmethod
+    def tasks_changed(cls, sender, instance, action, pk_set, **kwargs):
+        """Обработчик сигнала m2m_changed для отслеживания назначения задач"""
+        if action != 'post_add' or not pk_set:
+            return
+        
+        tasks = instance.tasks.all()
+        if not tasks.exists():
+            return
+        
+        user = instance.team.users.first()
+        if not user or not user.pnet_login or not user.pnet_password:
+            return
+        
+        generate_and_save_flags(instance, tasks)
+        
+        task = create_flag_deployment_task(
+            instance=instance,
+            user=user,
+            lab=instance.competition.lab,
+            competition_slug=instance.competition.slug,
+            instance_type='TeamCompetition2Team'
+        )
+        
+        if task:
+            get_flag_deployment_queue().submit_task(task)
 
     def delete_from_platform(self, final=False):
         if self.deleted and not final:
@@ -521,9 +600,20 @@ class TeamCompetition2Team(models.Model):
 
 
 
+class LabNode(models.Model):
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='nodes')
+    node_name = models.CharField(max_length=255, verbose_name="Имя Ноды")
+    login = models.CharField(max_length=255, verbose_name="Логин")
+    password = models.CharField(max_length=255, verbose_name="Пароль")
+
+    class Meta:
+        verbose_name = "Нода для SSH флагов"
+        verbose_name_plural = "Ноды для SSH флагов"
 
 
 post_save.connect(Competition2User.post_create, sender=Competition2User)
 post_save.connect(TeamCompetition2Team.post_create, sender=TeamCompetition2Team)
+m2m_changed.connect(Competition2User.tasks_changed, sender=Competition2User.tasks.through)
+m2m_changed.connect(TeamCompetition2Team.tasks_changed, sender=TeamCompetition2Team.tasks.through)
 post_delete.connect(TeamCompetition2Team.on_through_delete, sender=TeamCompetition2Team)
 post_delete.connect(User.delete_from_elasticsearch, sender=User)

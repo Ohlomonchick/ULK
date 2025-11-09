@@ -1,6 +1,6 @@
 from django.test import TransactionTestCase
 from django.utils import timezone
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from datetime import timedelta
 
 from interface.forms import TeamCompetitionForm
@@ -23,6 +23,7 @@ class TeamCompetitionFormTest(TransactionTestCase):
         cls.patcher_change_workspace = patch("interface.pnet_session_manager.PNetSessionManager.change_user_workspace")
         cls.patcher_delete_lab_team = patch("interface.pnet_session_manager.PNetSessionManager.delete_lab_for_team")
         cls.patcher_elastic_client = patch("interface.elastic_utils.get_elastic_client", return_value=None)
+        cls.patcher_flag_queue = patch("interface.models.get_flag_deployment_queue")
         
         cls.mock_login = cls.patcher_login.start()
         cls.mock_create_lab = cls.patcher_create_lab.start()
@@ -32,6 +33,11 @@ class TeamCompetitionFormTest(TransactionTestCase):
         cls.mock_change_workspace = cls.patcher_change_workspace.start()
         cls.mock_delete_lab_team = cls.patcher_delete_lab_team.start()
         cls.mock_elastic_client = cls.patcher_elastic_client.start()
+        
+        # Mock flag deployment queue
+        cls.mock_queue = MagicMock()
+        cls.mock_flag_queue = cls.patcher_flag_queue.start()
+        cls.mock_flag_queue.return_value = cls.mock_queue
 
     @classmethod
     def tearDownClass(cls):
@@ -45,6 +51,7 @@ class TeamCompetitionFormTest(TransactionTestCase):
         cls.patcher_change_workspace.stop()
         cls.patcher_delete_lab_team.stop()
         cls.patcher_elastic_client.stop()
+        cls.patcher_flag_queue.stop()
 
     def setUp(self):
         self.mock_login.reset_mock()
@@ -55,6 +62,7 @@ class TeamCompetitionFormTest(TransactionTestCase):
         self.mock_change_workspace.reset_mock()
         self.mock_delete_lab_team.reset_mock()
         self.mock_elastic_client.reset_mock()
+        self.mock_queue.reset_mock()
         self.lab = Lab.objects.create(
             name="PN Lab Competition",
             platform="PN",
@@ -104,7 +112,9 @@ class TeamCompetitionFormTest(TransactionTestCase):
                 username=f"team1_user_{i}",
                 first_name=f"Team1_{i}",
                 last_name="User",
-                password="testpass"
+                password="testpass",
+                pnet_login=f"pnet_team1_user_{i}",
+                pnet_password="pnetpass123"
             )
             team1_members.append(user)
         self.team1.users.set(team1_members)
@@ -115,7 +125,9 @@ class TeamCompetitionFormTest(TransactionTestCase):
                 username=f"team2_user_{i}",
                 first_name=f"Team2_{i}",
                 last_name="User",
-                password="testpass"
+                password="testpass",
+                pnet_login=f"pnet_team2_user_{i}",
+                pnet_password="pnetpass123"
             )
             team2_members.append(user)
         self.team2.users.set(team2_members)
@@ -222,7 +234,9 @@ class TeamCompetitionFormTest(TransactionTestCase):
         for i in range(2):
             user = User.objects.create_user(
                 username=f"team3_user_{i}",
-                password="testpass"
+                password="testpass",
+                pnet_login=f"pnet_team3_user_{i}",
+                pnet_password="pnetpass123"
             )
             team3_members.append(user)
         team3.users.set(team3_members)
@@ -330,5 +344,88 @@ class TeamCompetitionFormTest(TransactionTestCase):
                 assigned_task_ids,
                 lab_task_ids,
                 f"Team {team.name} should have all lab tasks when none specified"
+            )
+
+    def test_flag_generation_on_team_task_assignment(self):
+        """
+        Проверяет, что при назначении задач командам:
+        1) Генерируются флаги и сохраняются в TeamCompetition2Team.generated_flags
+        2) Создается задача развертывания флагов и отправляется в очередь
+        """
+        # Создаем лабораторию с нодами для развертывания флагов
+        from interface.models import LabNode
+        LabNode.objects.create(
+            lab=self.lab,
+            node_name="test_node",
+            login="admin",
+            password="admin123"
+        )
+        
+        form = TeamCompetitionForm(data=self.form_data)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+        
+        competition = form.save()
+        
+        # Проверяем, что для каждого TeamCompetition2Team сгенерированы флаги
+        for team_comp in TeamCompetition2Team.objects.filter(competition=competition):
+            # Проверяем, что задачи назначены
+            self.assertTrue(
+                team_comp.tasks.exists(),
+                f"Tasks should be assigned to TeamCompetition2Team for team {team_comp.team.name}"
+            )
+            
+            # Проверяем, что флаги сгенерированы
+            self.assertIsNotNone(
+                team_comp.generated_flags,
+                f"Generated flags should be set for team {team_comp.team.name}"
+            )
+            
+            # Проверяем формат флагов (должен быть список или словарь)
+            self.assertIsInstance(
+                team_comp.generated_flags,
+                (list, dict),
+                f"Generated flags should be list or dict for team {team_comp.team.name}"
+            )
+            
+            # Если это список, проверяем структуру
+            if isinstance(team_comp.generated_flags, list):
+                for flag_item in team_comp.generated_flags:
+                    self.assertIn('task_id', flag_item, "Flag item should have task_id")
+                    self.assertIn('flag', flag_item, "Flag item should have flag")
+                    self.assertTrue(
+                        flag_item['flag'].startswith('FLAG_'),
+                        f"Flag should start with 'FLAG_': {flag_item['flag']}"
+                    )
+            
+            # Проверяем, что количество флагов соответствует количеству задач
+            assigned_tasks = team_comp.tasks.all()
+            if isinstance(team_comp.generated_flags, list):
+                self.assertEqual(
+                    len(team_comp.generated_flags),
+                    assigned_tasks.count(),
+                    f"Number of flags should match number of tasks for team {team_comp.team.name}"
+                )
+        
+        # Проверяем, что очередь развертывания флагов была вызвана
+        # (для каждого TeamCompetition2Team с задачами должна быть создана задача)
+        team_comps_with_tasks = [
+            tc for tc in TeamCompetition2Team.objects.filter(competition=competition)
+            if tc.tasks.exists() and tc.team.users.exists() and tc.team.users.first().pnet_login and tc.team.users.first().pnet_password
+        ]
+        
+        # Проверяем, что submit_task был вызван (если есть ноды в лаборатории)
+        if self.lab.nodes.exists() and team_comps_with_tasks:
+            self.assertGreaterEqual(
+                self.mock_queue.submit_task.call_count,
+                1,
+                f"Flag deployment task should be submitted for {len(team_comps_with_tasks)} TeamCompetition2Team records with tasks and pnet credentials"
+            )
+            
+            # Проверяем, что каждая задача была отправлена с правильными параметрами
+            submitted_tasks = self.mock_queue.submit_task.call_args_list
+            self.assertEqual(
+                len(submitted_tasks),
+                len(team_comps_with_tasks),
+                f"Expected {len(team_comps_with_tasks)} flag deployment tasks to be submitted"
             )
 

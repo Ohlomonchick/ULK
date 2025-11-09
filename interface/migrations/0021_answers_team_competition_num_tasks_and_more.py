@@ -5,6 +5,52 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def column_exists(cursor, db_table, column_name, vendor):
+    """Проверяет существование колонки в зависимости от типа БД."""
+    if vendor == 'postgresql':
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name=%s AND column_name=%s
+        """, [db_table, column_name])
+        return cursor.fetchone() is not None
+    elif vendor == 'sqlite':
+        cursor.execute(f"PRAGMA table_info([{db_table}])")
+        columns = [row[1] for row in cursor.fetchall()]
+        return column_name in columns
+    return False
+
+
+def add_num_tasks_if_not_exists(apps, schema_editor):
+    """Добавляет поле num_tasks только если оно еще не существует."""
+    db_table = 'interface_competition'
+    column_name = 'num_tasks'
+    vendor = schema_editor.connection.vendor
+    quoted_table = schema_editor.connection.ops.quote_name(db_table)
+    
+    with schema_editor.connection.cursor() as cursor:
+        if not column_exists(cursor, db_table, column_name, vendor):
+            cursor.execute(f"""
+                ALTER TABLE {quoted_table} 
+                ADD COLUMN num_tasks INTEGER NOT NULL DEFAULT 1
+            """)
+
+
+def remove_num_tasks_if_exists(apps, schema_editor):
+    """Удаляет поле num_tasks если оно существует."""
+    db_table = 'interface_competition'
+    column_name = 'num_tasks'
+    vendor = schema_editor.connection.vendor
+    quoted_table = schema_editor.connection.ops.quote_name(db_table)
+    
+    with schema_editor.connection.cursor() as cursor:
+        if column_exists(cursor, db_table, column_name, vendor):
+            try:
+                cursor.execute(f"ALTER TABLE {quoted_table} DROP COLUMN num_tasks")
+            except Exception:
+                pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -12,10 +58,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='competition',
-            name='num_tasks',
-            field=models.PositiveIntegerField(default=1, verbose_name='Количество заданий для распределения'),
+        migrations.RunPython(
+            add_num_tasks_if_not_exists,
+            remove_num_tasks_if_exists,
         ),
         migrations.AlterField(
             model_name='answers',

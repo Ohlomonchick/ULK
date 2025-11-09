@@ -2,32 +2,50 @@
 
 import django.db.models.deletion
 from django.conf import settings
-from django.db import migrations, models, connection
+from django.db import migrations, models
 
 
 def add_primary_key_constraint(apps, schema_editor):
     """
-    Add PRIMARY KEY constraint to interface_lab table
+    Add PRIMARY KEY constraint to interface_lab table if it doesn't exist
     """
-    if connection.vendor == 'postgresql':
-        with connection.cursor() as cursor:
-            cursor.execute("ALTER TABLE interface_lab ADD CONSTRAINT interface_lab_pkey PRIMARY KEY (id);")
-    elif connection.vendor == 'sqlite':
-        # SQLite doesn't support adding PRIMARY KEY to existing table
-        # We'll create a unique index instead
-        with connection.cursor() as cursor:
-            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS interface_lab_pkey ON interface_lab(id);")
+    vendor = schema_editor.connection.vendor
+    db_table = 'interface_lab'
+    quoted_table = schema_editor.connection.ops.quote_name(db_table)
+    
+    with schema_editor.connection.cursor() as cursor:
+        if vendor == 'postgresql':
+            # Проверяем, есть ли уже первичный ключ
+            cursor.execute("""
+                SELECT constraint_name 
+                FROM information_schema.table_constraints 
+                WHERE table_name = %s 
+                AND constraint_type = 'PRIMARY KEY'
+            """, [db_table])
+            
+            if not cursor.fetchone():
+                cursor.execute(f"ALTER TABLE {quoted_table} ADD CONSTRAINT interface_lab_pkey PRIMARY KEY (id);")
+        elif vendor == 'sqlite':
+            # SQLite doesn't support adding PRIMARY KEY to existing table
+            # We'll create a unique index instead
+            cursor.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS interface_lab_pkey ON {quoted_table}(id);")
 
 
 def remove_primary_key_constraint(apps, schema_editor):
     """
     Remove PRIMARY KEY constraint from interface_lab table
     """
-    if connection.vendor == 'postgresql':
-        with connection.cursor() as cursor:
-            cursor.execute("ALTER TABLE interface_lab DROP CONSTRAINT interface_lab_pkey;")
-    elif connection.vendor == 'sqlite':
-        with connection.cursor() as cursor:
+    vendor = schema_editor.connection.vendor
+    db_table = 'interface_lab'
+    quoted_table = schema_editor.connection.ops.quote_name(db_table)
+    
+    with schema_editor.connection.cursor() as cursor:
+        if vendor == 'postgresql':
+            try:
+                cursor.execute(f"ALTER TABLE {quoted_table} DROP CONSTRAINT IF EXISTS interface_lab_pkey;")
+            except Exception:
+                pass
+        elif vendor == 'sqlite':
             cursor.execute("DROP INDEX IF EXISTS interface_lab_pkey;")
 
 

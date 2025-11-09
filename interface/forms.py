@@ -207,7 +207,42 @@ class CompetitionForm(forms.ModelForm):
         instance.save()
 
         self.handle_competition_users(instance)
+        
+        # Ожидаем завершения задач развертывания флагов
+        self._wait_for_flag_deployment(instance)
+        
         return instance
+    
+    def _wait_for_flag_deployment(self, instance, timeout: float = 60.0):
+        """
+        Ожидает завершения задач развертывания флагов для соревнования.
+        Если есть ошибки, добавляет их в форму.
+        """
+        from interface.flag_deployment import get_flag_deployment_queue, TaskStatus
+        
+        queue = get_flag_deployment_queue()
+        tasks = queue.get_tasks_by_competition(instance.slug)
+        
+        if not tasks:
+            return
+        
+        task_ids = [task.task_id for task in tasks]
+        results = queue.wait_for_tasks(task_ids, timeout=timeout)
+        
+        failed_tasks = [
+            task for task in results.values()
+            if task.status == TaskStatus.FAILED
+        ]
+        
+        if failed_tasks:
+            error_messages = [
+                f"Ошибка развертывания флагов для {task.instance_type} (ID: {task.instance_id}): {task.error}"
+                for task in failed_tasks
+            ]
+            error_message = "; ".join(error_messages)
+            raise ValidationError(
+                f"Не удалось развернуть флаги для некоторых участников: {error_message}"
+            )
 
     def get_all_users(self, instance):
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
@@ -443,6 +478,9 @@ class TeamCompetitionForm(CompetitionForm):
                     team_record.delete()
 
         with_pnet_session_if_needed(instance.lab, _delete_teams_operation)
+        
+        # Ожидаем завершения задач развертывания флагов (наследуется от CompetitionForm)
+        # Метод _wait_for_flag_deployment уже вызывается в super().save()
 
         return instance
 
