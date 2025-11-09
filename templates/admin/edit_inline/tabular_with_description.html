@@ -11,11 +11,31 @@
      <h2>{{ inline_admin_formset.opts.verbose_name_plural|capfirst }}</h2>
    {% endif %}
    {% if inline_admin_formset.opts.description %}
-   <div class="inline-description" style="margin: 12px 0; padding: 12px 16px; background-color: #e8f4f8; border-left: 4px solid #417690; border-radius: 4px; color: #333; line-height: 1.5;">
-       <p style="margin: 0; font-size: 14px;">
-           <strong style="color: #417690;">Описание:</strong> {{ inline_admin_formset.opts.description }}
-       </p>
+   <div class="inline-description-wrapper" style="margin: 12px 0;">
+       <button type="button" class="inline-description-toggle" style="background-color: #417690; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+           <span class="toggle-icon" style="display: inline-block; transition: transform 0.2s;">▼</span>
+           <span>Показать документацию</span>
+       </button>
+       <div class="inline-description-content" style="display: none; margin-top: 8px; padding: 16px; background-color: #e8f4f8; border-left: 4px solid #417690; border-radius: 4px; color: #333; line-height: 1.6; font-size: 14px;">
+           {{ inline_admin_formset.opts.description|safe }}
+       </div>
    </div>
+   <script>
+   (function() {
+       var wrapper = document.currentScript.previousElementSibling;
+       var toggle = wrapper.querySelector('.inline-description-toggle');
+       var content = wrapper.querySelector('.inline-description-content');
+       var icon = wrapper.querySelector('.toggle-icon');
+       var isOpen = false;
+       
+       toggle.addEventListener('click', function() {
+           isOpen = !isOpen;
+           content.style.display = isOpen ? 'block' : 'none';
+           icon.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+           toggle.querySelector('span:last-child').textContent = isOpen ? 'Скрыть документацию' : 'Показать документацию';
+       });
+   })();
+   </script>
    {% endif %}
    {{ inline_admin_formset.formset.non_form_errors }}
    <table>

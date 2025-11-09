@@ -19,6 +19,7 @@ from .forms import (
     LabForm,
     MyAttachmentAdminForm,
 )
+from .admin_descriptions import LAB_NODE_DESCRIPTION, get_lab_task_description
 from django.db.models import DurationField, JSONField
 from django.db import transaction
 from django_apscheduler.admin import DjangoJob, DjangoJobExecution
@@ -50,7 +51,7 @@ class LabLevelInline(admin.TabularInline):
     fields = ["level_number", "description"]
 
 
-class LabTaskInline(admin.TabularInline):
+class LabTaskInline(TabularInlineWithDescription):
     model = LabTask
     extra = 1
     fields = ['task_id', 'description']  # Базовые поля по умолчанию
@@ -99,10 +100,25 @@ class LabTaskInline(admin.TabularInline):
 
         return base_fields
 
+    def get_description(self):
+        """Возвращает описание в зависимости от типа заданий родительской Lab"""
+        parent_lab = None
+        if hasattr(self, 'parent_instance'):
+            parent_lab = self.parent_instance
+        
+        if parent_lab:
+            tasks_type = parent_lab.tasks_type
+            return get_lab_task_description(tasks_type)
+        
+        # По умолчанию возвращаем описание для CLASSIC
+        return get_lab_task_description('CLASSIC')
+
     def get_formset(self, request, obj=None, **kwargs):
-        """Сохраняет ссылку на родительский объект"""
+        """Сохраняет ссылку на родительский объект и устанавливает описание"""
         if obj:
             self.parent_instance = obj
+        # Устанавливаем описание динамически (даже если obj=None, будет использовано значение по умолчанию)
+        self.description = self.get_description()
         return super().get_formset(request, obj, **kwargs)
 
 
@@ -110,7 +126,7 @@ class LabNodeInline(TabularInlineWithDescription):
     model = LabNode
     extra = 1
     fields = ['node_name', 'login', 'password']
-    description = "Здесь можно настроить SSH-ноды для флагов. Укажите имя ноды, логин и пароль для подключения."
+    description = LAB_NODE_DESCRIPTION
 
 
 class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
@@ -174,6 +190,9 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
         for inline, formset in super().get_formsets_with_inlines(request, obj):
             if obj and hasattr(inline, 'parent_instance'):
                 inline.parent_instance = obj
+                # Устанавливаем описание для inline с описанием
+                if isinstance(inline, TabularInlineWithDescription):
+                    inline.description = inline.get_description()
             yield inline, formset
 
 
