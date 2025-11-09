@@ -315,6 +315,19 @@ def destroy_session(url, lab_session_id, cookie):
     logger.debug(r)
 
 
+def leave_session(url, lab_session_id, cookie):
+    """Покидает сессию лаборатории без уничтожения (wipe) и выключения нод"""
+    lab_session_id = '{"lab_session":"' + str(lab_session_id) + '"}'
+    r = requests.post(
+        url + '/api/labs/session/factory/leave',
+        data=lab_session_id,
+        headers={'content-type': 'application/json'},
+        cookies=cookie, verify=False,
+        timeout=4
+    )
+    logger.debug(r)
+
+
 def create_network(url, net_params, cookie):
     try:
         r = requests.post(
@@ -363,7 +376,21 @@ def delete_lab(url, cookie, lab_path):
     return r
 
 
-def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username):
+def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username, post_nodes_callback=None):
+    """
+    Создание узлов и коннекторов лаборатории.
+    
+    Args:
+        url: URL PNET сервера
+        lab_object: Объект Lab
+        lab_path: Путь к лаборатории
+        lab_name: Имя лаборатории
+        cookie: Cookie для аутентификации
+        xsrf: XSRF токен
+        username: Имя пользователя
+        post_nodes_callback: Callback функция, вызываемая после создания нод, но до destroy_session.
+                           Принимает (url, cookie, xsrf, sess_id) и должна вернуть данные для дальнейшей обработки
+    """
     username = slugify(username)
     lab_path += "/" + username
 
@@ -420,7 +447,20 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
         if cloudConnector:
             create_p2p_nat(url, cloudConnector, cookie)
 
+    callback_result = None
+    if post_nodes_callback:
+        logger.info(f"Calling post_nodes_callback for {username}")
+        try:
+            callback_result = post_nodes_callback(url, cookie, xsrf, sess_id)
+            logger.info(f"post_nodes_callback completed for {username}")
+        except Exception as e:
+            logger.error(f"Error in post_nodes_callback for {username}: {e}", exc_info=True)
+    else:
+        logger.debug(f"No post_nodes_callback provided for {username}")
+
     destroy_session(url, sess_id, cookie)
+    
+    return callback_result
 
 
 def delete_lab_with_session_destroy(url: object, lab_name: object, lab_path: object, cookie: object, xsrf: object, username: object) -> object:
@@ -503,6 +543,72 @@ def get_guacamole_url(url, node_id, cookie):
         return None
 
 
+def login_user_to_pnet(url, username, password):
+    """
+    Логинит пользователя в PNET и возвращает session с cookies.
+    Использует requests.Session() для правильного сохранения cookies.
+    
+    Args:
+        url: URL PNET сервера
+        username: Имя пользователя PNET
+        password: Пароль пользователя PNET
+    
+    Returns:
+        tuple: (session, xsrf_token) где session - requests.Session с установленными cookies
+               или (None, None) при ошибке
+    """
+    try:
+        session = requests.Session()
+        session.verify = False
+        
+        # Получаем XSRF-TOKEN
+        preflight_response = session.get(f"{url}/store/public/auth/login/login", timeout=10)
+        if preflight_response.status_code not in [200, 202]:
+            logger.error(f"Failed to connect to PNET for preflight: {preflight_response.status_code}")
+            return None, None
+        
+        xsrf_token = session.cookies.get('XSRF-TOKEN', '')
+        
+        # Аутентификация
+        headers = {'Content-Type': 'application/json;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest'}
+        if xsrf_token:
+            headers['X-XSRF-TOKEN'] = xsrf_token
+        
+        login_response = session.post(
+            f"{url}/store/public/auth/login/login",
+            headers=headers,
+            json={'username': username, 'password': password, 'html': '0', 'captcha': ''},
+            timeout=10
+        )
+        
+        if login_response.status_code not in [200, 201, 202]:
+            logger.error(f"PNET authentication failed: {login_response.status_code} - {login_response.text}")
+            return None, None
+        
+        # Проверка JSON ответа для статуса 202
+        if login_response.status_code == 202:
+            try:
+                response_data = login_response.json()
+                if not response_data.get('result', False):
+                    logger.error(f"PNET authentication failed: {response_data}")
+                    return None, None
+            except (ValueError, KeyError):
+                pass  # Продолжаем, возможно cookies установлены
+        
+        logger.info(f"Successfully logged in to PNET as {username}")
+        return session, xsrf_token
+    
+    except requests.exceptions.Timeout:
+        logger.error("PNET login timeout")
+        return None, None
+    except requests.exceptions.ConnectionError:
+        logger.error("Failed to connect to PNET for login")
+        return None, None
+    except Exception as e:
+        logger.error(f"Error logging in to PNET: {str(e)}")
+        return None, None
+
+
 def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
     """Общая логика создания сессии лаборатории в PNET"""
     try:
@@ -558,6 +664,11 @@ def turn_on_node(url, node_id, cookie):
         )
 
         if response.status_code == 200:
+            try:
+                response_data = response.json()
+                logger.info(f"Node {node_id} start response: {response_data}")
+            except:
+                logger.info(f"Node {node_id} start response (non-JSON): {response.text[:200]}")
             logger.info(f"Node {node_id} started successfully")
             return True, "Node started successfully"
         else:
@@ -573,3 +684,62 @@ def turn_on_node(url, node_id, cookie):
     except Exception as e:
         logger.error(f"Error starting node {node_id}: {str(e)}")
         return False, f"Node start error: {str(e)}"
+
+
+def get_node_status(url, node_id, cookie):
+    """
+    Получает статус ноды из PNET.
+    
+    Args:
+        url: URL PNET сервера
+        node_id: ID ноды
+        cookie: Cookie для аутентификации
+    
+    Returns:
+        int или None: Статус ноды (0=stopped, 1=starting, 2=ready) или None при ошибке
+    """
+    try:
+        response = requests.post(
+            f"{url}/api/labs/session/nodestatus",
+            headers={
+                'Content-Type': 'application/json;charset=UTF-8',
+                'Accept': 'application/json, text/plain, */*',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            json={},
+            cookies=cookie,
+            verify=False,
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            try:
+                response_data = response.json()
+                if response_data.get('code') == 200 and 'data' in response_data:
+                    data = response_data['data']
+                    node_id_str = str(node_id)
+                    if node_id_str in data:
+                        status = data[node_id_str]
+                        return int(status)
+                    else:
+                        logger.warning(f"Node {node_id} not found in nodestatus response: {data}")
+                        return None
+                else:
+                    logger.error(f"Invalid nodestatus response format: {response_data}")
+                    return None
+            except (ValueError, KeyError) as e:
+                logger.error(f"Error parsing nodestatus response: {e}, response: {response.text[:200]}")
+                return None
+        else:
+            logger.error(f"Failed to get node status: {response.status_code} - {response.text}")
+            return None
+
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout getting node {node_id} status")
+        return None
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error getting node {node_id} status")
+        return None
+    except Exception as e:
+        logger.error(f"Error getting node {node_id} status: {str(e)}")
+        return None

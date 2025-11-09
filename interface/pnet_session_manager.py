@@ -180,10 +180,10 @@ class PNetSessionManager:
         create_lab(url, lab_name, "", get_pnet_base_dir(), cookie, xsrf, username)
 
     @require_pnet_url
-    def create_lab_nodes_and_connectors(self, lab, lab_name, username):
+    def create_lab_nodes_and_connectors(self, lab, lab_name, username, post_nodes_callback=None):
         """Создание узлов и коннекторов для пользователя"""
         url, cookie, xsrf = self.session_data
-        create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), lab_name, cookie, xsrf, username)
+        return create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), lab_name, cookie, xsrf, username, post_nodes_callback)
 
     @require_pnet_url
     def delete_lab_for_team(self, lab_name, team_slug):
