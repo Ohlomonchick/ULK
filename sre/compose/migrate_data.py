@@ -40,6 +40,91 @@ def clear_env_vars():
         if var in os.environ:
             del os.environ[var]
 
+def init_django():
+    """Инициализирует Django после установки переменных окружения"""
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Cyberpolygon.settings')
+    import django
+    django.setup()
+
+def disconnect_signals():
+    """Отключает сигналы post_save и m2m_changed для предотвращения побочных эффектов при загрузке данных"""
+    from django.db.models.signals import post_save, m2m_changed
+    from interface.models import Competition2User, TeamCompetition2Team
+    
+    print("🔇 Отключаю сигналы post_save и m2m_changed...")
+    
+    # Отключаем post_save сигналы (игнорируем ошибки, если сигналы уже отключены)
+    try:
+        post_save.disconnect(Competition2User.post_create, sender=Competition2User)
+    except (KeyError, TypeError):
+        pass  # Сигнал уже отключен или не был подключен
+    
+    try:
+        post_save.disconnect(TeamCompetition2Team.post_create, sender=TeamCompetition2Team)
+    except (KeyError, TypeError):
+        pass
+    
+    # Отключаем m2m_changed сигналы
+    try:
+        m2m_changed.disconnect(Competition2User.tasks_changed, sender=Competition2User.tasks.through)
+    except (KeyError, TypeError):
+        pass
+    
+    try:
+        m2m_changed.disconnect(TeamCompetition2Team.tasks_changed, sender=TeamCompetition2Team.tasks.through)
+    except (KeyError, TypeError):
+        pass
+    
+    print("✅ Сигналы отключены")
+
+def reconnect_signals():
+    """Включает обратно сигналы post_save и m2m_changed"""
+    from django.db.models.signals import post_save, m2m_changed
+    from interface.models import Competition2User, TeamCompetition2Team
+    
+    print("🔊 Включаю обратно сигналы post_save и m2m_changed...")
+    
+    # Включаем обратно post_save сигналы (отключаем перед подключением, если уже подключены)
+    try:
+        post_save.disconnect(Competition2User.post_create, sender=Competition2User)
+    except (KeyError, TypeError):
+        pass
+    post_save.connect(Competition2User.post_create, sender=Competition2User)
+    
+    try:
+        post_save.disconnect(TeamCompetition2Team.post_create, sender=TeamCompetition2Team)
+    except (KeyError, TypeError):
+        pass
+    post_save.connect(TeamCompetition2Team.post_create, sender=TeamCompetition2Team)
+    
+    # Включаем обратно m2m_changed сигналы
+    try:
+        m2m_changed.disconnect(Competition2User.tasks_changed, sender=Competition2User.tasks.through)
+    except (KeyError, TypeError):
+        pass
+    m2m_changed.connect(Competition2User.tasks_changed, sender=Competition2User.tasks.through)
+    
+    try:
+        m2m_changed.disconnect(TeamCompetition2Team.tasks_changed, sender=TeamCompetition2Team.tasks.through)
+    except (KeyError, TypeError):
+        pass
+    m2m_changed.connect(TeamCompetition2Team.tasks_changed, sender=TeamCompetition2Team.tasks.through)
+    
+    print("✅ Сигналы включены")
+
+def load_data_direct(dump_file):
+    """Загружает данные напрямую через Django call_command (в том же процессе)"""
+    from django.core.management import call_command
+    
+    print(f"📥 Загружаю данные из {dump_file.name}...")
+    try:
+        call_command('loaddata', str(dump_file), verbosity=1)
+        print("✅ Данные успешно загружены")
+        return True
+    except Exception as e:
+        print(f"❌ Ошибка при загрузке данных: {e}")
+        return False
+
 def run_command(cmd, cwd=None):
     """Выполняет команду и возвращает результат"""
     print(f"Выполняю: {cmd}")
@@ -125,17 +210,27 @@ def main():
         # Устанавливаем переменные окружения для PostgreSQL
         set_env_vars()
         
+        # Инициализируем Django с настройками PostgreSQL
+        init_django()
+        
         # 2. Применяем миграции в PostgreSQL
         print("\n🔄 Применяю миграции в PostgreSQL...")
         if not run_command("python manage.py migrate", cwd=project_root):
             print("❌ Ошибка при применении миграций!")
             return
         
-        # 3. Загружаем данные в PostgreSQL
-        print("\n📥 Загружаю данные в PostgreSQL...")
-        if not run_command(f"python manage.py loaddata {dump_file.name}", cwd=project_root):
-            print("❌ Ошибка при загрузке данных!")
-            return
+        # 3. Отключаем сигналы перед загрузкой данных
+        disconnect_signals()
+        
+        try:
+            # 4. Загружаем данные в PostgreSQL напрямую через Django API
+            print("\n📥 Загружаю данные в PostgreSQL...")
+            if not load_data_direct(dump_file):
+                print("❌ Ошибка при загрузке данных!")
+                return
+        finally:
+            # 5. Включаем обратно сигналы после загрузки данных
+            reconnect_signals()
         
         print("\n✅ Миграция завершена успешно!")
         print(f"📊 База данных: {DB_CONFIG['POSTGRES_DB']}")
