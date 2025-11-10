@@ -225,4 +225,4 @@ class PNetSessionManager:
     def create_user(self, username, password):
         """Создание пользователя"""
         url, cookie, xsrf = self.session_data
-        create_user(url, username, password, '1', cookie, xsrf)
+        create_user(url, username, password, '1', cookie)
