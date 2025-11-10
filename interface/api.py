@@ -57,13 +57,16 @@ def find_lab_by_name_and_type(lab_name, lab_type_code=None):
 
 
 @api_view(['GET'])
-def get_time(request, competition_id):  # pragma: no cover
+def get_time(request, instance_type, instance_id):  # pragma: no cover
     try:
         # Fetch the competition by ID
-        competition = Competition.objects.get(id=competition_id)
+        if instance_type == 'kkz':
+            instance = Kkz.objects.get(id=instance_id)
+        else:  # competition
+            instance = Competition.objects.get(id=instance_id)
 
         # Calculate remaining time
-        remaining_time = competition.finish - timezone.now()
+        remaining_time = instance.finish - timezone.now()
         if remaining_time < timedelta(0):
             remaining_time = timedelta(0)
 
@@ -75,8 +78,9 @@ def get_time(request, competition_id):  # pragma: no cover
             'minutes': minutes,
             'seconds': seconds,
         })
-    except Competition.DoesNotExist:
-        return Response({'error': 'Competition not found'}, status=404)
+
+    except (Competition.DoesNotExist, Kkz.DoesNotExist):
+        return Response({'error': f'{instance_type.upper()} not found'}, status=404)
 
 
 def make_solution_data(solution, competition):
@@ -247,6 +251,36 @@ def get_solutions(request, slug):
     return JsonResponse(response)
 
 
+def update_user_aggregated(user_aggregated, uid, user_data, competition, progress):
+    if uid not in user_aggregated:
+        try:
+            user = User.objects.get(id=uid)
+        except User.DoesNotExist:
+            return
+
+        user_aggregated[uid] = {
+            'user_id': uid,
+            'user': user,
+            'progress': 0,
+            'max_tasks': 0,
+            'latest_datetime': None,
+            'competition': competition
+        }
+    user_aggregated[uid]['progress'] += progress
+
+    comp2user = Competition2User.objects.filter(
+        competition=competition,
+        user_id=uid
+    ).first()
+
+    if comp2user:
+        user_aggregated[uid]['max_tasks'] += comp2user.tasks.count()
+
+    raw_dt = user_data.get('raw_datetime') or user_data.get('datetime') or None
+    if raw_dt and (not user_aggregated[uid]['latest_datetime'] or raw_dt > user_aggregated[uid]['latest_datetime']):
+        user_aggregated[uid]['latest_datetime'] = raw_dt
+
+
 @api_view(['GET'])
 def get_kkz_solutions(request, kkz_id):
     try:
@@ -264,80 +298,35 @@ def get_kkz_solutions(request, kkz_id):
             'total_progress': 0
         })
 
-    user_aggregated = defaultdict(lambda: {
-        'user_id': None,
-        'user': None,
-        'progress': 0,
-        'max_tasks': 0,
-        'latest_datetime': None
-    })
+    user_aggregated = {}
 
     for competition in competitions:
         is_team_competition = hasattr(competition, 'teamcompetition')
         comp_data = get_competition_solutions_data(competition, is_team_competition)
 
         for uid, user_data in comp_data['individual_data'].items():
-            if user_aggregated[uid]['user_id'] is None:
-                user = User.objects.get(id=uid)
-                user_aggregated[uid]['user_id'] = uid
-                user_aggregated[uid]['user'] = user
-
-            user_aggregated[uid]['progress'] += user_data['progress']
-            comp2user = Competition2User.objects.filter(
-                competition=competition,
-                user_id=uid
-            ).first()
-            if comp2user:
-                user_aggregated[uid]['max_tasks'] += comp2user.tasks.count()
-
-            if user_data['raw_datetime']:
-                if not user_aggregated[uid]['latest_datetime'] or user_data['raw_datetime'] > user_aggregated[uid][
-                    'latest_datetime']:
-                    user_aggregated[uid]['latest_datetime'] = user_data['raw_datetime']
+            update_user_aggregated(user_aggregated, uid, user_data, competition, user_data['progress'])
 
         if is_team_competition:
             for tid, t_data in comp_data['team_data'].items():
                 team_obj = t_data['team']
                 for user in team_obj.users.all():
-                    uid = user.id
-                    if user_aggregated[uid]['user_id'] is None:
-                        user_aggregated[uid]['user_id'] = uid
-                        user_aggregated[uid]['user'] = user
-
-                    user_aggregated[uid]['progress'] += t_data['progress']
-
-                    comp2user = Competition2User.objects.filter(
-                        competition=competition,
-                        user_id=uid
-                    ).first()
-                    if comp2user:
-                        user_aggregated[uid]['max_tasks'] += comp2user.tasks.count()
-
-                    if t_data['raw_datetime']:
-                        if not user_aggregated[uid]['latest_datetime'] or t_data['raw_datetime'] > user_aggregated[uid][
-                            'latest_datetime']:
-                            user_aggregated[uid]['latest_datetime'] = t_data['raw_datetime']
+                    update_user_aggregated(user_aggregated, user.id, t_data, competition, t_data['progress'])
 
     solutions_data = []
     total_max_tasks = 0
 
     for uid, data in user_aggregated.items():
-        user = data['user']
-        max_tasks = data['max_tasks']
-        total_max_tasks += max_tasks
+        total_max_tasks += data['max_tasks']
 
-        solutions_data.append({
-            'pos': 0,
-            'user_id': uid,
-            'user_first_name': user.first_name,
-            'user_last_name': user.last_name,
-            'user_platoon': str(user.platoon),
-            'progress': data['progress'],
-            'max_tasks': max_tasks,
-            'datetime': data['latest_datetime'].strftime("%H:%M:%S") if data['latest_datetime'] else "",
-            'raw_datetime': data['latest_datetime'],
-            'team_name': ''
-        })
+        dummy_solution = {
+            "user_id": uid,
+            "datetime": data['latest_datetime']
+        }
+        sol = make_solution_data(dummy_solution, data['competition'])
+        sol["progress"] = data['progress']
+        sol["max_tasks"] = data['max_tasks']
+        solutions_data.append(sol)
 
     solutions_data.sort(key=lambda x: (-x['progress'], x['raw_datetime'] if x['raw_datetime'] else timezone.now()))
 
@@ -388,6 +377,32 @@ def change_iso_timezone(utc_time):  # pragma: no cover
     return datetime.fromisoformat(utc_time) + timedelta(hours=3)
 
 
+def update_instance_time(instance, action):
+    if action == "start":
+        time = timezone.now()
+        field = "start"
+        message = "started"
+    elif action == "end":
+        time = timezone.now()
+        field = "finish"
+        message = "ended"
+    elif action == "resume":
+        time = timezone.now() + timedelta(minutes=15)
+        field = "finish"
+        message = "resumed"
+    else:
+        return None, "Unknown action"
+
+    setattr(instance, field, time)
+    instance.save()
+
+    if isinstance(instance, Kkz):
+        Competition.objects.filter(kkz=instance).update(**{field: time})
+
+    cache.set("competitions_update", True, timeout=60)
+    return message, None
+
+
 @api_view(['POST'])
 def press_button(request, action):
     try:
@@ -395,55 +410,28 @@ def press_button(request, action):
         kkz_id = request.data.get('kkz_id')
 
         if kkz_id:
-            kkz = Kkz.objects.get(id=kkz_id)
+            instance = get_object_or_404(Kkz, id=kkz_id)
             redirect_url = reverse('interface:kkz-detail', kwargs={'pk': kkz_id})
-
-            if action == "start":
-                kkz.start = timezone.now()
-                kkz.save()
-                Competition.objects.filter(kkz=kkz).update(start=timezone.now())
-                cache.set("competitions_update", True, timeout=60)
-                return JsonResponse({"redirect_url": redirect_url}, status=200)
-            elif action == "end":
-                kkz.finish = timezone.now()
-                kkz.save()
-                Competition.objects.filter(kkz=kkz).update(finish=timezone.now())
-                cache.set("competitions_update", True, timeout=60)
-                return JsonResponse({"message": "KKZ ended", "redirect_url": redirect_url}, status=200)
-            elif action == "resume":
-                new_finish = timezone.now() + timedelta(minutes=15)
-                kkz.finish = new_finish
-                kkz.save()
-                Competition.objects.filter(kkz=kkz).update(finish=new_finish)
-                cache.set("competitions_update", True, timeout=60)
-                return JsonResponse({"message": "KKZ resumed", "redirect_url": redirect_url}, status=200)
-
         elif slug:
-            competition = Competition.objects.get(slug=slug)
+            instance = get_object_or_404(Competition, slug=slug)
             redirect_url = reverse('interface:competition-detail', kwargs={'slug': slug})
-
-            if action == "start":
-                competition.start = timezone.now()
-                competition.save()
-                cache.set("competitions_update", True, timeout=60)
-                return JsonResponse({"redirect_url": redirect_url}, status=200)
-            elif action == "end":
-                competition.finish = timezone.now()
-                competition.save()
-                cache.set("competitions_update", True, timeout=60)
-                return JsonResponse({"message": "Competition ended", "redirect_url": redirect_url}, status=200)
-            elif action == "resume":
-                competition.finish = timezone.now() + timedelta(minutes=15)
-                competition.save()
-                cache.set("competitions_update", True, timeout=60)
-                return JsonResponse({"message": "Competition resumed", "redirect_url": redirect_url}, status=200)
         else:
             return JsonResponse({"error": "Missing slug or kkz_id"}, status=400)
 
-        return JsonResponse({"error": "Unknown action"}, status=400)
+        message, error = update_instance_time(instance, action)
+
+        if error:
+            return JsonResponse({"error": error}, status=400)
+
+        instance_type = "KKZ" if isinstance(instance, Kkz) else "Competition"
+        return JsonResponse({
+            "message": f"{instance_type} {message}",
+            "redirect_url": redirect_url
+        }, status=200)
 
     except Exception as e:
-        print(f"Server error: {e}")
+        logger = logging.getLogger(__name__)
+        logger.error(f"Server error in press_button: {e}")
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -1104,6 +1092,7 @@ def kkz_save_preview(request):
             first_user_id = next(iter(assignments))
             uniform_task_ids = assignments[first_user_id]
             users = kkz.get_users()
+            users = User.get_o
             for user in users:
                 preview, created = KkzPreview.objects.update_or_create(
                     kkz=kkz,
@@ -1144,12 +1133,9 @@ def get_labs_for_platoon(request):
     except Platoon.DoesNotExist:
         return JsonResponse({'error': 'Platoon not found'}, status=404)
 
-    labs = Lab.objects.filter(
-        lab_type=LabType.EXAM,
-        learning_years__contains=[platoon.learning_year]
-    )
-
-    logger.debug(f"Found {labs.count()} labs for learning_year {platoon.learning_year}")
+    all_exam_labs = Lab.objects.filter(lab_type=LabType.EXAM)
+    labs = [lab for lab in all_exam_labs if platoon.learning_year in lab.learning_years]
+    logger.debug(f"Found {labs} labs for learning_year {platoon.learning_year}")
 
     labs_data = []
     for lab in labs:

@@ -287,8 +287,10 @@ class Kkz(models.Model):
     unified_tasks = models.BooleanField("Единые задания для всех", default=False)
 
     def get_users(self):
-        users = User.objects.filter(platoon__in=self.platoons.all())
-        users = users.union(User.objects.filter(id__in=self.non_platoon_users.values('id')))
+        users_platoon = User.objects.filter(platoon__in=self.platoons.all()).values_list('id', flat=True)
+        users_non_platoon = self.non_platoon_users.values_list('id', flat=True)
+        user_ids = users_platoon.union(users_non_platoon)
+        users = User.objects.filter(id__in=user_ids)
         return users
 
     def delete(self, *args, **kwargs):

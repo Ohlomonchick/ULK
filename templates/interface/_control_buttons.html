@@ -1,0 +1,70 @@
+{% load static %}
+
+{% if button_start_now %}
+    <p class="help mb-2">
+        {% if instance_type == 'kkz' %}
+            ККЗ будет доступен студентам в {{ start_time|date:"H:i" }}, но вы можете начать его сейчас
+        {% else %}
+            Работа будет доступна студентам в {{ start_time|date:"H:i" }}, но вы можете начать её сейчас
+        {% endif %}
+    </p>
+    <div id="button-video-container mb-3" style="display: flex; align-items: center;">
+        <button id="start-now" class="button is-danger is-medium control-button"
+                data-action="start"
+                data-instance-type="{{ instance_type }}"
+                {% if instance_type == 'kkz' %}
+                    data-kkz-id="{{ instance.id }}"
+                {% else %}
+                    data-slug="{{ instance.slug }}"
+                {% endif %}>
+            Начать сейчас
+        </button>
+        <div id="video-container" class="hidden">
+            <video id="exam-video" style="width: auto; height: 62px; border-radius: 4px;" class="is-hidden" autoplay muted>
+                <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
+            </video>
+        </div>
+    </div>
+{% endif %}
+
+{% if button_end_now %}
+    <p class="help mb-2">
+        {% if instance_type == 'kkz' %}
+            ККЗ закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить его сейчас
+        {% else %}
+            Работа закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить её сейчас
+        {% endif %}
+    </p>
+    <div id="button-video-container mb-3" style="display: flex; align-items: center;">
+        <button id="end-now" class="button is-danger is-medium control-button"
+                data-action="end"
+                data-instance-type="{{ instance_type }}"
+                {% if instance_type == 'kkz' %}
+                    data-kkz-id="{{ instance.id }}"
+                {% else %}
+                    data-slug="{{ instance.slug }}"
+                {% endif %}>
+            Закончить сейчас
+        </button>
+    </div>
+{% elif button_resume %}
+    <p class="help mb-2">
+        {% if instance_type == 'kkz' %}
+            ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его на 15 минут
+        {% else %}
+            Работа закончилась в {{ finish_time|date:"H:i" }}, но вы можете продлить её на 15 минут
+        {% endif %}
+    </p>
+    <div id="button-video-container mb-3" style="display: flex; align-items: center;">
+        <button id="resume" class="button is-danger is-medium control-button"
+                data-action="resume"
+                data-instance-type="{{ instance_type }}"
+                {% if instance_type == 'kkz' %}
+                    data-kkz-id="{{ instance.id }}"
+                {% else %}
+                    data-slug="{{ instance.slug }}"
+                {% endif %}>
+            Продлить на 15 минут
+        </button>
+    </div>
+{% endif %}

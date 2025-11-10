@@ -36,59 +36,13 @@
 
     <div class="columns is-centered">
         <div class="column is-three-quarters">
-            {% if user.is_superuser %}
-                <div class="box mb-5" style="border: 1px solid rgba(0, 0, 0, 0.1)">
-                    <h2 class="has-text-weight-bold">Общий прогресс:</h2><br>
-                    <progress class="progress is-success" value="{{ total_progress }}" max="{{ max_progress }}" id="total-progress-bar">{{ progress_percent }}%</progress>
-                    {% if button_start_now %}
-                        <p class="help mb-2">ККЗ будет доступен студентам в {{ kkz.start|date:"H:i" }}, но вы можете начать его сейчас</p>
-                        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-                            <button id="start-now" class="button is-danger is-medium" data-kkz-id="{{ kkz.id }}">
-                                Начать сейчас
-                            </button>
-                            <div id="video-container" class="hidden">
-                                <video id="exam-video" style="width: auto; height: 62px; border-radius: 4px;" class="is-hidden" autoplay muted>
-                                    <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
-                                </video>
-                            </div>
-                        </div>
-                    {% endif %}
-                    <div id="kkz-slug" data-slug="{{ kkz.id }}">
-                        <table class="table is-fullwidth" style="border-spacing: 7px;">
-                            <thead>
-                                <tr>
-                                    <th><abbr title="Позиция" style="text-decoration: none;">Поз.</abbr></th>
-                                    <th>Имя</th>
-                                    <th>Фамилия</th>
-                                    <th>Взвод</th>
-                                    <th>Решено</th>
-                                    <th>Прогресс</th>
-                                    <th>Время сдачи</th>
-                                </tr>
-                            </thead>
-                            <tbody id="solutions-table"></tbody>
-                        </table>
-                    </div>
+            <div class="box">
+                {% if user.is_superuser %}
+                    {% include 'interface/_solutions_table.html' with instance_slug=kkz.id instance_type='kkz' show_team_column=False show_max_tasks=True progress=total_progress max_progress=max_progress %}
 
-                {% if button_end_now %}
-                    <p class="help mb-2">ККЗ закончится в {{ kkz.finish|date:"H:i" }}, но вы можете закончить его сейчас</p>
-                    <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-                        <button id="end-now" class="button is-danger is-medium" data-kkz-id="{{ kkz.id }}">
-                            Закончить сейчас
-                        </button>
-                    </div>
-                {% elif button_resume %}
-                    <p class="help mb-2">ККЗ закончился в {{ kkz.finish|date:"H:i" }}, но вы можете продлить его на 15 минут</p>
-                    <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-                        <button id="resume" class="button is-danger is-medium" data-kkz-id="{{ kkz.id }}">
-                            Продлить на 15 минут
-                        </button>
-                    </div>
+                    {% include 'interface/_control_buttons.html' with button_start_now=button_start_now button_end_now=lab_data.button_end_now button_resume=lab_data.button_resume instance=kkz instance_type='kkz' start_time=kkz.start finish_time=kkz.finish %}
                 {% endif %}
-                </div>
-            {% endif %}
-
-
+            </div>
             {% for lab_data in labs_data %}
                 <div class="box mb-4" style="border: 1px solid rgba(0, 0, 0, 0.1)">
                     <div style="display: flex; align-items: center; cursor: pointer;" class="lab-header" data-lab-id="{{ lab_data.lab.id }}">
@@ -99,7 +53,6 @@
                     </div>
 
                     <div class="lab-description-content">
-
                         <div class="content">
                             {{ lab_data.lab.description|safe }}
                         </div>
@@ -124,214 +77,34 @@
         </div>
 
         <div class="column is-one-quarter">
-            <div id="timer" class="message is-dark mb-3" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09); border: 1px solid rgba(0, 0, 0, 0.1)">
-                <div class="message-body">
-                    <h2 class="has-text-weight-bold">Оставшееся время:</h2>
-                    <div id="countdown" class="has-text-weight-bold has-text-danger">
-                         {{ delta.hours }} <span>:</span>
-                         {{ delta.minutes }} <span>:</span>
-                         {{ delta.seconds }}
-                    </div>
-                </div>
-            </div>
+            {% include 'interface/_timer.html' with delta=delta instance_id=kkz.id instance_type='kkz' %}
         </div>
     </div>
 
+    <meta name="csrf-token" content="{{ csrf_token }}">
+
+    <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
     <script src="{% static 'js/gsap.min.js' %}"></script>
     <script src="{% static 'js/Flip.min.js' %}"></script>
-
-    <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const startButton = document.getElementById("start-now");
-        const endButton = document.getElementById("end-now");
-        const resumeButton = document.getElementById("resume");
-        const video = document.getElementById("exam-video");
-
-        if (startButton) {
-            startButton.addEventListener("click", function () {
-                const kkzId = this.dataset.kkzId;
-
-                if (video) {
-                    video.style.display = "block";
-                    video.play();
-
-                    video.onended = function () {
-                        pressButton('start', null, kkzId);
-                    };
-                } else {
-                    pressButton('start', null, kkzId);
-                }
-            });
-        }
-
-        if (endButton) {
-            endButton.addEventListener("click", function () {
-                const kkzId = this.dataset.kkzId;
-                if (confirm('Вы уверены что хотите завершить ККЗ?')) {
-                    pressButton('end', null, kkzId);
-                }
-            });
-        }
-
-        if (resumeButton) {
-            resumeButton.addEventListener("click", function () {
-                const kkzId = this.dataset.kkzId;
-                pressButton('resume', null, kkzId);
-            });
-        }
-
-        function pressButton(action, slug = null, kkzId = null) {
-            const body = slug ? { slug: slug } : { kkz_id: kkzId };
-
-            fetch(`/api/press_button/${action}/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                },
-                body: JSON.stringify(body)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Произошла ошибка');
-            });
-        }
-    });
-
-
-
-    gsap.registerPlugin(Flip);
-
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.lab-header').forEach(header => {
-            header.addEventListener('click', function() {
-                const arrow = this.querySelector('.lab-description-toggle');
-                const content = this.nextElementSibling;
-
-                arrow.classList.toggle('rotated');
-                content.classList.toggle('open');
-            });
-        });
-
-        {% if user.is_superuser %}
-            refreshKkzSolutions();
-        {% endif %}
-    });
+    <script src="{% static 'js/timer.js' %}"></script>
+    <script src="{% static 'js/solutions_table.js' %}"></script>
 
     {% if user.is_superuser %}
-    function refreshKkzSolutions() {
-        const kkzId = document.getElementById('kkz-slug').getAttribute('data-slug');
-
-        $.ajax({
-            url: `/api/get_kkz_solutions/${kkzId}/`,
-            type: 'GET',
-            success: function(response) {
-                const tableBody = document.querySelector('#solutions-table');
-                const oldState = Flip.getState(tableBody.querySelectorAll('tr[data-flip-id]'));
-
-                const existingRows = {};
-                tableBody.querySelectorAll('tr[data-flip-id]').forEach(row => {
-                    const id = row.getAttribute('data-flip-id');
-                    existingRows[id] = row;
-                });
-
-                const newRows = [];
-
-                const totalProgressBar = document.querySelector('#total-progress-bar');
-                if (totalProgressBar) {
-                    totalProgressBar.value = response.total_progress;
-                    totalProgressBar.max = response.max_total_progress;
-                }
-
-                if (response.solutions.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: gray;">Пока никто не выполнил работу</td></tr>';
-                } else {
-                    response.solutions.forEach(function(solution) {
-                        const id = solution.user_id || solution.pos;
-                        let row = existingRows[id];
-                        if (!row) {
-                            row = document.createElement('tr');
-                            row.setAttribute('data-flip-id', id);
-                        }
-                        row.innerHTML = `
-                            <th>${solution.pos}</th>
-                            <td>${solution.user_first_name}</td>
-                            <td>${solution.user_last_name}</td>
-                            <td>${solution.user_platoon}</td>
-                            <td style="text-align: center;">${solution.progress}/${solution.max_tasks}</td>
-                            <td><progress class="progress is-success" value="${solution.progress}" max="${solution.max_tasks}">${solution.progress}</progress></td>
-                            <td>${solution.datetime}</td>
-                        `;
-                        newRows.push(row);
-                    });
-                }
-
-                tableBody.innerHTML = '';
-                newRows.forEach(row => tableBody.appendChild(row));
-
-                Flip.from(oldState, {
-                    duration: 2,
-                    ease: "power1.inOut"
-                });
-            },
-            error: function(xhr, status, error) {
-                console.error("Error loading KKZ solutions:", error);
-            }
-        });
-    }
-
-    setInterval(refreshKkzSolutions, 10000);
+        <script src="{% static 'js/control_buttons.js' %}"></script>
     {% endif %}
 
-    let end = false;
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.lab-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const arrow = this.querySelector('.lab-description-toggle');
+                    const content = this.nextElementSibling;
 
-    function updateTimer() {
-        const countdownElem = document.getElementById('countdown');
-        const text = countdownElem.textContent.trim();
-        if (text === "ККЗ завершено") return;
-
-        let hours = parseInt(text.split(':')[0]);
-        let minutes = parseInt(text.split(':')[1]);
-        let seconds = parseInt(text.split(':')[2]);
-
-        if (hours === 0 && minutes === 0 && seconds === 0) {
-            countdownElem.textContent = "ККЗ завершено";
-            if (!end) {
-                end = true;
-                localStorage.setItem('kkz_end', 'true');
-            }
-            return;
-        }
-
-        if (seconds > 0) {
-            seconds--;
-        } else {
-            if (minutes > 0) {
-                minutes--;
-                seconds = 59;
-            } else {
-                if (hours > 0) {
-                    hours--;
-                    minutes = 59;
-                    seconds = 59;
-                }
-            }
-        }
-
-        countdownElem.textContent =
-            (hours < 10 ? '0' : '') + hours + ' : ' +
-            (minutes < 10 ? '0' : '') + minutes + ' : ' +
-            (seconds < 10 ? '0' : '') + seconds;
-    }
-
-    setInterval(updateTimer, 1000);
+                    arrow.classList.toggle('rotated');
+                    content.classList.toggle('open');
+                });
+            });
+        });
     </script>
-    <meta name="csrf-token" content="{{ csrf_token }}">
 
 {% endblock %}

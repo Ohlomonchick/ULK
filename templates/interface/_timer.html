@@ -1,0 +1,15 @@
+<div id="timer" class="message is-dark mb-3" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09); border: 1px solid rgba(0, 0, 0, 0.1)">
+    <div class="message-body">
+        <h2 class="has-text-weight-bold">Оставшееся время:</h2>
+        <div id="countdown" class="has-text-weight-bold has-text-danger"
+             data-hours="{{ delta.hours }}"
+             data-minutes="{{ delta.minutes }}"
+             data-seconds="{{ delta.seconds }}"
+             data-instance-id="{{ instance_id }}"
+             data-instance-type="{{ instance_type }}">
+             {{ delta.hours }} <span>:</span>
+             {{ delta.minutes }} <span>:</span>
+             {{ delta.seconds }}
+        </div>
+    </div>
+</div>

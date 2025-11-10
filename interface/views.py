@@ -243,6 +243,9 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         competition = context["object"]
+        base_ctx = build_competition_context(self.request, competition,
+                                             is_team_competition=hasattr(competition, 'teamcompetition'))
+        context.update(base_ctx)
         context = self.set_submitted(context)
 
         if self.request.user.is_staff:
@@ -281,9 +284,6 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             context["assigned_tasks"] = assigned_tasks
 
         patch_lab_description(context["object"], self.request.user)
-        context["button_start_now"] = (timezone.now() - competition.start).total_seconds() < 0
-        context["button_end_now"] = not context["button_start_now"] and (competition.finish - timezone.now()).total_seconds() > 0
-        context["button_resume"] = not context["button_start_now"] and not context["button_end_now"]
 
         return context
 
@@ -303,68 +303,77 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         competitions = Competition.objects.filter(kkz=kkz).select_related('lab').order_by('lab__name')
 
         labs_data = []
-
-        for comp in competitions:
-            lab = comp.lab
-            assigned_tasks = []
-
-            if kkz.unified_tasks:
-                first_comp2user = Competition2User.objects.filter(competition=comp).prefetch_related('tasks').first()
-                if first_comp2user:
-                    assigned_tasks = list(first_comp2user.tasks.all())
-
-            labs_data.append({
-                'lab': lab,
-                'competition': comp,
-                'assigned_tasks': assigned_tasks
-            })
-
-        context['labs_data'] = labs_data
-
-        remaining_time = kkz.finish - timezone.now()
-        if remaining_time < timedelta(0):
-            remaining_time = timedelta(0)
-
-        hours, remainder = divmod(remaining_time.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-
-        context['delta'] = {
-            'hours': f'{hours:02d}',
-            'minutes': f'{minutes:02d}',
-            'seconds': f'{seconds:02d}'
-        }
-
-        users = list(kkz.get_users())
         total_possible = 0
-
-        for user in users:
-            for comp in competitions:
-                comp2user = Competition2User.objects.filter(
-                    competition=comp,
-                    user=user
-                ).first()
-                if comp2user:
-                    total_possible += comp2user.tasks.count()
-
         total_completed = 0
+
         for comp in competitions:
+            comp_context = build_competition_context(self.request, comp, hasattr(comp, 'teamcompetition'))
+            comp2users = Competition2User.objects.filter(competition=comp)
+            total_possible += sum(cu.tasks.count() for cu in comp2users)
             total_completed += Answers.objects.filter(
                 lab=comp.lab,
-                user__in=users,
+                user__in=kkz.get_users(),
                 datetime__gte=kkz.start,
                 datetime__lte=kkz.finish
             ).count()
 
-        context['total_progress'] = total_completed
-        context['max_progress'] = total_possible
-        context['progress_percent'] = int((total_completed / total_possible * 100)) if total_possible > 0 else 0
-        context['now'] = timezone.now()
-        context["button_start_now"] = (timezone.now() - kkz.start).total_seconds() < 0
-        context["button_end_now"] = not context["button_start_now"] and (
-                    kkz.finish - timezone.now()).total_seconds() > 0
-        context["button_resume"] = not context["button_start_now"] and not context["button_end_now"]
+            labs_data.append({
+                'lab': comp.lab,
+                'competition': comp,
+                'assigned_tasks': comp_context.get('assigned_tasks', []),
+                'delta': comp_context['delta'],
+                'button_start_now': comp_context['button_start_now'],
+                'button_end_now': comp_context['button_end_now'],
+                'button_resume': comp_context['button_resume'],
+            })
+
+        if labs_data:
+            context['delta'] = labs_data[0]['delta']
+            context['lab_data'] = labs_data[0]
+        else:
+            context['delta'] = {"hours": "00", "minutes": "00", "seconds": "00"}
+
+        context['labs_data'] = labs_data
+        context['total_possible'] = total_possible
+        context['total_completed'] = total_completed
 
         return context
+
+
+def build_competition_context(request, instance, is_team_competition=False):
+    """
+    Возвращает единый словарь контекста, который используют оба шаблона.
+    """
+    now = timezone.now()
+
+    remaining = instance.finish - now if hasattr(instance, "finish") else timedelta(0)
+    if remaining.total_seconds() < 0:
+        remaining = timedelta(0)
+    hours, rem = divmod(int(remaining.total_seconds()), 3600)
+    minutes, seconds = divmod(rem, 60)
+
+    button_start_now = (now - instance.start).total_seconds() < 0 if hasattr(instance, "start") else False
+    button_end_now = not button_start_now and (instance.finish - now).total_seconds() > 0 if hasattr(instance, "finish") else False
+    button_resume = not button_start_now and not button_end_now
+
+    progress = getattr(instance, "progress", 0)
+    max_progress = getattr(instance, "max_progress", 100)
+    total_progress = getattr(instance, "total_progress", 0)
+    total_tasks = getattr(instance, "num_tasks", 0) or 0
+
+    return {
+        "object": instance,
+        "delta": {"hours": f"{hours:02d}", "minutes": f"{minutes:02d}", "seconds": f"{seconds:02d}"},
+        "button_start_now": button_start_now,
+        "button_end_now": button_end_now,
+        "button_resume": button_resume,
+        "available": getattr(instance, "finish", now) > now,
+        "progress": progress,
+        "max_progress": max_progress,
+        "total_progress": total_progress,
+        "total_tasks": total_tasks,
+        "is_team_competition": is_team_competition,
+    }
 
 
 class TeamCompetitionDetailView(CompetitionDetailView):

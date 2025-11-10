@@ -1,4 +1,3 @@
-
 {% extends 'interface/base.html' %}
 {% load static %}
 
@@ -17,66 +16,10 @@
     <div class="columns is-centered">
         <div class="column is-three-quarters">
             {% if user.is_superuser %}
-                <div class="box mb-5" style="border: 1px solid rgba(0, 0, 0, 0.1)">
-                    <h2 class="has-text-weight-bold">Общий прогресс:</h2><br>
-                    <progress class="progress is-success" value="{{ progress }}" max="100" id="total-progress-bar">{{ progress }}%</progress>
-
-                    {% if button_start_now %}
-                        <p class="help mb-2">Работа будет доступна студентам в {{ object.start|date:"H:i" }}, но вы можете начать её сейчас</p>
-                        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-                            <button id="start-now" class="button is-danger is-medium"
-                                    data-slug="{{ object.slug }}">
-                                Начать сейчас
-                            </button>
-                            <div id="video-container" class="hidden">
-                                <video id="exam-video" style="width: auto; height: 62px; border-radius: 4px;" class="is-hidden" autoplay muted>
-                                    <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
-                                </video>
-                            </div>
-                        </div>
-                    {% endif %}
-
-                    <div id="competition-slug" data-slug="{{ object.slug }}">
-                        <table class="table is-fullwidth" style="border-spacing: 7px;">
-                        <thead>
-                            <tr>
-                                <th><abbr title="Позиция" style="text-decoration: none;">Поз.</abbr></th>
-                                <th>Имя</th>
-                                <th>Фамилия</th>
-                                <th>Взвод</th>
-                                {% if is_team_competition %}
-                                    <th>Команда</th>
-                                {% endif %}
-                                {% if object.tasks %}
-                                    <th>Решено</th>
-                                    <th>Прогресс</th>
-                                {% endif %}
-                                <th>Затраченное время</th>
-                                <th>Время сдачи</th>
-                            </tr>
-                        </thead>
-                        <tbody  id="solutions-table">
-
-                        </tbody>
-                        </table>
-                    </div>
-                    {% if button_end_now %}
-                        <p class="help mb-2">Работа закончится в {{ object.finish|date:"H:i" }}, но вы можете закончить её сейчас</p>
-                        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-                            <button id="end-now" class="button is-danger is-medium"
-                                    data-slug="{{ object.slug }}">
-                                Закончить сейчас
-                            </button>
-                        </div>
-                    {% elif button_resume %}
-                        <p class="help mb-2">Работа закончилась в {{ object.finish|date:"H:i" }}, но вы можете продлить её на 15 минут</p>
-                        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-                            <button id="resume" class="button is-danger is-medium"
-                                    data-slug="{{ object.slug }}">
-                                Продлить на 15 минут
-                            </button>
-                        </div>
-                    {% endif %}
+                <div class="box">
+                    {% include 'interface/_solutions_table.html' with instance_slug=object.slug instance_type='competition' show_team_column=is_team_competition show_max_tasks=False progress=progress max_progress=max_progress %}
+                
+                    {% include 'interface/_control_buttons.html' with button_start_now=button_start_now button_end_now=button_end_now button_resume=button_resume instance=object instance_type='competition' start_time=object.start finish_time=object.finish %}
                 </div>
             {% elif object.lab.platform == "PN" or object.lab.platform == "CMD" %}
                 <div class="iframe-container" style="position: relative;">
@@ -100,30 +43,25 @@
                     </iframe>
                 </div>
             {% endif %}
+            
             {% with object=object.lab %}
                 {% include 'interface/lab_data.html' %}
             {% endwith %}
 
         </div>
         <div class="column is-one-quarter">
-            <div id="timer" class="message is-dark mb-3" style="box-shadow: 0 0px 32px rgba(0,0,0,0.09); border: 1px solid rgba(0, 0, 0, 0.1)">
-                <div class="message-body">
-                    <h2 class="has-text-weight-bold">Оставшееся время:</h2>
-
-                    <div id="countdown" class="has-text-weight-bold has-text-danger">
-                         {{ delta.hours }} <span>:</span>
-                         {{ delta.minutes }} <span>:</span>
-                         {{ delta.seconds }}
-                    </div>
-                </div>
-            </div>
+            {% include 'interface/_timer.html' with delta=delta instance_id=object.id instance_type='competition' %}
 
             {% if not user.is_superuser %}
-                <span class="tag is-medium mb-3"><h5 class="title is-5 mb-0">Ваше имя пользователя: <br>{{ pnet_username }}</h5></span>
+                <span class="tag is-medium mb-3">
+                    <h5 class="title is-5 mb-0">Ваше имя пользователя: <br>{{ pnet_username }}</h5>
+                </span>
             {% endif %}
 
             {% if not user.is_superuser and object.level %}
-                <span class="tag is-medium "><h5 class="title is-5">Ваш вариант: {{ object.level.level_number }}</h5></span>
+                <span class="tag is-medium">
+                    <h5 class="title is-5">Ваш вариант: {{ object.level.level_number }}</h5>
+                </span>
             {% endif %}
 
             {% if object.lab.need_kibana and not user.is_superuser %}
@@ -142,7 +80,6 @@
                     {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Ваши задания" is_superuser=user.is_superuser competition_slug=object.slug %}
                 {% endif %}
             {% endif %}
-
 
             {% if not user.is_superuser and object.lab.answer_flag %}
                 <div id="answer-form" class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
@@ -167,215 +104,23 @@
                 </div>
             {% endif %}
 
-
         </div>
     </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const startButton = document.getElementById("start-now");
-            const video = document.getElementById("exam-video");
-
-            if (startButton) {
-                startButton.addEventListener("click", function () {
-                    video.style.display = "block";
-                    video.play();
-
-                    video.onended = function () {
-                        video.style.display = "none";
-                    };
-                });
-            }
-        });
-    </script>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    
     <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
-
     <script src="{% static 'js/gsap.min.js' %}"></script>
     <script src="{% static 'js/Flip.min.js' %}"></script>
-
-    <script>
-    gsap.registerPlugin(Flip);
-        function refreshSolutions() {
-            if (!document.getElementById('competition-slug')) { return; }
-            var competitionSlug = document.getElementById('competition-slug').getAttribute('data-slug');
-            $.ajax({
-                url: `/api/get_competition_solutions/${competitionSlug}/`,
-                type: 'GET',
-                success: function(response) {
-                    var tableBody = document.querySelector('#solutions-table');
-                    var oldState = Flip.getState(tableBody.querySelectorAll('tr[data-flip-id]'));
-                    console.log("Old state:", oldState);
-                    const existingRows = {};
-                    tableBody.querySelectorAll('tr[data-flip-id]').forEach(row => {
-                      const id = row.getAttribute('data-flip-id');
-                      existingRows[id] = row;
-                    });
-                    const newRows = [];
-                    {#tableBody.innerHTML = '';#}
-
-                    var totalProgressBar = document.querySelector('#total-progress-bar');
-
-                    if (totalProgressBar) {
-                        totalProgressBar.value = response.total_progress;
-                        totalProgressBar.max = response.max_total_progress;
-                        totalProgressBar.textContent = response.total_progress + '%';
-                    }
-
-
-                    if (response.solutions.length === 0) {
-                        const row = document.createElement('tr');
-                        tableBody.innerHTML = `
-                                <td colspan = 6 style="text-align: center; color: gray;">Пока никто не выполнил работу</td>
-                        `;
-                        newRows.push(row);
-                    } else {
-                        response.solutions.forEach(function(solution) {
-                            const id = solution.user_id || solution.pos;
-                            let row = existingRows[id];
-                            if (!row) {
-                              row = document.createElement('tr');
-                              row.setAttribute('data-flip-id', id);
-                            }
-                            row.innerHTML = `
-                                <th>${solution.pos}</th>
-                                <td>${solution.user_first_name}</td>
-                                <td>${solution.user_last_name}</td>
-                                <td>${solution.user_platoon}</td>
-                                {% if is_team_competition %}
-                                    <td>${solution.team_name}</td>
-                                {% endif %}
-                                {% if object.tasks %}
-                                    <td>${solution.progress}/${response.total_tasks}</td>
-                                    <td><progress class="progress is-success" value="${solution.progress}" max="${response.total_tasks}">${solution.progress}</progress></td>
-                                {% endif %}
-                                <td>${solution.spent}</td>
-                                <td>${solution.datetime}</td>
-                                `;
-                            {#tableBody.appendChild(row);#}
-                            newRows.push(row);
-                        });
-                    }
-                    // Clear the table body (but not remove rows that might be reused elsewhere)
-                    tableBody.innerHTML = '';
-                    // Append each row in the new order
-                    newRows.forEach(function(row) {
-                      tableBody.appendChild(row);
-                    });
-                    Flip.from(oldState, {
-                        duration: 2,
-                        ease: "power1.inOut"
-                    });
-                },
-                error: function(xhr, status, error) {
-                    console.error("Error loading solutions:", error);
-                }
-            });
-        }
-
-        setInterval(refreshSolutions, 10000);
-    </script>
-
-    <script>
-        let end = false;
-
-        function updateTimer() {
-            const countdownElem = document.getElementById('countdown');
-            const text = countdownElem.textContent.trim();
-            if (text === "Экзамен завершён") {
-                return;
-            }
-
-            var hours = parseInt(text.split(':')[0]);
-            var minutes = parseInt(text.split(':')[1]);
-            var seconds = parseInt(text.split(':')[2]);
-
-            if (hours === 0 && minutes === 0 && seconds === 0) {
-                // Time is fully exhausted
-                countdownElem.textContent = "Экзамен завершён";
-                if (!end) {
-                    end = true;
-                    localStorage.setItem('end', 'true');
-                }
-                return;
-            }
-
-            if (seconds > 0) {
-                seconds--;
-            } else {
-                if (minutes > 0) {
-                    minutes--;
-                    seconds = 59;
-                } else {
-                    if (hours > 0) {
-                        hours--;
-                        minutes = 59;
-                        seconds = 59;
-                    } else {
-                        if (!end) {
-                            {% if available and not solutions %}
-                                location.reload();
-                            {% endif %}
-                            end = true;
-                            localStorage.setItem('end', 'true');
-                        }
-                    }
-                }
-            }
-
-            // Update the timer display
-            document.getElementById('countdown').textContent =
-                (hours < 10 ? '0' : '') + hours + ' : ' +
-                (minutes < 10 ? '0' : '') + minutes + ' : ' +
-                (seconds < 10 ? '0' : '') + seconds;
-        }
-
-        function fetchTime() {
-            // Get the competition ID from the template (assuming you pass it in context)
-            var competitionId = "{{ object.pk }}";
-
-            // Make an AJAX GET request to fetch the remaining time
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', '{% url 'interface_api:get_time' competition_id=object.id %}', true);
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    var response = JSON.parse(xhr.responseText);
-                    console.log(response.hours);
-
-                    // Update the timer display with new time
-                    document.getElementById('countdown').textContent =
-                        (response.hours < 10 ? '0' : '') + response.hours + ' : ' +
-                        (response.minutes < 10 ? '0' : '') + response.minutes + ' : ' +
-                        (response.seconds < 10 ? '0' : '') + response.seconds;
-                }
-            };
-            xhr.send();
-        }
-
-        window.onload = function() {
-            if (localStorage.getItem('end') === 'true') {
-                end = true;
-            } else {
-                end = false;
-            }
-            fetchTime();
-            {% if user.is_superuser %}
-                refreshSolutions();
-            {% endif %}
-        }
-
-        // Update the timer every second
-        setInterval(updateTimer, 1000);
-        setInterval(fetchTime, 30000);
-    </script>
-
-    <meta name="csrf-token" content="{{ csrf_token }}">
+    <script src="{% static 'js/timer.js' %}"></script>
+    <script src="{% static 'js/solutions_table.js' %}"></script>
+    
     {% if user.is_superuser %}
         <script src="{% static 'admin/js/button.js' %}"></script>
+        <script src="{% static 'js/control_buttons.js' %}"></script>
     {% else %}
         <script src="{% static 'js/tasks_controller.js' %}"></script>
     {% endif %}
-
-
 
     {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
         {% if not user.is_superuser %}

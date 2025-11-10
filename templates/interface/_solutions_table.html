@@ -1,0 +1,36 @@
+<div class="box mb-5" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+    <h2 class="has-text-weight-bold">Общий прогресс:</h2><br>
+    <progress class="progress is-success"
+              value="{{ progress }}"
+              max="{{ max_progress }}"
+              id="total-progress-bar">
+        {{ progress }}%
+    </progress>
+
+    <div id="solutions-container"
+         data-slug="{{ instance_slug }}"
+         data-type="{{ instance_type }}"
+         data-show-team="{{ show_team_column|default:False }}"
+         data-show-max-tasks="{{ show_max_tasks|default:False }}">
+        <table class="table is-fullwidth" style="border-spacing: 7px;">
+            <thead>
+                <tr>
+                    <th><abbr title="Позиция" style="text-decoration: none;">Поз.</abbr></th>
+                    <th>Имя</th>
+                    <th>Фамилия</th>
+                    <th>Взвод</th>
+                    {% if show_team_column %}
+                        <th>Команда</th>
+                    {% endif %}
+                    <th>Решено</th>
+                    <th>Прогресс</th>
+                    <th>{% if instance_type == 'kkz' %}Время последнего решения{% else %}Затраченное время{% endif %}</th>
+                    {% if instance_type == 'competition' %}
+                        <th>Время сдачи</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody id="solutions-table"></tbody>
+        </table>
+    </div>
+</div>
