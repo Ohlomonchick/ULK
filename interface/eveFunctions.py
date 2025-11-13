@@ -376,7 +376,7 @@ def delete_lab(url, cookie, lab_path):
     return r
 
 
-def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username, post_nodes_callback=None):
+def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username, post_nodes_callback=None, usb_device_ids=None):
     """
     Создание узлов и коннекторов лаборатории.
     
@@ -390,7 +390,10 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
         username: Имя пользователя
         post_nodes_callback: Callback функция, вызываемая после создания нод, но до destroy_session.
                            Принимает (url, cookie, xsrf, sess_id) и должна вернуть данные для дальнейшей обработки
+        usb_device_ids: Список USB device IDs для замены в qemu_options (например, [1, 2, 3])
     """
+    from interface.utils import replace_usb_device_ids_in_nodes
+    
     username = slugify(username)
     lab_path += "/" + username
 
@@ -431,7 +434,12 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
 
     join_session(url, sess_id, cookie)
 
-    for node in lab_object.NodesData:
+    # Модифицируем NodesData с USB device IDs, если они предоставлены
+    nodes_data = lab_object.NodesData
+    if usb_device_ids:
+        nodes_data = replace_usb_device_ids_in_nodes(nodes_data, usb_device_ids)
+
+    for node in nodes_data:
         if node:
             create_node(url, node, cookie, xsrf)
 

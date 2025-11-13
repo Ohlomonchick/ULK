@@ -2,6 +2,7 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 from unittest.mock import patch, MagicMock
 from datetime import timedelta
+import re
 
 from interface.forms import TeamCompetitionForm
 from interface.models import (
@@ -63,10 +64,88 @@ class TeamCompetitionFormTest(TransactionTestCase):
         self.mock_delete_lab_team.reset_mock()
         self.mock_elastic_client.reset_mock()
         self.mock_queue.reset_mock()
+        
+        # Create NodesData with USB drive options for testing
+        self.nodes_data = [
+            {
+                "cpu": 2,
+                "ram": 4096,
+                "top": 434,
+                "icon": "linux-1.png",
+                "left": 356,
+                "name": "Linux",
+                "size": "",
+                "type": "qemu",
+                "uuid": "",
+                "count": "1",
+                "delay": 0,
+                "image": "linux-Astra_snap_mrd",
+                "config": 0,
+                "console": "vnc",
+                "postfix": 0,
+                "cpulimit": 1,
+                "ethernet": 1,
+                "firstmac": "",
+                "map_port": "",
+                "password": "",
+                "qemu_nic": "virtio-net-pci",
+                "shutdown": 1,
+                "template": "linux",
+                "username": "",
+                "first_nic": "",
+                "qemu_arch": "x86_64",
+                "console_2nd": "",
+                "description": "Linux",
+                "map_port_2nd": "",
+                "qemu_options": "-machine type=pc,accel=kvm -vga virtio -usbdevice tablet -boot order=cd -cpu host -device usb-ehci -device usb-storage,drive=usbdisk -drive id=usbdisk,file=/usr/share/qemu/usb_flash1.img,if=none",
+                "qemu_version": "4.1.0",
+                "config_script": "",
+                "script_timeout": 1200
+            },
+            {
+                "cpu": 1,
+                "ram": 256,
+                "top": 478,
+                "icon": "Router.png",
+                "left": 540,
+                "name": "Mikrotik",
+                "size": "",
+                "type": "qemu",
+                "uuid": "",
+                "count": "1",
+                "delay": 0,
+                "image": "mikrotik-mikrotik_L3",
+                "config": 0,
+                "console": "telnet",
+                "postfix": 0,
+                "cpulimit": 1,
+                "ethernet": 4,
+                "firstmac": "",
+                "map_port": "",
+                "password": "",
+                "qemu_nic": "e1000",
+                "template": "mikrotik",
+                "username": "",
+                "first_nic": "",
+                "qemu_arch": "x86_64",
+                "console_2nd": "",
+                "description": "MikroTik RouterOS",
+                "map_port_2nd": "",
+                "qemu_options": "-machine type=pc,accel=kvm -serial mon:stdio -nographic -no-user-config -nodefaults -display none -vga std -rtc base=utc -drive id=usb_drive,file=flashdrive.img",
+                "qemu_version": "2.12.0",
+                "config_script": "config_mikrotik.py",
+                "script_timeout": 1200
+            }
+        ]
+        
         self.lab = Lab.objects.create(
             name="PN Lab Competition",
             platform="PN",
-            lab_type="COMPETITION"
+            lab_type="COMPETITION",
+            NodesData=self.nodes_data,
+            ConnectorsData=[],
+            Connectors2CloudData=[],
+            NetworksData=[]
         )
 
         self.level = LabLevel.objects.create(
@@ -428,4 +507,133 @@ class TeamCompetitionFormTest(TransactionTestCase):
                 len(team_comps_with_tasks),
                 f"Expected {len(team_comps_with_tasks)} flag deployment tasks to be submitted"
             )
+
+    def test_usb_device_ids_shared_between_users_and_teams(self):
+        """
+        Проверяет, что в TeamCompetitionForm пользователи и команды используют один общий набор USB IDs
+        без пересечений.
+        """
+        from dynamic_config.models import ConfigEntry
+        
+        ConfigEntry.objects.update_or_create(
+            key='USB_DEVICES_COUNT',
+            defaults={'value': '20'}
+        )
+        
+        form = TeamCompetitionForm(data=self.form_data)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+        
+        competition = form.save()
+        
+        # Собираем все USB IDs от пользователей
+        comp2users = Competition2User.objects.filter(competition=competition)
+        user_usb_ids = []
+        for comp2user in comp2users:
+            usb_ids = comp2user.deploy_meta.get('usb_device_ids', [])
+            user_usb_ids.extend(usb_ids)
+        
+        # Собираем все USB IDs от команд
+        team_comps = TeamCompetition2Team.objects.filter(competition=competition)
+        team_usb_ids = []
+        for team_comp in team_comps:
+            usb_ids = team_comp.deploy_meta.get('usb_device_ids', [])
+            team_usb_ids.extend(usb_ids)
+        
+        # Проверяем, что нет пересечений между пользователями и командами
+        all_ids = user_usb_ids + team_usb_ids
+        unique_ids = set(all_ids)
+        self.assertEqual(len(all_ids), len(unique_ids),
+                        "USB IDs should not overlap between users and teams")
+        
+        # Проверяем, что все ID уникальны
+        self.assertGreater(len(user_usb_ids), 0, "Users should have USB IDs")
+        self.assertGreater(len(team_usb_ids), 0, "Teams should have USB IDs")
+
+    def test_usb_device_ids_passed_to_create_nodes_for_teams(self):
+        """
+        Проверяет, что USB device IDs правильно передаются в create_lab_nodes_and_connectors для команд.
+        """
+        from dynamic_config.models import ConfigEntry
+        
+        ConfigEntry.objects.update_or_create(
+            key='USB_DEVICES_COUNT',
+            defaults={'value': '20'}
+        )
+        
+        # Сохраняем аргументы вызовов create_lab_nodes_and_connectors
+        call_args_list = []
+        
+        def capture_call_args(*args, **kwargs):
+            call_args_list.append((args, kwargs))
+            return self.mock_create_nodes.return_value
+        
+        self.mock_create_nodes.side_effect = capture_call_args
+        
+        form = TeamCompetitionForm(data=self.form_data)
+        self.assertTrue(form.is_valid())
+        
+        competition = form.save()
+        
+        # Проверяем вызовы для команд
+        team_comps = TeamCompetition2Team.objects.filter(competition=competition)
+        
+        # Находим вызовы для команд (по username=team_slug)
+        team_calls = []
+        for team_comp in team_comps:
+            for args, kwargs in call_args_list:
+                # create_lab_nodes_and_connectors вызывается с lab, lab_name, username, usb_device_ids=...
+                # args: (lab, lab_name, username)
+                # kwargs: {usb_device_ids=...}
+                if len(args) >= 3 and args[2] == team_comp.team.slug:
+                    team_calls.append((team_comp, kwargs))
+                    break
+        
+        # Проверяем, что USB IDs переданы правильно для каждой команды
+        self.assertGreater(len(team_calls), 0, "Should have calls for teams")
+        for team_comp, kwargs in team_calls:
+            expected_usb_ids = team_comp.deploy_meta.get('usb_device_ids', [])
+            actual_usb_ids = kwargs.get('usb_device_ids', [])
+            self.assertEqual(actual_usb_ids, expected_usb_ids,
+                           f"USB IDs for team {team_comp.team.name} should match deploy_meta")
+
+    def test_usb_device_ids_replacement_in_qemu_options_for_teams(self):
+        """
+        Проверяет, что USB device IDs правильно заменяются в qemu_options для команд.
+        """
+        from interface.utils import replace_usb_device_ids_in_nodes
+        from dynamic_config.models import ConfigEntry
+        
+        ConfigEntry.objects.update_or_create(
+            key='USB_DEVICES_COUNT',
+            defaults={'value': '20'}
+        )
+        
+        form = TeamCompetitionForm(data=self.form_data)
+        self.assertTrue(form.is_valid())
+        
+        competition = form.save()
+        
+        # Получаем первую команду для проверки
+        team_comp = TeamCompetition2Team.objects.filter(competition=competition).first()
+        self.assertIsNotNone(team_comp, "Should have at least one TeamCompetition2Team")
+        
+        usb_ids = team_comp.deploy_meta.get('usb_device_ids', [])
+        self.assertGreater(len(usb_ids), 0, "Should have USB IDs")
+        
+        # Проверяем замену в qemu_options
+        modified_nodes = replace_usb_device_ids_in_nodes(self.nodes_data, usb_ids)
+        
+        # Проверяем, что опции были заменены
+        usb_id_index = 0
+        for node in modified_nodes:
+            qemu_options = node.get('qemu_options', '')
+            # Ищем паттерн file=*.img в опциях drive
+            if re.search(r'-{1,2}drive\s+[^,]*id=[^,]+,\s*file=[^,\s]+\.img', qemu_options):
+                # Если есть опция, она должна быть заменена на /usr/share/qemu/usb_flash{i}.img
+                expected_path = f'/usr/share/qemu/usb_flash{usb_ids[usb_id_index]}.img'
+                self.assertIn(expected_path, qemu_options,
+                             f"USB ID {usb_ids[usb_id_index]} should be in qemu_options as {expected_path}")
+                usb_id_index += 1
+                if usb_id_index >= len(usb_ids):
+                    break
 

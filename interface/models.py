@@ -44,6 +44,7 @@ def get_platform_choices():
 class LabProgram(models.TextChoices):
     INFOBOR = "INFOBOR", "Информационное противоборство"
     COMPETITION = "COMPETITION", "Соревнования"
+    STUDENT_WORKS = "STUDENT_WORKS", "Работы студентов"
 
 class LabType(models.TextChoices):
     HW = "HW", "Домашнее задание"
@@ -420,6 +421,12 @@ class Competition2User(models.Model):
         default=list,
         validators=[validate_top_level_array]
     )
+    deploy_meta = models.JSONField(
+        "Метаданные развертывания",
+        blank=True,
+        null=True,
+        default=dict
+    )
 
     deleted = models.BooleanField(default=False)
 
@@ -454,8 +461,11 @@ class Competition2User(models.Model):
             lab_name = get_pnet_lab_name(instance.competition)
             username = instance.user.username
             
+            # Получаем USB device IDs из deploy_meta
+            usb_device_ids = instance.deploy_meta.get('usb_device_ids', []) if instance.deploy_meta else []
+            
             session_manager.create_lab_for_user(lab_name, username)
-            session_manager.create_lab_nodes_and_connectors(lab, lab_name, username)
+            session_manager.create_lab_nodes_and_connectors(lab, lab_name, username, usb_device_ids=usb_device_ids)
 
         execute_pnet_operation_if_needed(lab, _create_operation)
     
@@ -523,6 +533,12 @@ class TeamCompetition2Team(models.Model):
         default=list,
         validators=[validate_top_level_array]
     )
+    deploy_meta = models.JSONField(
+        "Метаданные развертывания",
+        blank=True,
+        null=True,
+        default=dict
+    )
     deleted = models.BooleanField(default=False)
 
     def __str__(self):
@@ -538,8 +554,11 @@ class TeamCompetition2Team(models.Model):
             lab_name = get_pnet_lab_name(instance.competition)
             team_slug = instance.team.slug
             
+            # Получаем USB device IDs из deploy_meta
+            usb_device_ids = instance.deploy_meta.get('usb_device_ids', []) if instance.deploy_meta else []
+            
             session_manager.create_lab_for_user(lab_name, team_slug)
-            session_manager.create_lab_nodes_and_connectors(lab, lab_name, team_slug)
+            session_manager.create_lab_nodes_and_connectors(lab, lab_name, team_slug, usb_device_ids=usb_device_ids)
 
             relative_path = f'{get_user_workspace_relative_path()}/{team_slug}'
             logger.debug(f'competition created for team {team_slug}')

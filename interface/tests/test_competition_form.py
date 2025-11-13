@@ -2,6 +2,7 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 from unittest.mock import patch, MagicMock
 from datetime import timedelta
+import re
 
 from interface.forms import CompetitionForm
 from interface.models import (
@@ -55,10 +56,87 @@ class CompetitionFormTest(TransactionTestCase):
         self.mock_elastic_client.reset_mock()
         self.mock_queue.reset_mock()
         
+        # Create NodesData with USB drive options for testing
+        self.nodes_data = [
+            {
+                "cpu": 2,
+                "ram": 4096,
+                "top": 434,
+                "icon": "linux-1.png",
+                "left": 356,
+                "name": "Linux",
+                "size": "",
+                "type": "qemu",
+                "uuid": "",
+                "count": "1",
+                "delay": 0,
+                "image": "linux-Astra_snap_mrd",
+                "config": 0,
+                "console": "vnc",
+                "postfix": 0,
+                "cpulimit": 1,
+                "ethernet": 1,
+                "firstmac": "",
+                "map_port": "",
+                "password": "",
+                "qemu_nic": "virtio-net-pci",
+                "shutdown": 1,
+                "template": "linux",
+                "username": "",
+                "first_nic": "",
+                "qemu_arch": "x86_64",
+                "console_2nd": "",
+                "description": "Linux",
+                "map_port_2nd": "",
+                "qemu_options": "-machine type=pc,accel=kvm -vga virtio -usbdevice tablet -boot order=cd -cpu host -device usb-ehci -device usb-storage,drive=usbdisk -drive id=usbdisk,file=/usr/share/qemu/usb_flash1.img,if=none",
+                "qemu_version": "4.1.0",
+                "config_script": "",
+                "script_timeout": 1200
+            },
+            {
+                "cpu": 1,
+                "ram": 256,
+                "top": 478,
+                "icon": "Router.png",
+                "left": 540,
+                "name": "Mikrotik",
+                "size": "",
+                "type": "qemu",
+                "uuid": "",
+                "count": "1",
+                "delay": 0,
+                "image": "mikrotik-mikrotik_L3",
+                "config": 0,
+                "console": "telnet",
+                "postfix": 0,
+                "cpulimit": 1,
+                "ethernet": 4,
+                "firstmac": "",
+                "map_port": "",
+                "password": "",
+                "qemu_nic": "e1000",
+                "template": "mikrotik",
+                "username": "",
+                "first_nic": "",
+                "qemu_arch": "x86_64",
+                "console_2nd": "",
+                "description": "MikroTik RouterOS",
+                "map_port_2nd": "",
+                "qemu_options": "-machine type=pc,accel=kvm -serial mon:stdio -nographic -no-user-config -nodefaults -display none -vga std -rtc base=utc -drive id=usb_drive,file=flashdrive.img",
+                "qemu_version": "2.12.0",
+                "config_script": "config_mikrotik.py",
+                "script_timeout": 1200
+            }
+        ]
+        
         # Create a Lab that uses "PN" platform to trigger external calls
         self.lab = Lab.objects.create(
             name="PN Lab",
-            platform="PN"  # So it attempts to call pf_login/create_lab on save
+            platform="PN",  # So it attempts to call pf_login/create_lab on save
+            NodesData=self.nodes_data,
+            ConnectorsData=[],
+            Connectors2CloudData=[],
+            NetworksData=[]
         )
 
         # Create a LabLevel
@@ -379,3 +457,123 @@ class CompetitionFormTest(TransactionTestCase):
             remaining_user_ids,
             "user_platoon_2 should still be in competition_users"
         )
+
+    def test_usb_device_ids_generation_and_storage(self):
+        """
+        Проверяет, что USB device IDs генерируются и сохраняются в deploy_meta для каждого Competition2User.
+        """
+        from dynamic_config.models import ConfigEntry
+        
+        # Устанавливаем количество USB устройств
+        ConfigEntry.objects.update_or_create(
+            key='USB_DEVICES_COUNT',
+            defaults={'value': '20'}
+        )
+        
+        form = CompetitionForm(data=self.form_data)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+        
+        competition = form.save()
+        
+        # Проверяем, что для каждого Competition2User сохранены USB IDs в deploy_meta
+        comp2users = Competition2User.objects.filter(competition=competition)
+        self.assertGreater(comp2users.count(), 0, "Should have at least one Competition2User")
+        
+        all_usb_ids = []
+        for comp2user in comp2users:
+            self.assertIsNotNone(comp2user.deploy_meta, "deploy_meta should be set")
+            self.assertIn('usb_device_ids', comp2user.deploy_meta, "usb_device_ids should be in deploy_meta")
+            usb_ids = comp2user.deploy_meta['usb_device_ids']
+            self.assertIsInstance(usb_ids, list, "usb_device_ids should be a list")
+            self.assertGreater(len(usb_ids), 0, "usb_device_ids should not be empty")
+            all_usb_ids.extend(usb_ids)
+        
+        # Проверяем, что все USB IDs уникальны (нет пересечений)
+        self.assertEqual(len(all_usb_ids), len(set(all_usb_ids)), "All USB IDs should be unique")
+
+    def test_usb_device_ids_passed_to_create_nodes(self):
+        """
+        Проверяет, что USB device IDs правильно передаются в create_lab_nodes_and_connectors.
+        """
+        from dynamic_config.models import ConfigEntry
+        
+        ConfigEntry.objects.update_or_create(
+            key='USB_DEVICES_COUNT',
+            defaults={'value': '20'}
+        )
+        
+        # Сохраняем аргументы вызовов create_lab_nodes_and_connectors
+        call_args_list = []
+        
+        def capture_call_args(*args, **kwargs):
+            call_args_list.append((args, kwargs))
+            return self.mock_create_nodes.return_value
+        
+        self.mock_create_nodes.side_effect = capture_call_args
+        
+        form = CompetitionForm(data=self.form_data)
+        self.assertTrue(form.is_valid())
+        
+        competition = form.save()
+        
+        # Проверяем, что create_lab_nodes_and_connectors был вызван с правильными USB IDs
+        comp2users = Competition2User.objects.filter(competition=competition)
+        self.assertGreater(len(call_args_list), 0, 
+                          "create_lab_nodes_and_connectors should be called at least once")
+        
+        # Проверяем, что USB IDs переданы правильно
+        # Создаем словарь для сопоставления username -> comp2user
+        user_map = {comp2user.user.username: comp2user for comp2user in comp2users}
+        
+        for args, kwargs in call_args_list:
+            # args: (lab, lab_name, username)
+            # kwargs: {usb_device_ids=...}
+            if len(args) >= 3:
+                username = args[2]
+                if username in user_map:
+                    comp2user = user_map[username]
+                    expected_usb_ids = comp2user.deploy_meta.get('usb_device_ids', [])
+                    actual_usb_ids = kwargs.get('usb_device_ids', [])
+                    self.assertEqual(actual_usb_ids, expected_usb_ids,
+                                   f"USB IDs for user {username} should match deploy_meta")
+
+    def test_usb_device_ids_replacement_in_qemu_options(self):
+        """
+        Проверяет, что USB device IDs правильно заменяются в qemu_options при создании узлов.
+        """
+        from interface.utils import replace_usb_device_ids_in_nodes
+        from dynamic_config.models import ConfigEntry
+        
+        ConfigEntry.objects.update_or_create(
+            key='USB_DEVICES_COUNT',
+            defaults={'value': '20'}
+        )
+        
+        form = CompetitionForm(data=self.form_data)
+        self.assertTrue(form.is_valid())
+        
+        competition = form.save()
+        
+        # Получаем первый Competition2User для проверки
+        comp2user = Competition2User.objects.filter(competition=competition).first()
+        self.assertIsNotNone(comp2user, "Should have at least one Competition2User")
+        
+        usb_ids = comp2user.deploy_meta.get('usb_device_ids', [])
+        self.assertGreater(len(usb_ids), 0, "Should have USB IDs")
+        
+        # Проверяем замену в qemu_options
+        modified_nodes = replace_usb_device_ids_in_nodes(self.nodes_data, usb_ids)
+        
+        # Проверяем, что опции были заменены
+        usb_id_index = 0
+        for node in modified_nodes:
+            qemu_options = node.get('qemu_options', '')
+            # Ищем паттерн file=*.img в опциях drive
+            if re.search(r'-{1,2}drive\s+[^,]*id=[^,]+,\s*file=[^,\s]+\.img', qemu_options):
+                # Если есть опция, она должна быть заменена на /usr/share/qemu/usb_flash{i}.img
+                expected_path = f'/usr/share/qemu/usb_flash{usb_ids[usb_id_index]}.img'
+                self.assertIn(expected_path, qemu_options,
+                             f"USB ID {usb_ids[usb_id_index]} should be in qemu_options as {expected_path}")
+                usb_id_index += 1
+                if usb_id_index >= len(usb_ids):
+                    break

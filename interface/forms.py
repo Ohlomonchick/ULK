@@ -7,7 +7,7 @@ from django import forms
 from durationwidget.widgets import TimeDurationWidget
 from django.utils import timezone
 
-from interface.utils import get_pnet_password
+from interface.utils import get_pnet_password, generate_usb_device_ids
 from interface.elastic_utils import create_elastic_user
 from .models import (
     LabType,
@@ -248,6 +248,34 @@ class CompetitionForm(forms.ModelForm):
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
         return all_users
 
+    def _get_new_participants(self, instance):
+        """Возвращает список новых участников (пользователей) для создания."""
+        all_users = self.get_all_users(instance)
+        existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
+        return [user for user in all_users if user.id not in existing_user_ids]
+
+    def _get_total_new_participants_count(self, instance):
+        """Возвращает общее количество новых участников. Переопределяется в TeamCompetitionForm."""
+        return len(self._get_new_participants(instance))
+
+    def _init_usb_ids_distribution(self, instance):
+        """Инициализирует распределение USB IDs. Сохраняет в переменную экземпляра."""
+        total = self._get_total_new_participants_count(instance)
+        if total > 0:
+            self._usb_ids_distribution = generate_usb_device_ids(total)
+            self._usb_ids_index = 0
+        else:
+            self._usb_ids_distribution = []
+            self._usb_ids_index = 0
+
+    def _get_next_usb_ids(self):
+        """Возвращает следующий набор USB IDs из распределения."""
+        if self._usb_ids_index < len(self._usb_ids_distribution):
+            ids = self._usb_ids_distribution[self._usb_ids_index]
+            self._usb_ids_index += 1
+            return ids
+        return []
+
     def handle_competition_users(self, instance):
         import time
         import logging
@@ -255,54 +283,55 @@ class CompetitionForm(forms.ModelForm):
         logger = logging.getLogger(__name__)
         start_time = time.time()
 
-        all_users = self.get_all_users(instance)
-        existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
-        new_users = [user for user in all_users if user.id not in existing_user_ids]
+        new_users = self._get_new_participants(instance)
 
         if new_users:
+            self._init_usb_ids_distribution(instance)
+            
             logger.info(f"Starting lab creation for {len(new_users)} users in competition {instance.slug}")
             with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_users(instance, new_users))
 
             total_time = time.time() - start_time
             logger.info(f"Completed lab creation for {len(new_users)} users in {total_time:.2f} seconds (avg: {total_time/len(new_users):.2f}s per user)")
 
-        # Удаляем пользователей, которых больше нет в списке
-        all_users_ids = set(all_users.values_list('pk', flat=True))
-        def _delete_users_operation():
-            for user_id in existing_user_ids:
-                if user_id not in all_users_ids:
-                    Competition2User.objects.get(competition=instance, user_id=user_id).delete()
-
-        with_pnet_session_if_needed(instance.lab, _delete_users_operation)
-
+        self._delete_removed_users(instance)
         return instance
 
     def _create_competition_users(self, instance, users: List[User]):
-        """
-        Последовательное создание Competition2User записей.
-        """
-        def _create_single_competition_user(user):
-            """Создание одной записи Competition2User"""
-
+        """Создание Competition2User записей с USB IDs из распределения."""
+        for user in users:
+            usb_ids = self._get_next_usb_ids()
+            deploy_meta = {'usb_device_ids': usb_ids}
+            
             competition2user, created = Competition2User.objects.update_or_create(
                 competition=instance,
                 user=user,
                 level=instance.level,
+                defaults={'deploy_meta': deploy_meta}
             )
 
             if created:
                 tasks = list(instance.tasks.all() or instance.lab.options.all())
                 assigned_tasks = random.sample(tasks, min(instance.num_tasks, len(tasks)))
                 competition2user.tasks.set(assigned_tasks)
+            else:
+                if not competition2user.deploy_meta:
+                    competition2user.deploy_meta = {}
+                competition2user.deploy_meta['usb_device_ids'] = usb_ids
+                competition2user.save(update_fields=['deploy_meta'])
 
-            return competition2user
-
-        created_competition_users = []
-
-        for user in users:
-            created_competition_users.append(_create_single_competition_user(user))
-
-        return created_competition_users
+    def _delete_removed_users(self, instance):
+        """Удаляет пользователей, которых больше нет в списке."""
+        all_users = self.get_all_users(instance)
+        all_users_ids = set(all_users.values_list('pk', flat=True))
+        existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
+        
+        def _delete_operation():
+            for user_id in existing_user_ids:
+                if user_id not in all_users_ids:
+                    Competition2User.objects.get(competition=instance, user_id=user_id).delete()
+        
+        with_pnet_session_if_needed(instance.lab, _delete_operation)
 
 
 class KkzForm(forms.ModelForm):  # pragma: no cover
@@ -452,62 +481,84 @@ class TeamCompetitionForm(CompetitionForm):
 
     def get_all_users(self, instance):
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
-        team_user_ids = User.objects.filter(team__in=self.cleaned_data["teams"]).values_list("id", flat=True)
-        all_users = all_users.exclude(id__in=team_user_ids)
-        return all_users
+        team_user_ids = User.objects.filter(team__in=self.cleaned_data.get("teams", [])).values_list("id", flat=True)
+        return all_users.exclude(id__in=team_user_ids)
 
-    def save(self, commit=True):
-        """
-        This calls CompetitionForm's save() logic first,
-        so you reuse all that field assignment and M2M logic.
-        """
-        instance = super().save(commit=False)
-        if commit:
-            instance.save()
-
+    def _get_new_teams(self, instance):
+        """Возвращает список новых команд для создания."""
         teams = self.cleaned_data.get('teams', [])
+        existing_team_ids = set(TeamCompetition2Team.objects.filter(competition=instance).values_list('team_id', flat=True))
+        return [team for team in teams if team.id not in existing_team_ids]
 
-        with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_teams(instance, teams))
+    def _get_total_new_participants_count(self, instance):
+        """Возвращает общее количество новых участников (пользователи + команды)."""
+        return len(self._get_new_participants(instance)) + len(self._get_new_teams(instance))
 
-        team_ids = set(teams.values_list('id', flat=True))
-        existing_team_records = TeamCompetition2Team.objects.filter(competition=instance)
+    def handle_competition_users(self, instance):
+        """Обрабатывает создание пользователей и команд с общим распределением USB IDs."""
+        import time
+        import logging
 
-        def _delete_teams_operation():
-            for team_record in existing_team_records:
-                if team_record.team_id not in team_ids:
-                    team_record.delete()
+        logger = logging.getLogger(__name__)
+        start_time = time.time()
 
-        with_pnet_session_if_needed(instance.lab, _delete_teams_operation)
-        
-        # Ожидаем завершения задач развертывания флагов (наследуется от CompetitionForm)
-        # Метод _wait_for_flag_deployment уже вызывается в super().save()
+        new_users = self._get_new_participants(instance)
+        new_teams = self._get_new_teams(instance)
+        total_new = len(new_users) + len(new_teams)
 
+        if total_new > 0:
+            self._init_usb_ids_distribution(instance)
+            
+            logger.info(f"Starting lab creation for {total_new} participants in competition {instance.slug}")
+            
+            # Сначала создаем пользователей
+            if new_users:
+                with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_users(instance, new_users))
+            
+            # Затем создаем команды (используют оставшиеся USB IDs)
+            if new_teams:
+                with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_teams(instance, new_teams))
+
+            total_time = time.time() - start_time
+            logger.info(f"Completed lab creation for {total_new} participants in {total_time:.2f} seconds")
+
+        self._delete_removed_users(instance)
+        self._delete_removed_teams(instance)
         return instance
 
     def _create_competition_teams(self, instance, teams: List[Team]):
-        """
-        Последовательное создание TeamCompetition2Team записей.
-        """
-        def _create_single_competition_team(team):
-            """Создание одной записи TeamCompetition2Team"""
-
+        """Создание TeamCompetition2Team записей с USB IDs из распределения."""
+        for team in teams:
+            usb_ids = self._get_next_usb_ids()
+            deploy_meta = {'usb_device_ids': usb_ids}
+            
             team_competition2team, created = TeamCompetition2Team.objects.update_or_create(
                 competition=instance,
-                team=team
+                team=team,
+                defaults={'deploy_meta': deploy_meta}
             )
 
             if created:
                 tasks = list(instance.tasks.all() or instance.lab.options.all())
                 team_competition2team.tasks.set(tasks)
+            else:
+                if not team_competition2team.deploy_meta:
+                    team_competition2team.deploy_meta = {}
+                team_competition2team.deploy_meta['usb_device_ids'] = usb_ids
+                team_competition2team.save(update_fields=['deploy_meta'])
 
-            return team_competition2team
-
-        created_competition_teams = []
-
-        for team in teams:
-            created_competition_teams.append(_create_single_competition_team(team))
-
-        return created_competition_teams
+    def _delete_removed_teams(self, instance):
+        """Удаляет команды, которых больше нет в списке."""
+        teams = self.cleaned_data.get('teams', [])
+        team_ids = set(teams.values_list('id', flat=True))
+        existing_team_records = TeamCompetition2Team.objects.filter(competition=instance)
+        
+        def _delete_operation():
+            for team_record in existing_team_records:
+                if team_record.team_id not in team_ids:
+                    team_record.delete()
+        
+        with_pnet_session_if_needed(instance.lab, _delete_operation)
 
 
 class SimpleCompetitionForm(forms.Form):
