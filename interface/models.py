@@ -254,6 +254,7 @@ class Team(models.Model):
         with pnet_session:
             pnet_session.create_directory(get_pnet_base_dir(), instance.slug)
 
+
 class Answers(models.Model):
     lab = models.ForeignKey(Lab, related_name="lab", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)

@@ -1,5 +1,6 @@
 import random
 import json
+from collections import defaultdict
 from typing import List
 from datetime import timedelta
 
@@ -355,15 +356,23 @@ class KkzForm(forms.ModelForm):  # pragma: no cover
             kkz.save()
             self.save_m2m()
 
-            for lab in self.cleaned_data['labs']:
-                competition = Competition.objects.create(
-                    start=self.cleaned_data['start'],
-                    finish=self.cleaned_data['finish'],
-                    lab=lab,
-                    kkz=kkz
-                )
-                competition.platoons.set(self.cleaned_data['platoons'])
-                competition.non_platoon_users.set(self.cleaned_data['non_platoon_users'])
+            labs = self.cleaned_data['labs']
+            for lab in labs:
+                competition_data = {
+                    'start': self.cleaned_data['start'],
+                    'finish': self.cleaned_data['finish'],
+                    'lab': lab.pk,
+                    'kkz': kkz.pk,
+                    'platoons': [p.pk for p in self.cleaned_data['platoons']],
+                    'non_platoon_users': [u.pk for u in self.cleaned_data['non_platoon_users']],
+                    'tasks': [t.pk for t in self.cleaned_data['tasks']]
+                }
+
+                competition_form = CompetitionForm(data=competition_data)
+                if competition_form.is_valid():
+                    with_pnet_session_if_needed(lab, lambda: competition_form.save())
+                else:
+                    raise ValidationError(f"Неверные данные для создания competition: {competition_form.errors}")
 
         return kkz
 
@@ -810,10 +819,6 @@ class SimpleKkzForm(forms.Form):
         except json.JSONDecodeError:
             preview_assignments = {}
 
-        max_tasks_limit = None
-        if labs_data and len(labs_data) > 0:
-            max_tasks_limit = labs_data[0].get('max_tasks_limit')
-
         kkz = Kkz.objects.create(
             name=self.cleaned_data["name"],
             start=timezone.now(),
@@ -856,113 +861,96 @@ class SimpleKkzForm(forms.Form):
                 'tasks': tasks
             })
 
-        if max_tasks_limit and max_tasks_limit > 0:
-            total_tasks_to_assign = min(max_tasks_limit, len(all_available_tasks))
-        else:
-            total_tasks_to_assign = len(all_available_tasks)
+        max_tasks_limit = labs_data[0].get('max_tasks_limit') if labs_data else None
+        total_tasks_to_assign = min(max_tasks_limit, len(all_available_tasks)) if max_tasks_limit else len(
+            all_available_tasks)
+        created_competitions = {}
 
         for lab_data in labs_info:
             lab = lab_data['lab']
-            task_ids = lab_data['task_ids']
-
+            tasks = lab_data['tasks']
             kkz_lab = KkzLab.objects.create(
                 kkz=kkz,
                 lab=lab,
-                num_tasks=len(lab_data['tasks'])
+                num_tasks=len(tasks)
             )
 
-            if task_ids:
-                kkz_lab.tasks.set(LabTask.objects.filter(id__in=task_ids))
+            competition_data = {
+                'start': kkz.start,
+                'finish': kkz.finish,
+                'lab': str(lab.pk),
+                'platoons': [str(platoon.pk)],
+                'non_platoon_users': [],
+                'tasks': [str(t.pk) for t in tasks],
+                'num_tasks': str(len(tasks))
+            }
 
-            competition = Competition.objects.create(
-                lab=lab,
-                start=kkz.start,
-                finish=kkz.finish,
-                kkz=kkz,
-                num_tasks=len(lab_data['tasks'])
-            )
-            competition.platoons.add(platoon)
+            form = CompetitionForm(data=competition_data)
+            if not form.is_valid():
+                raise ValidationError(f"Ошибка CompetitionForm: {form.errors}")
+
+            competition = form.save(commit=False)
+            if not hasattr(competition, 'kkz_id'):
+                competition.kkz = kkz
+            else:
+                competition.kkz_id = kkz.pk
+            competition.save()
+            form.save_m2m()
+
+            created_competitions[lab.pk] = competition
+
+        def ensure_objs(items):
+            if not items:
+                return []
+            if hasattr(items[0], 'lab_id'):
+                return list(items)
+            return list(LabTask.objects.filter(id__in=[int(x) for x in items]))
+
+        assignments_by_user = defaultdict(list)
 
         if preview_assignments:
-            for user in users:
-                user_id_str = str(user.id)
-
-                for lab_data in labs_info:
-                    lab = lab_data['lab']
-                    lab_id_str = str(lab_data['lab_id'])
-
-                    if lab_id_str in preview_assignments and user_id_str in preview_assignments[lab_id_str]:
-                        task_ids_for_user = preview_assignments[lab_id_str][user_id_str]
-                        tasks_for_user = list(LabTask.objects.filter(id__in=task_ids_for_user))
-                    else:
-                        tasks_for_user = []
-
-                    if tasks_for_user:
-                        preview = KkzPreview.objects.create(
-                            kkz=kkz,
-                            lab=lab,
-                            user=user
-                        )
-                        preview.tasks.set(tasks_for_user)
-
-                        competition = Competition.objects.get(kkz=kkz, lab=lab)
-                        comp2user, _ = Competition2User.objects.get_or_create(
-                            competition=competition,
-                            user=user
-                        )
-                        comp2user.tasks.set(tasks_for_user)
-
+            for lab_data in labs_info:
+                lab_id_str = str(lab_data['lab_id'])
+                for user in users:
+                    uid = str(user.id)
+                    ids = preview_assignments.get(lab_id_str, {}).get(uid, [])
+                    assignments_by_user[uid].extend(ensure_objs(ids))
         elif kkz.unified_tasks:
             picked = random.sample(all_available_tasks, min(total_tasks_to_assign, len(all_available_tasks)))
-
-            for user in users:
-                tasks_by_lab = {}
-                for task in picked:
-                    if task.lab_id not in tasks_by_lab:
-                        tasks_by_lab[task.lab_id] = []
-                    tasks_by_lab[task.lab_id].append(task)
-
-                for lab_id, tasks in tasks_by_lab.items():
-                    lab = Lab.objects.get(id=lab_id)
-
-                    preview = KkzPreview.objects.create(
-                        kkz=kkz,
-                        lab=lab,
-                        user=user
-                    )
-                    preview.tasks.set(tasks)
-
-                    competition = Competition.objects.get(kkz=kkz, lab=lab)
-                    comp2user, _ = Competition2User.objects.get_or_create(
-                        competition=competition,
-                        user=user
-                    )
-                    comp2user.tasks.set(tasks)
+            assignments_by_user = {str(user.id): ensure_objs(picked) for user in users}
         else:
             for user in users:
-                user_tasks = random.sample(all_available_tasks, min(total_tasks_to_assign, len(all_available_tasks)))
-                tasks_by_lab = {}
-                for task in user_tasks:
-                    if task.lab_id not in tasks_by_lab:
-                        tasks_by_lab[task.lab_id] = []
-                    tasks_by_lab[task.lab_id].append(task)
+                picked = random.sample(all_available_tasks, min(total_tasks_to_assign, len(all_available_tasks)))
+                assignments_by_user[str(user.id)] = ensure_objs(picked)
 
-                for lab_id, tasks in tasks_by_lab.items():
-                    lab = Lab.objects.get(id=lab_id)
 
-                    preview = KkzPreview.objects.create(
-                        kkz=kkz,
-                        lab=lab,
-                        user=user
-                    )
-                    preview.tasks.set(tasks)
+        from interface.pnet_session_manager import with_pnet_session_if_needed
 
-                    competition = Competition.objects.get(kkz=kkz, lab=lab)
-                    comp2user, _ = Competition2User.objects.get_or_create(
-                        competition=competition,
-                        user=user
-                    )
-                    comp2user.tasks.set(tasks)
+        def _create_comp2users_operation():
+            for user in users:
+                user_id_str = str(user.id)
+                tasks = assignments_by_user.get(user_id_str, []) or []
+                tasks_by_lab = defaultdict(list)
+
+                for t in tasks:
+                    tasks_by_lab[int(t.lab_id)].append(t)
+
+                for lab_id, tasks_for_user in tasks_by_lab.items():
+                    lab = next((x['lab'] for x in labs_info if x['lab_id'] == lab_id), None)
+                    if not lab:
+                        continue
+
+                    preview = KkzPreview.objects.create(kkz=kkz, lab=lab, user=user)
+                    preview.tasks.set(tasks_for_user)
+
+                    competition = created_competitions.get(lab_id)
+                    if not competition:
+                        continue
+
+                    comp2user, _ = Competition2User.objects.get_or_create(competition=competition, user=user)
+                    comp2user.tasks.set(tasks_for_user)
+
+        with_pnet_session_if_needed(labs_info[0]['lab'], _create_comp2users_operation)
 
         return kkz
 

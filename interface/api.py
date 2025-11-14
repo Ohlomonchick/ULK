@@ -1092,7 +1092,6 @@ def kkz_save_preview(request):
             first_user_id = next(iter(assignments))
             uniform_task_ids = assignments[first_user_id]
             users = kkz.get_users()
-            users = User.get_o
             for user in users:
                 preview, created = KkzPreview.objects.update_or_create(
                     kkz=kkz,
