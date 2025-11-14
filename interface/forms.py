@@ -246,13 +246,20 @@ class CompetitionForm(forms.ModelForm):
 
     def get_all_users(self, instance):
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
-        return all_users
+        return all_users.distinct()
 
     def _get_new_participants(self, instance):
         """Возвращает список новых участников (пользователей) для создания."""
         all_users = self.get_all_users(instance)
-        existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
-        return [user for user in all_users if user.id not in existing_user_ids]
+        existing_user_ids = set(instance.competition_users.values_list('user_id', flat=True))
+        # Убираем дубликаты и существующих пользователей
+        seen_ids = set()
+        unique_users = []
+        for user in all_users:
+            if user.id not in existing_user_ids and user.id not in seen_ids:
+                seen_ids.add(user.id)
+                unique_users.append(user)
+        return unique_users
 
     def _get_total_new_participants_count(self, instance):
         """Возвращает общее количество новых участников. Переопределяется в TeamCompetitionForm."""
@@ -291,9 +298,23 @@ class CompetitionForm(forms.ModelForm):
         import logging
         logger = logging.getLogger(__name__)
         
+        # Убираем дубликаты пользователей перед созданием
+        seen_user_ids = set()
+        unique_users = []
+        unique_usb_ids = []
         for idx, user in enumerate(users):
-            usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
-            logger.info(f"User {idx+1}/{len(users)} ({user.username}): got USB IDs {usb_ids}")
+            if user.id not in seen_user_ids:
+                seen_user_ids.add(user.id)
+                unique_users.append(user)
+                usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
+                unique_usb_ids.append(usb_ids)
+        
+        if len(users) != len(unique_users):
+            logger.warning(f"Removed {len(users) - len(unique_users)} duplicate users. Creating {len(unique_users)} unique users.")
+        
+        for idx, user in enumerate(unique_users):
+            usb_ids = unique_usb_ids[idx]
+            logger.info(f"User {idx+1}/{len(unique_users)} ({user.username}, id={user.id}): got USB IDs {usb_ids}")
             
             deploy_meta = {'usb_device_ids': usb_ids}
             
@@ -476,13 +497,20 @@ class TeamCompetitionForm(CompetitionForm):
     def get_all_users(self, instance):
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
         team_user_ids = User.objects.filter(team__in=self.cleaned_data.get("teams", [])).values_list("id", flat=True)
-        return all_users.exclude(id__in=team_user_ids)
+        return all_users.exclude(id__in=team_user_ids).distinct()
 
     def _get_new_teams(self, instance):
         """Возвращает список новых команд для создания."""
         teams = self.cleaned_data.get('teams', [])
         existing_team_ids = set(TeamCompetition2Team.objects.filter(competition=instance).values_list('team_id', flat=True))
-        return [team for team in teams if team.id not in existing_team_ids]
+        # Убираем дубликаты команд
+        seen_team_ids = set()
+        unique_teams = []
+        for team in teams:
+            if team.id not in existing_team_ids and team.id not in seen_team_ids:
+                seen_team_ids.add(team.id)
+                unique_teams.append(team)
+        return unique_teams
 
     def _get_total_new_participants_count(self, instance):
         """Возвращает общее количество новых участников (пользователи + команды)."""
@@ -535,9 +563,23 @@ class TeamCompetitionForm(CompetitionForm):
         import logging
         logger = logging.getLogger(__name__)
         
+        # Убираем дубликаты команд перед созданием
+        seen_team_ids = set()
+        unique_teams = []
+        unique_usb_ids = []
         for idx, team in enumerate(teams):
-            usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
-            logger.info(f"Team {idx+1}/{len(teams)} ({team.name}): got USB IDs {usb_ids}")
+            if team.id not in seen_team_ids:
+                seen_team_ids.add(team.id)
+                unique_teams.append(team)
+                usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
+                unique_usb_ids.append(usb_ids)
+        
+        if len(teams) != len(unique_teams):
+            logger.warning(f"Removed {len(teams) - len(unique_teams)} duplicate teams. Creating {len(unique_teams)} unique teams.")
+        
+        for idx, team in enumerate(unique_teams):
+            usb_ids = unique_usb_ids[idx]
+            logger.info(f"Team {idx+1}/{len(unique_teams)} ({team.name}, id={team.id}): got USB IDs {usb_ids}")
             
             deploy_meta = {'usb_device_ids': usb_ids}
             
