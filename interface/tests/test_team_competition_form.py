@@ -624,8 +624,8 @@ class TeamCompetitionFormTest(TransactionTestCase):
         modified_nodes = replace_usb_device_ids_in_nodes(self.nodes_data, usb_ids)
         
         # Проверяем, что опции были заменены
-        usb_id_index = 0
         for node in modified_nodes:
+            usb_id_index = 0
             qemu_options = node.get('qemu_options', '')
             # Ищем паттерн file=*.img в опциях drive
             if re.search(r'-{1,2}drive\s+[^,]*id=[^,]+,\s*file=[^,\s]+\.img', qemu_options):

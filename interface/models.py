@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import timedelta
 from hashlib import md5
 
@@ -385,7 +386,8 @@ class Competition(models.Model):
         # Generate slug only once on creation; preserve on updates
         if self._state.adding and not self.slug:
             base_slug = slugify(f"{self.lab.name}-{self.start:%Y%m%d%H%M%S}-{self.lab.lab_type}")
-            unique_slug = base_slug + timezone.now().strftime("%Y%m%d%H%M%S%f")
+            # Add UUID to ensure uniqueness even when objects are created in the same microsecond
+            unique_slug = base_slug + timezone.now().strftime("%Y%m%d%H%M%S%f") + str(uuid.uuid4())
             self.slug = md5(unique_slug.encode('utf-8')).hexdigest()
         super(Competition, self).save(*args, **kwargs)
 

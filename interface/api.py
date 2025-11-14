@@ -1325,6 +1325,8 @@ def get_user_tasks_status(request):
             Answers.objects.filter(
                 lab=competition.lab,
                 lab_task__in=tasks,
+                datetime__lte=competition.finish,
+                datetime__gte=competition.start,
                 **answer_filters
             ).values_list('lab_task_id', flat=True)
         )
