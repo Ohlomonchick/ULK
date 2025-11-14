@@ -245,16 +245,30 @@ class CompetitionForm(forms.ModelForm):
             )
 
     def get_all_users(self, instance):
+        """
+        Возвращает всех пользователей из взводов и non_platoon_users.
+        
+        Примечание: даже с .distinct() могут появиться дубликаты при итерации,
+        если QuerySet был оценен до вызова distinct() или из-за JOIN'ов в Django ORM.
+        Поэтому дедубликация также выполняется в _get_new_participants.
+        """
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
         return all_users.distinct()
 
     def _get_new_participants(self, instance):
-        """Возвращает список новых участников (пользователей) для создания."""
+        """
+        Возвращает список новых участников (пользователей) для создания.
+        
+        Дедубликация здесь необходима, так как:
+        1. Объединение QuerySet через | может вернуть дубликаты даже с .distinct()
+        2. При итерации по QuerySet могут появиться дубликаты из-за JOIN'ов в ORM
+        3. Один пользователь может быть и во взводе, и в non_platoon_users (хотя это редко)
+        """
         all_users = self.get_all_users(instance)
         existing_user_ids = set(instance.competition_users.values_list('user_id', flat=True))
         # Убираем дубликаты и существующих пользователей
         seen_ids = set()
-        unique_users = []
+        unique_users = [user for user in all_users]
         for user in all_users:
             if user.id not in existing_user_ids and user.id not in seen_ids:
                 seen_ids.add(user.id)
@@ -294,27 +308,18 @@ class CompetitionForm(forms.ModelForm):
         return instance
 
     def _create_competition_users(self, instance, users: List[User], usb_ids_distribution: List[List[int]]):
-        """Создание Competition2User записей с USB IDs из распределения."""
+        """
+        Создание Competition2User записей с USB IDs из распределения.
+        
+        Примечание: users уже должны быть дедублицированы в _get_new_participants,
+        поэтому дополнительная дедубликация здесь не требуется.
+        """
         import logging
         logger = logging.getLogger(__name__)
         
-        # Убираем дубликаты пользователей перед созданием
-        seen_user_ids = set()
-        unique_users = []
-        unique_usb_ids = []
         for idx, user in enumerate(users):
-            if user.id not in seen_user_ids:
-                seen_user_ids.add(user.id)
-                unique_users.append(user)
-                usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
-                unique_usb_ids.append(usb_ids)
-        
-        if len(users) != len(unique_users):
-            logger.warning(f"Removed {len(users) - len(unique_users)} duplicate users. Creating {len(unique_users)} unique users.")
-        
-        for idx, user in enumerate(unique_users):
-            usb_ids = unique_usb_ids[idx]
-            logger.info(f"User {idx+1}/{len(unique_users)} ({user.username}, id={user.id}): got USB IDs {usb_ids}")
+            usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
+            logger.info(f"User {idx+1}/{len(users)} ({user.username}, id={user.id}): got USB IDs {usb_ids}")
             
             deploy_meta = {'usb_device_ids': usb_ids}
             
@@ -500,7 +505,12 @@ class TeamCompetitionForm(CompetitionForm):
         return all_users.exclude(id__in=team_user_ids).distinct()
 
     def _get_new_teams(self, instance):
-        """Возвращает список новых команд для создания."""
+        """
+        Возвращает список новых команд для создания.
+        
+        Дедубликация здесь необходима, так как cleaned_data.get('teams', [])
+        может содержать дубликаты, если команда была выбрана несколько раз в форме.
+        """
         teams = self.cleaned_data.get('teams', [])
         existing_team_ids = set(TeamCompetition2Team.objects.filter(competition=instance).values_list('team_id', flat=True))
         # Убираем дубликаты команд
@@ -559,27 +569,18 @@ class TeamCompetitionForm(CompetitionForm):
         return instance
 
     def _create_competition_teams(self, instance, teams: List[Team], usb_ids_distribution: List[List[int]]):
-        """Создание TeamCompetition2Team записей с USB IDs из распределения."""
+        """
+        Создание TeamCompetition2Team записей с USB IDs из распределения.
+        
+        Примечание: teams уже должны быть дедублицированы в _get_new_teams,
+        поэтому дополнительная дедубликация здесь не требуется.
+        """
         import logging
         logger = logging.getLogger(__name__)
         
-        # Убираем дубликаты команд перед созданием
-        seen_team_ids = set()
-        unique_teams = []
-        unique_usb_ids = []
         for idx, team in enumerate(teams):
-            if team.id not in seen_team_ids:
-                seen_team_ids.add(team.id)
-                unique_teams.append(team)
-                usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
-                unique_usb_ids.append(usb_ids)
-        
-        if len(teams) != len(unique_teams):
-            logger.warning(f"Removed {len(teams) - len(unique_teams)} duplicate teams. Creating {len(unique_teams)} unique teams.")
-        
-        for idx, team in enumerate(unique_teams):
-            usb_ids = unique_usb_ids[idx]
-            logger.info(f"Team {idx+1}/{len(unique_teams)} ({team.name}, id={team.id}): got USB IDs {usb_ids}")
+            usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
+            logger.info(f"Team {idx+1}/{len(teams)} ({team.name}, id={team.id}): got USB IDs {usb_ids}")
             
             deploy_meta = {'usb_device_ids': usb_ids}
             
