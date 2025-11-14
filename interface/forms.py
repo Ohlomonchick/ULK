@@ -246,12 +246,11 @@ class CompetitionForm(forms.ModelForm):
 
     def get_all_users(self, instance):
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
-        return all_users
+        return all_users.distinct()
 
     def _get_new_participants(self, instance):
-        """Возвращает список новых участников (пользователей) для создания."""
         all_users = self.get_all_users(instance)
-        existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
+        existing_user_ids = set(instance.competition_users.values_list('user_id', flat=True))
         return [user for user in all_users if user.id not in existing_user_ids]
 
     def _get_total_new_participants_count(self, instance):
@@ -287,13 +286,18 @@ class CompetitionForm(forms.ModelForm):
         return instance
 
     def _create_competition_users(self, instance, users: List[User], usb_ids_distribution: List[List[int]]):
-        """Создание Competition2User записей с USB IDs из распределения."""
+        """
+        Создание Competition2User записей с USB IDs из распределения.
+        
+        Примечание: users уже должны быть дедублицированы в _get_new_participants,
+        поэтому дополнительная дедубликация здесь не требуется.
+        """
         import logging
         logger = logging.getLogger(__name__)
         
         for idx, user in enumerate(users):
             usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
-            logger.info(f"User {idx+1}/{len(users)} ({user.username}): got USB IDs {usb_ids}")
+            logger.info(f"User {idx+1}/{len(users)} ({user.username}, id={user.id}): got USB IDs {usb_ids}")
             
             deploy_meta = {'usb_device_ids': usb_ids}
             
@@ -476,10 +480,9 @@ class TeamCompetitionForm(CompetitionForm):
     def get_all_users(self, instance):
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
         team_user_ids = User.objects.filter(team__in=self.cleaned_data.get("teams", [])).values_list("id", flat=True)
-        return all_users.exclude(id__in=team_user_ids)
+        return all_users.exclude(id__in=team_user_ids).distinct()
 
     def _get_new_teams(self, instance):
-        """Возвращает список новых команд для создания."""
         teams = self.cleaned_data.get('teams', [])
         existing_team_ids = set(TeamCompetition2Team.objects.filter(competition=instance).values_list('team_id', flat=True))
         return [team for team in teams if team.id not in existing_team_ids]
@@ -531,13 +534,18 @@ class TeamCompetitionForm(CompetitionForm):
         return instance
 
     def _create_competition_teams(self, instance, teams: List[Team], usb_ids_distribution: List[List[int]]):
-        """Создание TeamCompetition2Team записей с USB IDs из распределения."""
+        """
+        Создание TeamCompetition2Team записей с USB IDs из распределения.
+        
+        Примечание: teams уже должны быть дедублицированы в _get_new_teams,
+        поэтому дополнительная дедубликация здесь не требуется.
+        """
         import logging
         logger = logging.getLogger(__name__)
         
         for idx, team in enumerate(teams):
             usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
-            logger.info(f"Team {idx+1}/{len(teams)} ({team.name}): got USB IDs {usb_ids}")
+            logger.info(f"Team {idx+1}/{len(teams)} ({team.name}, id={team.id}): got USB IDs {usb_ids}")
             
             deploy_meta = {'usb_device_ids': usb_ids}
             

@@ -32,8 +32,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 utm_sources: ['labs', 'lab-menu']
             },
             'взвод': {
-                paths: [window.navbarUrls['platoon-list'] || ''],
-                utm_sources: ['platoons']
+                paths: [window.navbarUrls['platoon-list'] || '', window.navbarUrls['user-detail'] || ''],
+                utm_sources: ['platoons', 'user']
             }
         };
         

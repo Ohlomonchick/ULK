@@ -513,39 +513,87 @@ class PlatoonListView(LoginRequiredMixin, ListView, UserPassesTestMixin):  # pra
         return progress_dict
 
 
-class UserDetailView(LoginRequiredMixin, DetailView, UserPassesTestMixin):  # pragma: no cover
+class UserDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):  # pragma: no cover
     model = User
     pk_url_kwarg = 'id'
 
     def test_func(self):
-        # Allow only admin users
+        """Allow only admin users to access this view."""
         return self.request.user.is_staff
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["issues"] = Competition2User.objects.filter(user=context["object"]).all().prefetch_related('tasks')
-
-        for issue in context["issues"]:
-            assigned_tasks = issue.tasks.count()
-            submitted_tasks = Answers.objects.filter(user=context["object"], lab_task__in=issue.tasks.all()).count()
-            has_none_task_answer = Answers.objects.filter(user=context["object"], lab=issue.competition.lab, lab_task=None).exists()
-            if has_none_task_answer or (submitted_tasks == assigned_tasks and submitted_tasks > 0):
-                issue.done = True
-            else:
-                issue.done = False
-
-        submitted_labs = Answers.objects.filter(user=context["object"]).values("lab").distinct()
-        context["submitted"] = submitted_labs.count()
-        all_labs = set([issue.competition.lab.id for issue in context["issues"]] + list(submitted_labs.values_list('id', flat=True)))
-        total = len(all_labs)
-        context["total"] = total
-        if total == 0:
-            progress = 100
-        else:
-            progress = int((context["submitted"] / total) * 100)
-        context["progress"] = progress
+        user = context["object"]
+        
+        issues = self._get_user_issues(user)
+        self._mark_issues_completion(issues, user)
+        
+        # Count issues (not unique labs) - total should be number of assigned works
+        issues_list = list(issues)
+        context["issues"] = issues_list
+        context["total"] = len(issues_list)
+        
+        # Count unique labs with submitted answers (old behavior)
+        submitted_labs = self._get_submitted_labs(user)
+        submitted_lab_ids = set(submitted_labs.values_list('lab', flat=True))
+        context["submitted"] = len(submitted_lab_ids)
+        
+        # Also include submitted labs that are not in any competition issue
+        issue_lab_ids = {
+            issue.competition.lab.id
+            for issue in issues_list
+            if issue.competition and issue.competition.lab
+        }
+        additional_labs = submitted_lab_ids - issue_lab_ids
+        if additional_labs:
+            # Add labs with submissions that are not in any competition issue to total
+            context["total"] += len(additional_labs)
+        
+        context["progress"] = self._calculate_progress(context["submitted"], context["total"])
+        
         logging.debug(context)
         return context
+
+    def _get_user_issues(self, user):
+        """Get all Competition2User objects for the user, excluding those with missing competitions."""
+        return Competition2User.objects.filter(
+            user=user,
+            competition__isnull=False
+        ).select_related('competition', 'competition__lab').prefetch_related('tasks')
+
+    def _mark_issues_completion(self, issues, user):
+        """Mark each issue as done or not based on task completion status."""
+        for issue in issues:
+            if not issue.competition or not issue.competition.lab:
+                continue
+            
+            issue.done = self._is_issue_completed(issue, user)
+
+    def _is_issue_completed(self, issue, user):
+        """Check if an issue is completed based on task submissions."""
+        assigned_tasks = issue.tasks.count()
+        submitted_tasks = Answers.objects.filter(
+            user=user,
+            lab_task__in=issue.tasks.all()
+        ).count()
+        
+        has_none_task_answer = Answers.objects.filter(
+            user=user,
+            lab=issue.competition.lab,
+            lab_task=None
+        ).exists()
+        
+        return has_none_task_answer or (submitted_tasks == assigned_tasks and submitted_tasks > 0)
+
+    def _get_submitted_labs(self, user):
+        """Get distinct labs for which the user has submitted answers."""
+        return Answers.objects.filter(user=user).values("lab").distinct()
+
+    def _calculate_progress(self, submitted_count, total_count):
+        """Calculate progress percentage. Returns 100 if total is 0."""
+        if total_count == 0:
+            return 100
+        return int((submitted_count / total_count) * 100)
 
 
 def registration(request):  # pragma: no cover

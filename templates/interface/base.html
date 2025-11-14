@@ -27,13 +27,13 @@
 
           </div>
             <div class="navbar-start">
-              {% if  user.is_superuser %}
+              {% if request.user.is_superuser %}
                   <a class="navbar-item" href="{% url 'interface:lab-menu' %}">
                       Лабораторные работы
                   </a>
               {% endif %}
 
-              {% if user.is_authenticated %}
+              {% if request.user.is_authenticated %}
                 <a class="navbar-item" href="{% url 'interface:competition-list' %}">
                   Экзамены
                 </a>
@@ -45,7 +45,7 @@
                 </a>
               {% endif %}
 
-              {% if user.is_superuser %}
+              {% if request.user.is_superuser %}
                 <a class="navbar-item" href = "{% url 'interface:platoon-list' %}">
                   Список взводов
                 </a>
@@ -55,8 +55,8 @@
             <div class="navbar-end">
               <div class="navbar-item no-hover">
                 <div class="buttons">
-                    {% if user.is_authenticated %}
-                        {% if user.is_superuser %}
+                    {% if request.user.is_authenticated %}
+                        {% if request.user.is_superuser %}
                             <a class="button is-light" href="{% url 'admin:index' %}">
                                 <strong>Админ-панель</strong>
                             </a>
@@ -129,6 +129,7 @@
             'lab-menu': "{% url 'interface:lab-menu' %}",
             'lab-list': "{% url 'interface:lab-list' %}",
             'platoon-list': "{% url 'interface:platoon-list' %}",
+            'user-detail': "/cyberpolygon/user/",
             'reg': "{% url 'reg' %}",
             'login': "{% url 'login' %}"
         };

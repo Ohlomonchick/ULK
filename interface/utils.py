@@ -121,9 +121,9 @@ def replace_usb_device_ids_in_nodes(nodes_data, usb_device_ids):
     
     # Создаем копию, чтобы не изменять оригинальные данные
     modified_nodes = copy.deepcopy(nodes_data)
-    usb_id_index = 0
     
     for node in modified_nodes:
+        usb_id_index = 0 # Пока делаем для одного узла доступными все флешки одного пользователя
         if not node or 'qemu_options' not in node:
             continue
         
