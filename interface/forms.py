@@ -245,35 +245,13 @@ class CompetitionForm(forms.ModelForm):
             )
 
     def get_all_users(self, instance):
-        """
-        Возвращает всех пользователей из взводов и non_platoon_users.
-        
-        Примечание: даже с .distinct() могут появиться дубликаты при итерации,
-        если QuerySet был оценен до вызова distinct() или из-за JOIN'ов в Django ORM.
-        Поэтому дедубликация также выполняется в _get_new_participants.
-        """
         all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
         return all_users.distinct()
 
     def _get_new_participants(self, instance):
-        """
-        Возвращает список новых участников (пользователей) для создания.
-        
-        Дедубликация здесь необходима, так как:
-        1. Объединение QuerySet через | может вернуть дубликаты даже с .distinct()
-        2. При итерации по QuerySet могут появиться дубликаты из-за JOIN'ов в ORM
-        3. Один пользователь может быть и во взводе, и в non_platoon_users (хотя это редко)
-        """
         all_users = self.get_all_users(instance)
         existing_user_ids = set(instance.competition_users.values_list('user_id', flat=True))
-        # Убираем дубликаты и существующих пользователей
-        seen_ids = set()
-        unique_users = [user for user in all_users]
-        # for user in all_users:
-        #     if user.id not in existing_user_ids and user.id not in seen_ids:
-        #         seen_ids.add(user.id)
-        #         unique_users.append(user)
-        return unique_users
+        return [user for user in all_users if user.id not in existing_user_ids]
 
     def _get_total_new_participants_count(self, instance):
         """Возвращает общее количество новых участников. Переопределяется в TeamCompetitionForm."""
@@ -505,22 +483,9 @@ class TeamCompetitionForm(CompetitionForm):
         return all_users.exclude(id__in=team_user_ids).distinct()
 
     def _get_new_teams(self, instance):
-        """
-        Возвращает список новых команд для создания.
-        
-        Дедубликация здесь необходима, так как cleaned_data.get('teams', [])
-        может содержать дубликаты, если команда была выбрана несколько раз в форме.
-        """
         teams = self.cleaned_data.get('teams', [])
         existing_team_ids = set(TeamCompetition2Team.objects.filter(competition=instance).values_list('team_id', flat=True))
-        # Убираем дубликаты команд
-        seen_team_ids = set()
-        unique_teams = []
-        for team in teams:
-            if team.id not in existing_team_ids and team.id not in seen_team_ids:
-                seen_team_ids.add(team.id)
-                unique_teams.append(team)
-        return unique_teams
+        return [team for team in teams if team.id not in existing_team_ids]
 
     def _get_total_new_participants_count(self, instance):
         """Возвращает общее количество новых участников (пользователи + команды)."""
