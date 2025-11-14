@@ -1,36 +1,117 @@
+{% extends "interface/base.html" %}
+{% load utm_filters %}
 
-{% extends 'interface/base.html' %}
+{% block extra_css %}
+<style>
+    .issue-title {
+        word-break: break-word;
+        overflow-wrap: break-word;
+        max-width: 100%;
+    }
+    .issue-header {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    .issue-header .level-left {
+        flex-wrap: wrap;
+        max-width: 70%;
+    }
+    .issue-header .level-right {
+        flex-shrink: 0;
+    }
+    .issue-header .level-item {
+        flex-shrink: 1;
+        min-width: 0;
+    }
+    @media screen and (max-width: 768px) {
+        .issue-header .level-left,
+        .issue-header .level-right {
+            width: 100%;
+            max-width: 100%;
+            justify-content: flex-start;
+        }
+    }
+</style>
+{% endblock extra_css %}
 
 {% block content %}
 {% if request.user.is_superuser %}
-    <div class="columns is-centered">
-        <div class="column is-two-thirds">
-            <h1 class="title is-2">{{ object.last_name }} {{ object.first_name }}</h1>
-            <h1 class = "title is-4"> Назначено: {{ total }} / Выполнено: {{ submitted}}</h1>
-            {% if progress >= 80%}
-            <h1 class = "title is-4 has-text-success"> Процент выполнения: {{progress}}%</h1>
-            {%elif progress >= 60%}
-            <h1 class = "title is-4 has-text-warning"> Процент выполнения: {{progress}}%</h1>
-            {%else%}
-            <h1 class = "title is-4 has-text-danger"> Процент выполнения: {{progress}}%</h1>
-            {%endif%}
-            <h1 class="title is-3">Назначенные лабораторные работы</h1>
-                <ul>
-                {% for issue in issues %}
-                    <div class="box">
-                        <h2 class="title is-3">{{ issue.competition.lab }}</h2>
-                        <h2> Срок выполнения работы: {{ issue.competition.finish }}</h2>
-                        {% if issue.done %}
-                            <h2 class="tag is-success"> Выполнено </h2>
-                        {% else %}
-                            <h2 class="tag is-danger"> Не выполнено </h2>
-                        {% endif %}
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-two-thirds">
+                <div class="box has-background-light mb-5">
+                    <h1 class="title is-2 mb-4">{{ object.last_name }} {{ object.first_name }}</h1>
+                    <div class="level mb-4">
+                        <div class="level-item has-text-centered">
+                            <div>
+                                <p class="heading">Назначено</p>
+                                <p class="title is-4">{{ total }}</p>
+                            </div>
+                        </div>
+                        <div class="level-item has-text-centered">
+                            <div>
+                                <p class="heading">Выполнено</p>
+                                <p class="title is-4">{{ submitted }}</p>
+                            </div>
+                        </div>
+                        <div class="level-item has-text-centered">
+                            <div>
+                                <p class="heading">Процент выполнения</p>
+                                <p class="title is-4 {% if progress >= 80 %}has-text-success{% elif progress >= 60 %}has-text-warning{% else %}has-text-danger{% endif %}">
+                                    {{ progress }}%
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                {% empty %}
-                    <li>Лабораторных работ нет.</li>
-                {% endfor %}
-                </ul>
+                </div>
+
+                <h1 class="title is-3 mb-4">Назначенные лабораторные работы</h1>
+                
+                {% if issues %}
+                    <div class="columns is-multiline">
+                        {% for issue in issues %}
+                            <div class="column is-full">
+                                <div class="box">
+                                    <div class="level issue-header mb-3">
+                                        <div class="level-left">
+                                            <div class="level-item">
+                                                <h2 class="title is-4 mb-0 issue-title">{{ issue.competition.lab.name }}</h2>
+                                            </div>
+                                            <div class="level-item mt-4">
+                                                <span class="tag {{ issue.competition.lab.lab_type|lab_type_class }} is-medium">
+                                                    {{ issue.competition.lab.get_lab_type_display }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="level-right">
+                                            <div class="level-item">
+                                                {% if issue.done %}
+                                                    <span class="tag is-success is-medium">Выполнено</span>
+                                                {% else %}
+                                                    <span class="tag is-danger is-medium">Не выполнено</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p class="subtitle is-6 has-text-grey">
+                                        <span class="icon-text">
+                                            <span class="icon">
+                                                <i class="fas fa-calendar-alt"></i>
+                                            </span>
+                                            <span>Срок выполнения: {{ issue.competition.finish|date:"d.m.Y H:i" }}</span>
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="notification is-info">
+                        <p>Лабораторных работ нет.</p>
+                    </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 {% endif %}
-{% endblock %}
+{% endblock content %}

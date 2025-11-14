@@ -14,7 +14,7 @@
                 {% empty %}
                 <p class = "content is-medium">Студентов нет.</p>
                 {% endfor %}
-            <h2 class="title is-3">Список соревнований данного взвода или группы.</h2>
+            <h2 class="title is-3">Список работ данного взвода или группы.</h2>
                 {% for comp, info in competitions.items %}
                         <div class="box">
                             <h2 class="title is-3 is-link"><a href="{% url 'interface:competition-list' %}{{ comp.slug }}">{{ comp.lab.name }}</a></h2>
