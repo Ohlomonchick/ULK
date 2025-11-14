@@ -258,24 +258,6 @@ class CompetitionForm(forms.ModelForm):
         """Возвращает общее количество новых участников. Переопределяется в TeamCompetitionForm."""
         return len(self._get_new_participants(instance))
 
-    def _init_usb_ids_distribution(self, instance):
-        """Инициализирует распределение USB IDs. Сохраняет в переменную экземпляра."""
-        total = self._get_total_new_participants_count(instance)
-        if total > 0:
-            self._usb_ids_distribution = generate_usb_device_ids(total)
-            self._usb_ids_index = 0
-        else:
-            self._usb_ids_distribution = []
-            self._usb_ids_index = 0
-
-    def _get_next_usb_ids(self):
-        """Возвращает следующий набор USB IDs из распределения."""
-        if self._usb_ids_index < len(self._usb_ids_distribution):
-            ids = self._usb_ids_distribution[self._usb_ids_index]
-            self._usb_ids_index += 1
-            return ids
-        return []
-
     def handle_competition_users(self, instance):
         import time
         import logging
@@ -286,10 +268,17 @@ class CompetitionForm(forms.ModelForm):
         new_users = self._get_new_participants(instance)
 
         if new_users:
-            self._init_usb_ids_distribution(instance)
+            # Генерируем USB IDs и передаем их как параметр
+            total = len(new_users)
+            usb_ids_distribution = generate_usb_device_ids(total)
             
             logger.info(f"Starting lab creation for {len(new_users)} users in competition {instance.slug}")
-            with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_users(instance, new_users))
+            logger.info(f"USB IDs distribution: {usb_ids_distribution}")
+            
+            def _create_users():
+                return self._create_competition_users(instance, new_users, usb_ids_distribution)
+            
+            with_pnet_session_if_needed(instance.lab, _create_users)
 
             total_time = time.time() - start_time
             logger.info(f"Completed lab creation for {len(new_users)} users in {total_time:.2f} seconds (avg: {total_time/len(new_users):.2f}s per user)")
@@ -297,10 +286,15 @@ class CompetitionForm(forms.ModelForm):
         self._delete_removed_users(instance)
         return instance
 
-    def _create_competition_users(self, instance, users: List[User]):
+    def _create_competition_users(self, instance, users: List[User], usb_ids_distribution: List[List[int]]):
         """Создание Competition2User записей с USB IDs из распределения."""
-        for user in users:
-            usb_ids = self._get_next_usb_ids()
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        for idx, user in enumerate(users):
+            usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
+            logger.info(f"User {idx+1}/{len(users)} ({user.username}): got USB IDs {usb_ids}")
+            
             deploy_meta = {'usb_device_ids': usb_ids}
             
             competition2user, created = Competition2User.objects.update_or_create(
@@ -507,17 +501,27 @@ class TeamCompetitionForm(CompetitionForm):
         total_new = len(new_users) + len(new_teams)
 
         if total_new > 0:
-            self._init_usb_ids_distribution(instance)
+            # Генерируем один общий набор USB IDs для всех участников
+            usb_ids_distribution = generate_usb_device_ids(total_new)
+            
+            # Распределяем: сначала пользователям, потом командам
+            users_usb_ids = usb_ids_distribution[:len(new_users)]
+            teams_usb_ids = usb_ids_distribution[len(new_users):]
             
             logger.info(f"Starting lab creation for {total_new} participants in competition {instance.slug}")
+            logger.info(f"USB IDs distribution: users={len(users_usb_ids)}, teams={len(teams_usb_ids)}")
             
             # Сначала создаем пользователей
             if new_users:
-                with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_users(instance, new_users))
+                def _create_users():
+                    return self._create_competition_users(instance, new_users, users_usb_ids)
+                with_pnet_session_if_needed(instance.lab, _create_users)
             
             # Затем создаем команды (используют оставшиеся USB IDs)
             if new_teams:
-                with_pnet_session_if_needed(instance.lab, lambda: self._create_competition_teams(instance, new_teams))
+                def _create_teams():
+                    return self._create_competition_teams(instance, new_teams, teams_usb_ids)
+                with_pnet_session_if_needed(instance.lab, _create_teams)
 
             total_time = time.time() - start_time
             logger.info(f"Completed lab creation for {total_new} participants in {total_time:.2f} seconds")
@@ -526,10 +530,15 @@ class TeamCompetitionForm(CompetitionForm):
         self._delete_removed_teams(instance)
         return instance
 
-    def _create_competition_teams(self, instance, teams: List[Team]):
+    def _create_competition_teams(self, instance, teams: List[Team], usb_ids_distribution: List[List[int]]):
         """Создание TeamCompetition2Team записей с USB IDs из распределения."""
-        for team in teams:
-            usb_ids = self._get_next_usb_ids()
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        for idx, team in enumerate(teams):
+            usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
+            logger.info(f"Team {idx+1}/{len(teams)} ({team.name}): got USB IDs {usb_ids}")
+            
             deploy_meta = {'usb_device_ids': usb_ids}
             
             team_competition2team, created = TeamCompetition2Team.objects.update_or_create(
