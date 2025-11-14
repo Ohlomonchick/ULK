@@ -269,10 +269,10 @@ class CompetitionForm(forms.ModelForm):
         # Убираем дубликаты и существующих пользователей
         seen_ids = set()
         unique_users = [user for user in all_users]
-        for user in all_users:
-            if user.id not in existing_user_ids and user.id not in seen_ids:
-                seen_ids.add(user.id)
-                unique_users.append(user)
+        # for user in all_users:
+        #     if user.id not in existing_user_ids and user.id not in seen_ids:
+        #         seen_ids.add(user.id)
+        #         unique_users.append(user)
         return unique_users
 
     def _get_total_new_participants_count(self, instance):
