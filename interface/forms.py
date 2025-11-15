@@ -183,7 +183,7 @@ class CompetitionForm(forms.ModelForm):
         self.fields['finish'].widget.attrs['autocomplete'] = 'off'
         self.fields['platoons'].queryset = Platoon.objects.filter(number__gt=0)
         self.fields['non_platoon_users'].help_text = \
-            'Вы можете добавить студентов к взводам. Или создать экзамен только для отдельных студентов.'
+            'Вы можете добавить студентов к взводам. Или создать работу только для отдельных студентов.'
         self.fields['tasks'].help_text = \
             'Вы можете выбрать набор заданий, которые будут распределены случайно. Если оставить пустым, то выберутся все задания.'
         self.fields['num_tasks'].help_text = \
@@ -299,7 +299,7 @@ class CompetitionForm(forms.ModelForm):
 
         for idx, user in enumerate(users):
             usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
-            logger.info(f"User {idx+1}/{len(users)} ({user.username}, id={user.id}): got USB IDs {usb_ids}")
+            logger.info(f"User {idx + 1}/{len(users)} ({user.username}, id={user.id}): got USB IDs {usb_ids}")
 
             deploy_meta = {'usb_device_ids': usb_ids}
 
@@ -529,12 +529,14 @@ class TeamCompetitionForm(CompetitionForm):
             if new_users:
                 def _create_users():
                     return self._create_competition_users(instance, new_users, users_usb_ids)
+
                 with_pnet_session_if_needed(instance.lab, _create_users)
 
             # Затем создаем команды (используют оставшиеся USB IDs)
             if new_teams:
                 def _create_teams():
                     return self._create_competition_teams(instance, new_teams, teams_usb_ids)
+
                 with_pnet_session_if_needed(instance.lab, _create_teams)
 
             total_time = time.time() - start_time
@@ -556,7 +558,7 @@ class TeamCompetitionForm(CompetitionForm):
 
         for idx, team in enumerate(teams):
             usb_ids = usb_ids_distribution[idx] if idx < len(usb_ids_distribution) else []
-            logger.info(f"Team {idx+1}/{len(teams)} ({team.name}, id={team.id}): got USB IDs {usb_ids}")
+            logger.info(f"Team {idx + 1}/{len(teams)} ({team.name}, id={team.id}): got USB IDs {usb_ids}")
 
             deploy_meta = {'usb_device_ids': usb_ids}
 

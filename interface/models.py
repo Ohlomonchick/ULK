@@ -366,7 +366,7 @@ class Competition(models.Model):
         if self.start >= self.finish:
             raise ValidationError("Начало должно быть позже конца!")
         if self.finish <= timezone.now():
-            raise ValidationError("Экзамен уже закончился!")
+            raise ValidationError("Работа уже закончилась!")
 
     def delete(self, *args, **kwargs):
 
@@ -380,8 +380,8 @@ class Competition(models.Model):
         super(Competition, self).delete(*args, **kwargs)
 
     class Meta:
-        verbose_name = 'Экзамен'
-        verbose_name_plural = 'Экзамены'
+        verbose_name = 'Работа'
+        verbose_name_plural = 'Работы'
 
     def save(self, *args, **kwargs):
         # Generate slug only once on creation; preserve on updates

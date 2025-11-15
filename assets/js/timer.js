@@ -25,7 +25,7 @@ class CountdownTimer {
 
     updateTimer() {
         const text = this.countdownElem.textContent.trim();
-        const completedText = this.instanceType === 'kkz' ? 'ККЗ завершено' : 'Экзамен завершён';
+        const completedText = this.instanceType === 'kkz' ? 'ККЗ завершено' : 'Работа завершена';
 
         if (text === completedText) {
             return;
