@@ -1,3 +1,4 @@
+import logging
 import random
 import json
 from collections import defaultdict
@@ -8,7 +9,7 @@ from django import forms
 from durationwidget.widgets import TimeDurationWidget
 from django.utils import timezone
 
-from interface.utils import get_pnet_password
+from interface.utils import get_pnet_password, generate_usb_device_ids
 from interface.elastic_utils import create_elastic_user
 from .models import (
     LabType,
@@ -820,6 +821,10 @@ class SimpleKkzForm(forms.Form):
         except json.JSONDecodeError:
             preview_assignments = {}
 
+        max_tasks_limit = None
+        if labs_data and len(labs_data) > 0:
+            max_tasks_limit = labs_data[0].get("max_tasks_limit")
+
         kkz = Kkz.objects.create(
             name=self.cleaned_data["name"],
             start=timezone.now(),
@@ -838,11 +843,12 @@ class SimpleKkzForm(forms.Form):
         labs_info = []
 
         for lab_info in labs_data:
-            if not lab_info.get('included', True):
+            if not lab_info.get("included", True):
                 continue
 
-            lab_id = lab_info['lab_id']
-            task_ids = lab_info.get('task_ids', [])
+            lab_id = lab_info["lab_id"]
+            task_ids = lab_info.get("task_ids", [])
+            num_to_assign = lab_info.get("num_tasks") or lab_info.get("num_to_assign") or len(task_ids) or 0
 
             try:
                 lab = Lab.objects.get(id=lab_id)
@@ -856,113 +862,117 @@ class SimpleKkzForm(forms.Form):
 
             all_available_tasks.extend(tasks)
             labs_info.append({
-                'lab': lab,
-                'lab_id': lab_id,
-                'task_ids': task_ids,
-                'tasks': tasks
+                "lab": lab,
+                "lab_id": lab_id,
+                "task_ids": task_ids,
+                "tasks": tasks,
+                "num_to_assign": int(num_to_assign)
             })
 
-        first_lab_data = labs_data[0] if labs_data else {}
+        if max_tasks_limit and max_tasks_limit > 0:
+            total_tasks_to_assign = min(max_tasks_limit, len(all_available_tasks))
+        else:
+            total_tasks_to_assign = len(all_available_tasks)
 
-        limit_key = 'num_tasks' if 'num_tasks' in first_lab_data else 'max_tasks_limit'
-        task_limit = first_lab_data.get(limit_key)
-
-        total_tasks_to_assign = len(all_available_tasks)
-
-        if task_limit is not None:
-            try:
-                int_limit = int(task_limit)
-                total_tasks_to_assign = min(int_limit, len(all_available_tasks))
-            except (ValueError, TypeError):
-                pass
-        created_competitions = {}
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "SimpleKkzForm.create_kkz: users_count=%s, labs_count=%s, preview_assignments_present=%s, unified=%s",
+            len(users), len(labs_info), bool(preview_assignments), kkz.unified_tasks
+        )
+        logger.info("All_available_tasks_count=%s, total_tasks_to_assign=%s", len(all_available_tasks),
+                    total_tasks_to_assign)
 
         for lab_data in labs_info:
-            lab = lab_data['lab']
-            tasks = lab_data['tasks']
+            lab = lab_data["lab"]
             kkz_lab = KkzLab.objects.create(
                 kkz=kkz,
                 lab=lab,
-                num_tasks=len(tasks)
+                num_tasks=len(lab_data["tasks"])
             )
+            if lab_data["task_ids"]:
+                kkz_lab.tasks.set(LabTask.objects.filter(id__in=lab_data["task_ids"]))
 
-            competition_data = {
-                'start': kkz.start,
-                'finish': kkz.finish,
-                'lab': str(lab.pk),
-                'platoons': [str(platoon.pk)],
-                'non_platoon_users': [],
-                'tasks': [str(t.pk) for t in tasks],
-                'num_tasks': str(total_tasks_to_assign)
-            }
+            competition = Competition.objects.create(
+                lab=lab,
+                start=kkz.start,
+                finish=kkz.finish,
+                kkz=kkz,
+                num_tasks=len(lab_data["tasks"])
+            )
+            competition.platoons.add(platoon)
 
-            form = CompetitionForm(data=competition_data)
-            if not form.is_valid():
-                raise ValidationError(f"Ошибка CompetitionForm: {form.errors}")
-
-            competition = form.save(commit=False)
-            if not hasattr(competition, 'kkz_id'):
-                competition.kkz = kkz
-            else:
-                competition.kkz_id = kkz.pk
-            competition.save()
-            form.save_m2m()
-
-            created_competitions[lab.pk] = competition
-
-        def ensure_objs(items):
-            if not items:
-                return []
-            if hasattr(items[0], 'lab_id'):
-                return list(items)
-            return list(LabTask.objects.filter(id__in=[int(x) for x in items]))
-
-        assignments_by_user = defaultdict(list)
-
+        assignments_by_user = {}
         if preview_assignments:
-            for lab_data in labs_info:
-                lab_id_str = str(lab_data['lab_id'])
-                for user in users:
-                    uid = str(user.id)
-                    ids = preview_assignments.get(lab_id_str, {}).get(uid, [])
-                    assignments_by_user[uid].extend(ensure_objs(ids))
+            assignments_by_user = preview_assignments
         elif kkz.unified_tasks:
-            picked = random.sample(all_available_tasks, min(total_tasks_to_assign, len(all_available_tasks)))
-            assignments_by_user = {str(user.id): ensure_objs(picked) for user in users}
+            per_lab_picks = {}
+            for lab_info in labs_info:
+                available = lab_info['tasks'] or []
+                per_lab_picks[lab_info['lab_id']] = list(available)
+
+            assignments_by_user = {}
+            for user in users:
+                remaining = total_tasks_to_assign
+                picks = []
+                for lab_info in labs_info:
+                    if remaining <= 0:
+                        break
+                    lab_id = lab_info['lab_id']
+                    available = per_lab_picks.get(lab_id, [])
+                    need = min(lab_info['num_to_assign'], len(available), remaining)
+                    if need > 0:
+                        picked = random.sample(available, need)
+                        picks.extend(picked)
+                        remaining -= need
+                assignments_by_user[str(user.id)] = picks
         else:
+            assignments_by_user = {}
             for user in users:
-                picked = random.sample(all_available_tasks, min(total_tasks_to_assign, len(all_available_tasks)))
-                assignments_by_user[str(user.id)] = ensure_objs(picked)
+                remaining = total_tasks_to_assign
+                picks = []
+                for lab_info in labs_info:
+                    if remaining <= 0:
+                        break
+                    available = lab_info['tasks'] or []
+                    need = min(lab_info['num_to_assign'], len(available), remaining)
+                    if need > 0:
+                        picked = random.sample(available, need)
+                        picks.extend(picked)
+                        remaining -= need
+                assignments_by_user[str(user.id)] = picks
 
-        from interface.pnet_session_manager import with_pnet_session_if_needed
-
-        def _create_comp2users_operation():
-            for user in users:
-                user_id_str = str(user.id)
-                tasks = assignments_by_user.get(user_id_str, []) or []
-                tasks_by_lab = defaultdict(list)
-
-                for t in tasks:
-                    tasks_by_lab[int(t.lab_id)].append(t)
-
-                for lab_id, tasks_for_user in tasks_by_lab.items():
-                    lab = next((x['lab'] for x in labs_info if x['lab_id'] == lab_id), None)
-                    if not lab:
-                        continue
-
-                    preview = KkzPreview.objects.create(kkz=kkz, lab=lab, user=user)
-                    preview.tasks.set(tasks_for_user)
-
-                    competition = created_competitions.get(lab_id)
-                    if not competition:
-                        continue
-
-                    comp2user, _ = Competition2User.objects.get_or_create(competition=competition, user=user)
-                    comp2user.tasks.set(tasks_for_user)
-
-        with_pnet_session_if_needed(labs_info[0]['lab'], _create_comp2users_operation)
+        for lab_entry in labs_info:
+            lab = lab_entry["lab"]
+            with_pnet_session_if_needed(lab, lambda le=lab_entry: _create_previews_for_lab(kkz, le, users, preview_assignments, assignments_by_user))
 
         return kkz
+
+def _create_previews_for_lab(kkz, lab_entry, users, preview_assignments, assignments_by_user):
+    lab = lab_entry["lab"]
+    lab_id = lab_entry["lab_id"]
+    for user in users:
+        user_id_str = str(user.id)
+
+        if preview_assignments:
+            tasks_for_user = []
+            preview_for_lab = preview_assignments.get(str(lab_id), {})
+            if user_id_str in preview_for_lab:
+                task_ids_for_user = preview_for_lab[user_id_str]
+                tasks_for_user = list(LabTask.objects.filter(id__in=task_ids_for_user))
+        else:
+            user_tasks = assignments_by_user.get(user_id_str, [])
+            if user_tasks and hasattr(user_tasks[0], "lab_id"):
+                tasks_for_user = [t for t in user_tasks if t.lab_id == lab_id]
+            else:
+                tasks_for_user = [t for t in LabTask.objects.filter(id__in=user_tasks) if t.lab_id == lab_id]
+
+        if tasks_for_user:
+            preview = KkzPreview.objects.create(kkz=kkz, lab=lab, user=user)
+            preview.tasks.set(tasks_for_user)
+
+            competition = Competition.objects.get(kkz=kkz, lab=lab)
+            comp2user, _ = Competition2User.objects.get_or_create(competition=competition, user=user)
+            comp2user.tasks.set(tasks_for_user)
 
 
 # Кастомная форма для MyAttachment в админке (поддержка не только изображений)
