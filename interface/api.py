@@ -216,11 +216,23 @@ def get_solutions(request, slug):
         }
         sol = make_solution_data(dummy_solution, competition)
         sol["progress"] = user_data['progress']
+
+        comp2user = Competition2User.objects.filter(competition=competition, user_id=uid).first()
+        if comp2user:
+            max_tasks = comp2user.tasks.count()
+        else:
+            max_tasks = total_tasks or competition.tasks.count() or 1
+
+        sol['max_tasks'] = max_tasks
+        sol['total_tasks'] = max_tasks
         solutions_data.append(sol)
 
     if is_team_competition:
         for tid, t_data in team_data.items():
             team_obj = t_data['team']
+            team_record = TeamCompetition2Team.objects.filter(competition=competition, team=team_obj).first()
+            team_max_tasks = team_record.tasks.count() if team_record else (total_tasks or competition.tasks.count() or 1)
+
             for user in team_obj.users.all():
                 dummy_solution = {
                     "user_id": user.id,
@@ -229,6 +241,8 @@ def get_solutions(request, slug):
                 sol = make_solution_data(dummy_solution, competition)
                 sol["progress"] = t_data['progress']
                 sol["team_name"] = team_obj.name
+                sol["max_tasks"] = team_max_tasks
+                sol["total_tasks"] = team_max_tasks
                 solutions_data.append(sol)
 
     solutions_data.sort(key=lambda x: (-x["progress"], x["raw_datetime"] or timezone.now(), x["team_name"]))
@@ -238,15 +252,25 @@ def get_solutions(request, slug):
         sol["pos"] = pos
         pos += 1
 
+    comp2users = Competition2User.objects.filter(competition=competition)
+    max_assigned = 0
+    if comp2users.exists():
+        max_assigned = max((c.tasks.count() for c in comp2users), default=0)
+    else:
+        team_records = TeamCompetition2Team.objects.filter(competition=competition) if is_team_competition else TeamCompetition2Team.objects.none()
+        if team_records.exists():
+            max_assigned = max((t.tasks.count() for t in team_records), default=0)
+
+    computed_total_tasks = total_tasks or max_assigned or competition.tasks.count() or 1
+
     response = {
         "solutions": solutions_data,
         "max_total_progress": competition.participants,
         "total_progress": sum(solution["progress"] for solution in solutions_data),
-        "total_tasks": 1
+        "total_tasks": computed_total_tasks
     }
     if total_tasks:
         response["max_total_progress"] = competition.participants * total_tasks
-        response["total_tasks"] = total_tasks
 
     return JsonResponse(response)
 
