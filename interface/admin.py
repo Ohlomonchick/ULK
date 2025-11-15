@@ -294,7 +294,22 @@ class KkzPreviewInline(admin.StackedInline):
 class KkzAdmin(admin.ModelAdmin):
     form = KkzForm
     inlines = [KkzLabInline, KkzPreviewInline]
-    list_display = ('name', 'start', 'finish')
+    list_display = ('name', 'platoons_display', 'start', 'duration')
+
+    def platoons_display(self, obj):
+        platoons = obj.platoons.all()
+        return (' ').join(str(platoon) for platoon in platoons)
+    platoons_display.short_description = 'Взводы'
+
+    def duration(self, obj):
+        if obj.finish and obj.start:
+            delta = obj.finish - obj.start
+            total_seconds = int(delta.total_seconds())
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return '-'
+    duration.short_description = 'Продолжительность'
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
