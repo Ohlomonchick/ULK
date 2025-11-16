@@ -1,5 +1,6 @@
 {% extends 'interface/base.html' %}
 {% load static %}
+{% load utm_filters %}
 
 {% block container_class %}container-full-width{% endblock %}
 
@@ -10,7 +11,7 @@
 {% block content %}
     <div class="columns is-centered">
         <div class="column is-full">
-            <h1 class="title is-2">{{ object.lab.name }} - {{ object.lab.get_lab_type_display }}</h1>
+            <h1 class="title is-2">{{ object.lab.name }} - <span class="tag {{ object.lab.lab_type|lab_type_class }}">{{ object.lab.get_lab_type_display }}</span></h1>
         </div>
     </div>
     <div class="columns is-centered">
