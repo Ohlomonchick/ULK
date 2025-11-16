@@ -50,12 +50,12 @@
 {% elif button_resume %}
     <p class="help mb-2">
         {% if instance_type == 'kkz' %}
-            ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его на 15 минут
+            ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его
         {% else %}
-            Работа закончилась в {{ finish_time|date:"H:i" }}, но вы можете продлить её на 15 минут
+            Работа закончилась в {{ finish_time|date:"H:i" }}, но вы можете продлить её
         {% endif %}
     </p>
-    <div id="button-video-container mb-3" style="display: flex; align-items: center;">
+    <div id="button-video-container mb-3" style="display: flex; align-items: center; gap: 0.75rem;">
         <button id="resume" class="button is-danger is-medium control-button"
                 data-action="resume"
                 data-instance-type="{{ instance_type }}"
@@ -66,5 +66,21 @@
                 {% endif %}>
             Продлить на 15 минут
         </button>
+        <div class="field has-addons mb-0">
+            <div class="control">
+                <input id="resume-minutes"
+                       type="number"
+                       class="input is-medium"
+                       value="15"
+                       min="1"
+                       max="240"
+                       style="width: 5rem;">
+            </div>
+            <div class="control">
+                <span class="button is-medium is-static">
+                    минут
+                </span>
+            </div>
+        </div>
     </div>
 {% endif %}

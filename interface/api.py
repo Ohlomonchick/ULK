@@ -401,7 +401,7 @@ def change_iso_timezone(utc_time):  # pragma: no cover
     return datetime.fromisoformat(utc_time) + timedelta(hours=3)
 
 
-def update_instance_time(instance, action):
+def update_instance_time(instance, action, minutes=15):
     if action == "start":
         time = timezone.now()
         field = "start"
@@ -411,9 +411,9 @@ def update_instance_time(instance, action):
         field = "finish"
         message = "ended"
     elif action == "resume":
-        time = timezone.now() + timedelta(minutes=15)
+        time = timezone.now() + timedelta(minutes=minutes)
         field = "finish"
-        message = "resumed"
+        message = f"resumed for {minutes} minutes"
     else:
         return None, "Unknown action"
 
@@ -430,6 +430,10 @@ def update_instance_time(instance, action):
 @api_view(['POST'])
 def press_button(request, action):
     try:
+        minutes = request.data.get('minutes', 15)
+        print(f"Action: {action}, Minutes: {minutes}")
+        print(f"Request data: {request.data}")
+
         slug = request.data.get('slug')
         kkz_id = request.data.get('kkz_id')
 
@@ -442,7 +446,7 @@ def press_button(request, action):
         else:
             return JsonResponse({"error": "Missing slug or kkz_id"}, status=400)
 
-        message, error = update_instance_time(instance, action)
+        message, error = update_instance_time(instance, action, minutes)
 
         if error:
             return JsonResponse({"error": error}, status=400)

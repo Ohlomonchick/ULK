@@ -1,14 +1,26 @@
 class ControlButtons {
     constructor() {
         this.video = document.getElementById('exam-video');
+        this.resumeInput = document.getElementById('resume-minutes');
+        this.resumeButton = document.getElementById('resume');
         this.init();
     }
 
     init() {
-        
         document.querySelectorAll('.control-button').forEach(button => {
             button.addEventListener('click', (e) => this.handleClick(e));
         });
+        
+        // Обновление текста кнопки при изменении значения в поле ввода
+        if (this.resumeInput && this.resumeButton) {
+            this.updateResumeButtonText();
+            this.resumeInput.addEventListener('input', () => this.updateResumeButtonText());
+        }
+    }
+
+    updateResumeButtonText() {
+        const minutes = parseInt(this.resumeInput.value, 10) || 15;
+        this.resumeButton.textContent = `Продлить на ${minutes} минут`;
     }
 
     handleClick(event) {
@@ -50,6 +62,12 @@ class ControlButtons {
 
     pressButton(action, slug = null, kkzId = null) {
         const body = slug ? { slug: slug } : { kkz_id: kkzId };
+        
+        // Добавляем количество минут для действия resume
+        if (action === 'resume' && this.resumeInput) {
+            body.minutes = parseInt(this.resumeInput.value, 10) || 15;
+        }
+        
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
         fetch(`/api/press_button/${action}/`, {
