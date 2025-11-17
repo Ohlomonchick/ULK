@@ -380,8 +380,8 @@ class Competition(models.Model):
         super(Competition, self).delete(*args, **kwargs)
 
     class Meta:
-        verbose_name = 'Работа'
-        verbose_name_plural = 'Работы'
+        verbose_name = 'Назначенная работа'
+        verbose_name_plural = 'Назначенные работы'
 
     def save(self, *args, **kwargs):
         # Generate slug only once on creation; preserve on updates

@@ -70,7 +70,7 @@ def get_time(request, instance_type, instance_id):  # pragma: no cover
         if remaining_time < timedelta(0):
             remaining_time = timedelta(0)
 
-        hours, remainder = divmod(remaining_time.seconds, 3600)
+        hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
         minutes, seconds = divmod(remainder, 60)
 
         return Response({

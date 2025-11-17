@@ -410,7 +410,7 @@ class CreateKkzView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     def form_valid(self, form):
         kkz = form.create_kkz()
         sleep(5)
-        return redirect('interface:competition-list')
+        return redirect('interface:kkz-detail', pk=kkz.pk)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -438,7 +438,7 @@ class CreateKkzFromLabView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     def form_valid(self, form):
         kkz = form.create_kkz()
         sleep(5)
-        return redirect('interface:competition-list')
+        return redirect('interface:kkz-detail', pk=kkz.pk)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
