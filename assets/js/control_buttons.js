@@ -10,7 +10,7 @@ class ControlButtons {
         document.querySelectorAll('.control-button').forEach(button => {
             button.addEventListener('click', (e) => this.handleClick(e));
         });
-        
+
         // Обновление текста кнопки при изменении значения в поле ввода
         if (this.resumeInput && this.resumeButton) {
             this.updateResumeButtonText();
@@ -29,7 +29,7 @@ class ControlButtons {
         const instanceType = button.dataset.instanceType;
         const slug = button.dataset.slug;
         const kkzId = button.dataset.kkzId;
-        
+
         if (action === 'end') {
             const confirmMessage = instanceType === 'kkz'
                 ? 'Вы уверены что хотите завершить ККЗ?'
@@ -61,13 +61,13 @@ class ControlButtons {
     }
 
     pressButton(action, slug = null, kkzId = null) {
-        const body = slug ? { slug: slug } : { kkz_id: kkzId };
-        
+        const body = slug ? {slug: slug} : {kkz_id: kkzId};
+
         // Добавляем количество минут для действия resume
         if (action === 'resume' && this.resumeInput) {
             body.minutes = parseInt(this.resumeInput.value, 10) || 15;
         }
-        
+
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
         fetch(`/api/press_button/${action}/`, {
@@ -78,18 +78,18 @@ class ControlButtons {
             },
             body: JSON.stringify(body)
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.redirect_url) {
-                window.location.href = data.redirect_url;
-            } else if (data.error) {
-                alert('Ошибка: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Произошла ошибка');
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else if (data.error) {
+                    alert('Ошибка: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка');
+            });
     }
 }
 

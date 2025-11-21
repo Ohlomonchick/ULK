@@ -411,7 +411,12 @@ def update_instance_time(instance, action, minutes=15):
         field = "finish"
         message = "ended"
     elif action == "resume":
-        time = timezone.now() + timedelta(minutes=minutes)
+        current_finish = getattr(instance, 'finish', None)
+        now = timezone.now()
+        if current_finish > now:
+            time = current_finish + timedelta(minutes=minutes)
+        else:
+            time = now + timedelta(minutes=minutes)
         field = "finish"
         message = f"resumed for {minutes} minutes"
     else:
