@@ -161,6 +161,7 @@ class LabTask(models.Model):
     class Meta:
         verbose_name = "Задание"
         verbose_name_plural = "Задания"
+        ordering = ['task_id']
 
     def __str__(self):
         return self.description
