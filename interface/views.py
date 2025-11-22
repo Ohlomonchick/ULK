@@ -317,10 +317,26 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
                 datetime__lte=kkz.finish
             ).count()
 
+            assigned_tasks = []
+            if kkz.unified_tasks:
+                if comp2users.exists():
+                    all_user_task_sets = [
+                        set(comp2user.tasks.values_list('id', flat=True))
+                        for comp2user in comp2users
+                    ]
+                    
+                    if all_user_task_sets:
+                        # Находим пересечение - задания, которые есть у всех пользователей
+                        common_task_ids = set.intersection(*all_user_task_sets)
+                        if all(tasks_user == common_task_ids for tasks_user in all_user_task_sets):
+                            assigned_tasks = list(LabTask.objects.filter(id__in=common_task_ids))
+            else:
+                assigned_tasks = list(comp.tasks.all())
+
             labs_data.append({
                 'lab': comp.lab,
                 'competition': comp,
-                'assigned_tasks': comp_context.get('assigned_tasks', []),
+                'assigned_tasks': assigned_tasks,
                 'delta': comp_context['delta'],
                 'button_start_now': comp_context['button_start_now'],
                 'button_end_now': comp_context['button_end_now'],
