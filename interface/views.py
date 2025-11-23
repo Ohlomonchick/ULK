@@ -787,3 +787,22 @@ class CustomSummernoteUploadAttachment(UserPassesTestMixin, View):
                 'status': 'false',
                 'message': _('Failed to save attachment'),
             }, status=500)
+
+
+def get_worker_id(request):
+    """
+    Тестовый эндпоинт для получения номера воркера Gunicorn.
+    Используется только для интеграционных тестов.
+    """
+    from interface.utils import get_gunicorn_worker_id, get_gunicorn_worker_index
+    import os
+    
+    worker_id = get_gunicorn_worker_id()
+    worker_index = get_gunicorn_worker_index()
+    pid = os.getpid()
+    
+    return JsonResponse({
+        'worker_id': worker_id,
+        'worker_index': worker_index,
+        'pid': pid,
+    })
