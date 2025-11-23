@@ -135,7 +135,7 @@
                                 <div class="content">
                                     <p>
                                         <strong class="title is-6">Задание {{ forloop.counter }}</strong>
-                                        <div class="mt-1">{{ task.description }}</div>
+                                        <div class="mt-1">{{ task.description | linebreaksbr }}</div>
                                     </p>
                                 </div>
                             </div>
@@ -163,7 +163,7 @@
                                 <div class="content">
                                     <p>
                                         <strong class="title is-6">Вариант {{ level.level_number }}</strong>
-                                        <div class="mt-1">{{ level.description }}</div>
+                                        <div class="mt-1">{{ level.description | linebreaksbr }}</div>
                                     </p>
                                 </div>
                             </div>

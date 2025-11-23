@@ -74,11 +74,11 @@
 
             {% if user.is_superuser %}
                 {% if assigned_tasks %}
-                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Задания" is_superuser=user.is_superuser competition_slug=object.slug %}
+                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Задания" is_superuser=user.is_superuser competition_slug=object.slug lab=object.lab %}
                 {% endif %}
             {% else %}
                 {% if assigned_tasks %}
-                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Ваши задания" is_superuser=user.is_superuser competition_slug=object.slug %}
+                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Ваши задания" is_superuser=user.is_superuser competition_slug=object.slug lab=object.lab %}
                 {% endif %}
             {% endif %}
 

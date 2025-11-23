@@ -24,7 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User
+from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
@@ -1297,9 +1297,19 @@ def check_task_answers(request):
             return JsonResponse({'error': 'User is not a participant of this competition'}, status=403)
         
         tasks = issue.tasks.all()
+        lab = competition.lab
+        
+        # Проверяем режим проверки заданий
+        is_one_attempt = lab.task_checking == TaskChecking.ONE_ATTEMPT
+        
+        # Получаем список заданий, на которые больше нельзя отвечать
+        failed_tasks_list = issue.failed_tasks if issue.failed_tasks else []
+        failed_tasks_set = set(failed_tasks_list) if isinstance(failed_tasks_list, list) else set()
         
         # Результаты проверки
         results = {}
+        new_failed_tasks = []
+        issue_needs_save = False
         
         # Извлекаем флаги из generated_flags
         flags_dict = {}
@@ -1315,9 +1325,18 @@ def check_task_answers(request):
         
         for task in tasks:
             task_id = str(task.id)
+            task_pk = task.id
             
             # Проверяем, есть ли вопрос у задания
             if not task.question or task.question.strip() == '':
+                continue
+            
+            # Проверяем, не находится ли задание в списке failed_tasks
+            if task_pk in failed_tasks_set:
+                results[task_id] = {
+                    'status': 'failed',
+                    'message': 'На это задание больше нельзя отвечать'
+                }
                 continue
             
             # Получаем ответ пользователя
@@ -1363,6 +1382,17 @@ def check_task_answers(request):
                     defaults={'datetime': timezone.now()},
                     **answer_filters
                 )
+            elif is_one_attempt and not is_correct:
+                # Если режим ONE_ATTEMPT и ответ неверный, добавляем задание в failed_tasks
+                if task_pk not in failed_tasks_set:
+                    new_failed_tasks.append(task_pk)
+                    failed_tasks_set.add(task_pk)
+                    issue_needs_save = True
+        
+        # Сохраняем обновленный список failed_tasks
+        if issue_needs_save:
+            issue.failed_tasks = list(failed_tasks_set)
+            issue.save(update_fields=['failed_tasks'])
         
         return JsonResponse({
             'success': True,
@@ -1408,6 +1438,10 @@ def get_user_tasks_status(request):
             ).values_list('lab_task_id', flat=True)
         )
         
+        # Получаем список заданий, на которые больше нельзя отвечать
+        failed_tasks_list = issue.failed_tasks if issue.failed_tasks else []
+        failed_tasks_set = set(failed_tasks_list) if isinstance(failed_tasks_list, list) else set()
+        
         # Формируем данные о заданиях
         tasks_data = []
         has_questions = False
@@ -1415,6 +1449,7 @@ def get_user_tasks_status(request):
         for idx, task in enumerate(tasks, 1):
             is_completed = task.id in completed_task_ids
             has_question = bool(task.question and task.question.strip())
+            is_failed = task.id in failed_tasks_set
             
             if has_question:
                 has_questions = True
@@ -1425,7 +1460,8 @@ def get_user_tasks_status(request):
                 'description': task.description or '',
                 'question': task.question or '',
                 'has_question': has_question,
-                'done': is_completed
+                'done': is_completed,
+                'failed': is_failed
             })
         
         return JsonResponse({
