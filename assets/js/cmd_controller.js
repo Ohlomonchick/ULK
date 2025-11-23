@@ -2,7 +2,7 @@
 
 // Кэш для хранения ссылок на Guacamole консоль (с localStorage)
 const consoleCache = {
-    CACHE_DURATION: 5 * 60 * 1000, // 5 минут в миллисекундах
+    CACHE_DURATION: 3 * 60 * 1000, // 3 минуты в миллисекундах
     STORAGE_KEY: 'cmd_console_cache',
     
     // Сохранить в кэш

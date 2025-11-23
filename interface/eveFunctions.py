@@ -38,14 +38,14 @@ def pf_login(url, name, password):
     return r2.cookies, session.cookies.get_dict()["_session"]
 
 
-def create_user(url, username, password, user_role, cookie):
+def create_user(url, username, password, user_role='1', cookie=None):
     relative_path = get_user_workspace_relative_path()
     user_params = {
         "data": [
             {
                 "username": username,
                 "password": password,
-                "role": "1",
+                "role": user_role,
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
@@ -376,7 +376,7 @@ def delete_lab(url, cookie, lab_path):
     return r
 
 
-def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username, post_nodes_callback=None, usb_device_ids=None):
+def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username, post_nodes_callback=None, usb_device_ids=None, pnet_login=None):
     """
     Создание узлов и коннекторов лаборатории.
     
@@ -391,6 +391,7 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
         post_nodes_callback: Callback функция, вызываемая после создания нод, но до destroy_session.
                            Принимает (url, cookie, xsrf, sess_id) и должна вернуть данные для дальнейшей обработки
         usb_device_ids: Список USB device IDs для замены в qemu_options (например, [1, 2, 3])
+        pnet_login: Логин PNet сессии для поиска сессии (если не указан, используется 'pnet_scripts')
     """
     from interface.utils import replace_usb_device_ids_in_nodes
     
@@ -427,11 +428,18 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
 
     logger.debug(session_list)
 
+    # Используем переданный логин или fallback на 'pnet_scripts'
+    target_login = pnet_login if pnet_login else 'pnet_scripts'
+    
     sess_id = 0
     for session in session_list:
-        if session[1] == 'pnet_scripts':
+        if session[1] == target_login:
             sess_id = session[0]
+            break
 
+    if sess_id == 0:
+        logger.warning(f"Сессия для логина {target_login} не найдена в списке сессий")
+    
     join_session(url, sess_id, cookie)
 
     # Модифицируем NodesData с USB device IDs, если они предоставлены

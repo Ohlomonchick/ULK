@@ -165,3 +165,23 @@ def replace_usb_device_ids_in_nodes(nodes_data, usb_device_ids):
             node['qemu_options'] = qemu_options
     
     return modified_nodes
+
+
+def get_gunicorn_worker_id():
+    """
+    Возвращает номер воркера Gunicorn (1, 2, 3, ...) или None, если не запущено через Gunicorn.
+    
+    Номер воркера стабилен даже при перезапусках воркеров (благодаря механизму синхронизации
+    в gunicorn.conf.py, который использует файловую блокировку).
+    
+    Returns:
+        int: Номер воркера от 1 до N, или None если не определен
+    """
+    import os
+    worker_id = os.getenv('GUNICORN_WORKER_ID')
+    if worker_id:
+        try:
+            return int(worker_id)
+        except ValueError:
+            return None
+    return None

@@ -20,4 +20,5 @@ urlpatterns = [
     path('kkz/create/', CreateKkzView.as_view(), name='kkz-create'),
     path('kkz/create-from-lab/<str:lab_type>/<slug:slug>/', CreateKkzFromLabView.as_view(), name='kkz-create-from-lab'),
     path('kkz_detail/<int:pk>/', KkzDetailView.as_view(), name='kkz-detail'),
+    path('test/worker-id/', get_worker_id, name='test-worker-id'),  # Только для тестов
 ]

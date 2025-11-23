@@ -4,9 +4,17 @@ from functools import wraps
 
 from interface.eveFunctions import change_user_password, create_directory, create_user, pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
     delete_lab_with_session_destroy, change_user_workspace
-from interface.config import get_pnet_url, get_pnet_base_dir
+from interface.config import get_pnet_url, get_pnet_base_dir, cache_for_minutes
+from interface.utils import get_gunicorn_worker_id
+from dynamic_config.utils import get_worker_credentials
 
 logger = logging.getLogger(__name__)
+
+
+@cache_for_minutes(5)
+def _get_cached_worker_credentials(worker_id):
+    """Получить credentials для воркера с кэшированием на 5 минут (модульный уровень)"""
+    return get_worker_credentials(worker_id)
 
 
 def require_pnet_url(func):
@@ -121,6 +129,7 @@ class PNetSessionManager:
         self._cookie = None
         self._xsrf = None
         self._is_authenticated = False
+        self._pnet_login = None  # Логин текущей сессии
         self._lock = threading.Lock()  # Блокировка для thread-safety
 
     def __enter__(self):
@@ -142,12 +151,26 @@ class PNetSessionManager:
             if not self._url:
                 raise ValueError("PNet URL не настроен")
 
-            Login = 'pnet_scripts'
-            Pass = 'eve'
+            # Пытаемся получить credentials для воркера
+            worker_id = get_gunicorn_worker_id()
+            login = 'pnet_scripts'
+            password = 'eve'
+            
+            if worker_id is not None:
+                worker_creds = _get_cached_worker_credentials(worker_id)
+                if worker_creds:
+                    login = worker_creds.get('username')
+                    password = worker_creds.get('password')
+                    logger.debug(f"Используются credentials воркера {worker_id}: {login}")
+                else:
+                    logger.debug(f"Credentials для воркера {worker_id} не найдены, используется fallback pnet_scripts")
+            else:
+                logger.debug("Gunicorn worker ID не определен, используется fallback pnet_scripts")
 
-            self._cookie, self._xsrf = pf_login(self._url, Login, Pass)
+            self._cookie, self._xsrf = pf_login(self._url, login, password)
+            self._pnet_login = login
             self._is_authenticated = True
-            logger.debug("PNet сессия создана")
+            logger.debug(f"PNet сессия создана для пользователя {login}")
 
     def logout(self):
         """Логаут из PNet"""
@@ -162,6 +185,7 @@ class PNetSessionManager:
                     self._is_authenticated = False
                     self._cookie = None
                     self._xsrf = None
+                    self._pnet_login = None
 
     @property
     def session_data(self):
@@ -173,6 +197,12 @@ class PNetSessionManager:
                 raise RuntimeError("Сессия не активна. Вызовите login() сначала")
             return self._url, self._cookie, self._xsrf
 
+    @property
+    def pnet_login(self):
+        """Возвращает логин текущей PNet сессии"""
+        with self._lock:
+            return self._pnet_login
+
     @require_pnet_url
     def create_lab_for_user(self, lab_name, username):
         """Создание лаборатории для пользователя"""
@@ -183,7 +213,8 @@ class PNetSessionManager:
     def create_lab_nodes_and_connectors(self, lab, lab_name, username, post_nodes_callback=None, usb_device_ids=None):
         """Создание узлов и коннекторов для пользователя"""
         url, cookie, xsrf = self.session_data
-        return create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), lab_name, cookie, xsrf, username, post_nodes_callback, usb_device_ids)
+        pnet_login = self.pnet_login
+        return create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), lab_name, cookie, xsrf, username, post_nodes_callback, usb_device_ids, pnet_login)
 
     @require_pnet_url
     def delete_lab_for_team(self, lab_name, team_slug):

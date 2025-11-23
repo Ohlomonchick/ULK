@@ -19,7 +19,9 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 class="title is-4 mb-0">{% if title %}{{ title }}{% else %}Задания{% endif %}</h3>
             {% if not is_superuser %}
-                <button id="check-tasks-btn" class="button is-primary is-small" data-competition-slug="{{ competition_slug }}">
+                <button id="check-tasks-btn" class="button is-primary is-small" 
+                        data-competition-slug="{{ competition_slug }}"
+                        {% if lab.task_checking == 'ONE_ATTEMPT' %}data-one-attempt="true"{% endif %}>
                     <span class="icon">
                         <i class="fas fa-check"></i>
                     </span>
@@ -38,7 +40,7 @@
                                 <span class="task-status-tag ml-2"></span>
                                 
                                 <div class="mt-3">
-                                    {{ task.description|safe }}
+                                    {{ task.description|linebreaksbr }}
                                 </div>
                                 
                                 {% if not is_superuser and task.question and task.question != '' %}
@@ -49,7 +51,7 @@
                                             </span>
                                             Вопрос:
                                         </p>
-                                        <p class="mb-3" style="color: #5c5c5c;">{{ task.question|safe }}</p>
+                                        <p class="mb-3" style="color: #5c5c5c;">{{ task.question|linebreaksbr }}</p>
                                         
                                         {% if not task.done %}
                                             <div class="field">
@@ -71,3 +73,23 @@
         </div>
     </div>
 {% endif %}
+
+<!-- Bulma Modal for One Attempt Warning -->
+<div class="modal" id="one-attempt-warning-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">Предупреждение</p>
+            <button class="delete" aria-label="close" id="one-attempt-modal-close"></button>
+        </header>
+        <section class="modal-card-body">
+            <p class="content">
+                <strong>Внимание!</strong> У вас больше не будет попыток, чтобы ответить на задания, в которые вы ввели ответ.
+            </p>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-danger" id="one-attempt-modal-confirm">Продолжить</button>
+            <button class="button" id="one-attempt-modal-cancel">Отмена</button>
+        </footer>
+    </div>
+</div>

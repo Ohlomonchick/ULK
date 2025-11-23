@@ -66,6 +66,11 @@ class LabTasksType(models.TextChoices):
     TESTING = "TESTING", "В форме тестирования"
 
 
+class TaskChecking(models.TextChoices):
+    MULTIPLE_ATTEMPTS = "MULTIPLE_ATTEMPTS", "Несколько попыток"
+    ONE_ATTEMPT = "ONE_ATTEMPT", "Одна попытка"
+
+
 class Lab(models.Model):
     id = models.AutoField(primary_key=True, serialize=False)
     name = models.CharField('Имя', max_length=255)
@@ -80,6 +85,7 @@ class Lab(models.Model):
     default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=7))
     tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
     need_kibana = models.BooleanField('Показывать дашборд в Kibana', default=False)
+    task_checking = models.CharField('Метод проверки заданий', max_length=32, choices=TaskChecking.choices, default=TaskChecking.MULTIPLE_ATTEMPTS)
 
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
@@ -430,6 +436,13 @@ class Competition2User(models.Model):
         null=True,
         default=dict
     )
+    failed_tasks = models.JSONField(
+        "Задания с неверным ответом (PK заданий, на которые больше нельзя отвечать)",
+        blank=True,
+        null=True,
+        default=list,
+        help_text="Список ID заданий, на которые пользователь больше не может отвечать"
+    )
 
     deleted = models.BooleanField(default=False)
 
@@ -541,6 +554,13 @@ class TeamCompetition2Team(models.Model):
         blank=True,
         null=True,
         default=dict
+    )
+    failed_tasks = models.JSONField(
+        "Задания с неверным ответом (PK заданий, на которые больше нельзя отвечать)",
+        blank=True,
+        null=True,
+        default=list,
+        help_text="Список ID заданий, на которые команда больше не может отвечать"
     )
     deleted = models.BooleanField(default=False)
 

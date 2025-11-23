@@ -178,3 +178,118 @@ html.iframe-fullscreen-active {
 .iframe-fullscreen-active .flex-wrapper {
     overflow: hidden !important;
 }
+
+/* Выдвижная правая панель в полноэкранном режиме */
+.sidebar-panel {
+    position: fixed;
+    top: 0;
+    right: -400px; /* Скрыта по умолчанию */
+    width: 400px;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 10001;
+    transition: right 0.3s ease;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    display: none;
+}
+
+.sidebar-panel.active {
+    right: 0;
+    display: block;
+}
+
+.sidebar-panel-content {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px;
+    padding-top: 60px; /* Место для кнопки сворачивания */
+}
+
+.sidebar-panel-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar-panel-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+.sidebar-panel-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.sidebar-panel-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Кнопка разворачивания панели */
+.sidebar-expand-btn {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 10000;
+    transition: all 0.3s ease;
+    display: none;
+    opacity: 0.8;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-expand-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: translateY(-50%) scale(1.1);
+    opacity: 1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.sidebar-expand-btn:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+/* Скрываем кнопку разворачивания, когда панель открыта */
+.sidebar-panel.active ~ .sidebar-expand-btn {
+    display: none !important;
+}
+
+/* Кнопка сворачивания панели */
+.sidebar-collapse-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 10002;
+    transition: all 0.3s ease;
+    opacity: 0.8;
+}
+
+.sidebar-collapse-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: scale(1.1);
+    opacity: 1;
+}
+
+.sidebar-collapse-btn:active {
+    transform: scale(0.95);
+}
+
+/* Скрываем оригинальную правую панель в полноэкранном режиме */
+body.iframe-fullscreen-active .column.is-one-quarter {
+    display: none !important;
+}
