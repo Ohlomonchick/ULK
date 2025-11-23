@@ -13,7 +13,7 @@ from django_apscheduler.jobstores import DjangoJobStore
 from django_apscheduler.models import DjangoJobExecution
 from django_apscheduler import util
 
-from interface.models import Competition2User, TeamCompetition2Team
+from interface.models import Competition2User, TeamCompetition2Team, Competition
 from interface.pnet_session_manager import with_pnet_session_if_needed
 
 logger = logging.getLogger(__name__)
@@ -28,9 +28,16 @@ def delete_labs_job():
     competitions2users = Competition2User.objects.filter(competition__finish__lte=delete_time, deleted=False)
 
     def _delete_competitions2users_operation():
+        competitions_to_mark_deleted = set()
         for competition2user in competitions2users:
             competition2user.delete_from_platform()
+            competitions_to_mark_deleted.add(competition2user.competition_id)
             time.sleep(2)
+        
+        # Помечаем соревнования как deleted
+        if competitions_to_mark_deleted:
+            Competition.objects.filter(id__in=competitions_to_mark_deleted).update(deleted=True)
+    
     if competitions2users.count() > 0:
         with_pnet_session_if_needed(competitions2users.first().competition.lab, _delete_competitions2users_operation)
 
@@ -44,9 +51,15 @@ def delete_competition2team_job():
     competitions2teams = TeamCompetition2Team.objects.filter(competition__finish__lte=delete_time, deleted=False)
 
     def _delete_competition2team_operation():
+        competitions_to_mark_deleted = set()
         for competition2team in competitions2teams:
             competition2team.delete_from_platform()
+            competitions_to_mark_deleted.add(competition2team.competition_id)
             time.sleep(2)
+        
+        # Помечаем соревнования как deleted
+        if competitions_to_mark_deleted:
+            Competition.objects.filter(id__in=competitions_to_mark_deleted).update(deleted=True)
 
     if competitions2teams.count() > 0:
         with_pnet_session_if_needed(competitions2teams.first().competition.lab, _delete_competition2team_operation)

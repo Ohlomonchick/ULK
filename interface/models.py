@@ -80,6 +80,7 @@ class Lab(models.Model):
     default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=7))
     tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
     need_kibana = models.BooleanField('Показывать дашборд в Kibana', default=False)
+    failing_tasks = models.BooleanField('Одна попытка на задание', default=False)
 
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)

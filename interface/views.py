@@ -355,6 +355,17 @@ def build_competition_context(request, instance, is_team_competition=False):
     button_start_now = (now - instance.start).total_seconds() < 0 if hasattr(instance, "start") else False
     button_end_now = not button_start_now and (instance.finish - now).total_seconds() > 0 if hasattr(instance, "finish") else False
     button_resume = not button_start_now and not button_end_now
+    
+    # Показываем кнопку удаления с платформы, если:
+    # - соревнование завершено (finish <= now)
+    # - платформа PNET или CMD
+    # - не удалено (deleted=False)
+    button_delete_from_platform = False
+    if hasattr(instance, "finish") and hasattr(instance, "lab") and hasattr(instance, "deleted"):
+        is_finished = instance.finish <= now
+        is_pnet_or_cmd = instance.lab and instance.lab.platform in ["PN", "CMD"]
+        is_not_deleted = not instance.deleted
+        button_delete_from_platform = is_finished and is_pnet_or_cmd and is_not_deleted
 
     progress = getattr(instance, "progress", 0)
     max_progress = getattr(instance, "max_progress", 100)
@@ -367,6 +378,7 @@ def build_competition_context(request, instance, is_team_competition=False):
         "button_start_now": button_start_now,
         "button_end_now": button_end_now,
         "button_resume": button_resume,
+        "button_delete_from_platform": button_delete_from_platform,
         "available": getattr(instance, "finish", now) > now,
         "progress": progress,
         "max_progress": max_progress,

@@ -427,6 +427,43 @@ def update_instance_time(instance, action, minutes=15):
     return message, None
 
 
+def delete_competition_from_platform(competition):
+    """
+    Удаляет соревнование с платформы: удаляет все competition2user и competition2team,
+    затем помечает competition как deleted.
+    """
+    import time
+    from .pnet_session_manager import with_pnet_session_if_needed
+    
+    # Получаем все competition2user и competition2team
+    competitions2users = Competition2User.objects.filter(competition=competition, deleted=False)
+    competitions2teams = TeamCompetition2Team.objects.filter(competition=competition, deleted=False)
+    
+    # Удаляем competition2user
+    if competitions2users.count() > 0:
+        def _delete_competitions2users_operation():
+            for competition2user in competitions2users:
+                competition2user.delete_from_platform()
+                time.sleep(2)
+        
+        with_pnet_session_if_needed(competition.lab, _delete_competitions2users_operation)
+    
+    # Удаляем competition2team
+    if competitions2teams.count() > 0:
+        def _delete_competition2team_operation():
+            for competition2team in competitions2teams:
+                competition2team.delete_from_platform()
+                time.sleep(2)
+        
+        with_pnet_session_if_needed(competition.lab, _delete_competition2team_operation)
+    
+    # Помечаем competition как deleted
+    competition.deleted = True
+    competition.save()
+    
+    return "deleted from platform"
+
+
 @api_view(['POST'])
 def press_button(request, action):
     try:
@@ -445,6 +482,19 @@ def press_button(request, action):
             redirect_url = reverse('interface:competition-detail', kwargs={'slug': slug})
         else:
             return JsonResponse({"error": "Missing slug or kkz_id"}, status=400)
+
+        # Обработка действия удаления с платформы
+        if action == "delete":
+            if isinstance(instance, Kkz):
+                return JsonResponse({"error": "Delete action is not supported for KKZ"}, status=400)
+            
+            message = delete_competition_from_platform(instance)
+            instance_type = "Competition"
+            cache.set("competitions_update", True, timeout=60)
+            return JsonResponse({
+                "message": f"{instance_type} {message}",
+                "redirect_url": redirect_url
+            }, status=200)
 
         message, error = update_instance_time(instance, action, minutes)
 
