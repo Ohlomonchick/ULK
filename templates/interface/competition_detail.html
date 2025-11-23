@@ -38,7 +38,7 @@
                         {% if object.lab.platform == "PN" %}data-src="/pnetlab/"{% endif %}
                         width="100%"
                         class="mb-5"
-                        height="600px"
+                        height="680px"
                         frameborder="0"
                         tabindex="0">
                     </iframe>
@@ -136,6 +136,21 @@
             <button class="iframe-collapse-btn" id="collapseIframeBtn">
                 <i class="fas fa-compress"></i>
             </button>
+            
+            <!-- Кнопка разворачивания правой панели -->
+            <button class="sidebar-expand-btn" id="sidebarExpandBtn" title="Показать информацию">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            
+            <!-- Выдвижная правая панель -->
+            <div class="sidebar-panel" id="sidebarPanel">
+                <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Скрыть информацию">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="sidebar-panel-content" id="sidebarPanelContent">
+                    <!-- Контент будет скопирован из правой колонки -->
+                </div>
+            </div>
         {% endif %}
     {% endif %}
 
