@@ -1380,22 +1380,15 @@ def check_task_answers(request):
                 # В режиме ONE_ATTEMPT используем транзакцию с блокировкой для предотвращения race condition
                 with transaction.atomic():
                     # Блокируем существующий ответ, если он есть
-                    existing_answer = Answers.objects.filter(
+                    existing_answer = Answers.objects.get_or_create(
                         lab=competition.lab,
                         lab_task=task,
                         datetime__lte=competition.finish,
                         datetime__gte=competition.start,
+                        defaults={'datetime': timezone.now()},
                         **answer_filters
-                    ).select_for_update().first()
+                    )
                     
-                    # Создаем ответ только если его еще нет
-                    if not existing_answer:
-                        Answers.objects.create(
-                            lab=competition.lab,
-                            lab_task=task,
-                            datetime=timezone.now(),
-                            **answer_filters
-                        )
             elif is_one_attempt and not is_correct:
                 # Если режим ONE_ATTEMPT и ответ неверный, добавляем задание в failed_tasks
                 if task_pk not in failed_tasks_set:
