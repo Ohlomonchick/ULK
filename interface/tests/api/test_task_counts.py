@@ -1,3 +1,4 @@
+import json
 from django.test import TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -321,17 +322,19 @@ class TaskCountsTestCase(TransactionTestCase):
         Проверяет, что при unified_tasks=True все пользователи имеют
         одинаковое количество max_tasks
         """
+        max_tasks_limit = 3
+        
         labs_data = [
             {
                 'lab_id': self.lab.id,
                 'name': self.lab.name,
                 'included': True,
-                'task_ids': [t.id for t in self.tasks],
-                'num_tasks': 3
+                'task_ids': [t.id for t in self.tasks], 
+                'num_tasks': len(self. tasks),
+                'max_tasks_limit': max_tasks_limit 
             }
         ]
 
-        import json
         form_data = {
             'name': 'Test Unified KKZ',
             'platoon': self.platoon.pk,
@@ -363,9 +366,25 @@ class TaskCountsTestCase(TransactionTestCase):
 
         self.assertEqual(
             max_tasks_values[0],
-            3,
+            max_tasks_limit,
             f"Expected 3 tasks per user with unified_tasks, got {max_tasks_values[0]}"
         )
+
+        competition = Competition.objects.get(kkz=kkz)
+        first_user_tasks = None
+        
+        for user in self.users:
+            comp2user = Competition2User.objects.get(competition=competition, user=user)
+            user_task_ids = set(comp2user. tasks.values_list('id', flat=True))
+            
+            if first_user_tasks is None:
+                first_user_tasks = user_task_ids
+            else:
+                self.assertEqual(
+                    first_user_tasks,
+                    user_task_ids,
+                    f"User {user. username} has different tasks than first user in unified mode"
+                )
 
     def test_max_total_progress_calculation(self):
         """
@@ -407,3 +426,101 @@ class TaskCountsTestCase(TransactionTestCase):
             3,
             f"total_tasks should be 3, got {data['total_tasks']}"
         )
+
+
+    @patch("interface.pnet_session_manager.PNetSessionManager.delete_lab_for_user")
+    @patch("interface.pnet_session_manager.PNetSessionManager.logout")
+    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_nodes_and_connectors")
+    @patch("interface.pnet_session_manager.PNetSessionManager.create_lab_for_user")
+    @patch("interface.pnet_session_manager.PNetSessionManager.login")
+    def test_simple_kkz_form_with_max_tasks_limit(
+            self,
+            mock_login,
+            mock_create_lab,
+            mock_create_nodes,
+            mock_logout,
+            mock_delete_lab
+    ):
+        """
+        Проверяем что max_tasks_limit ограничивает общее количество заданий
+        даже когда preview_assignments не передан (пользователь не открывал превью)
+        """
+        lab2 = Lab.objects.create(
+            name="Test Lab 2",
+            platform="NO",
+            lab_type="EXAM",
+            learning_years=[1]
+        )
+        
+        tasks2 = []
+        for i in range(3):
+            task = LabTask.objects.create(
+                lab=lab2,
+                task_id=f"Task2_{i + 1}",
+                description=f"Test task 2. {i + 1}"
+            )
+            tasks2.append(task)
+
+        # Устанавливаем лимит в 2 задания (при том что у нас 6 заданий в 2 лабах)
+        max_tasks_limit = 2
+        
+        labs_data = [
+            {
+                'lab_id': self.lab.id,
+                'name': self.lab.name,
+                'included': True,
+                'task_ids': [t.id for t in self.tasks],
+                'num_tasks': len(self.tasks),
+                'max_tasks_limit': max_tasks_limit
+            },
+            {
+                'lab_id': lab2.id,
+                'name': lab2.name,
+                'included': True,
+                'task_ids': [t.id for t in tasks2],
+                'num_tasks': len(tasks2),
+                'max_tasks_limit': max_tasks_limit
+            }
+        ]
+        
+        form_data = {
+            'name': 'Test KKZ with limit',
+            'platoon': self.platoon.pk,
+            'duration_0': '0',
+            'duration_1': '2',
+            'duration_2': '0',
+            'unified_tasks': False,
+            'labs_data': json.dumps(labs_data),
+            # НЕ передаем preview_assignments - имитируем что пользователь не открывал превью
+        }
+
+        form = SimpleKkzForm(data=form_data)
+        self.assertTrue(form. is_valid(), f"Form errors: {form.errors}")
+        kkz = form.create_kkz()
+
+        # Проверяем что у каждого пользователя не более max_tasks_limit заданий
+        for user in self.users:
+            total_tasks_for_user = 0
+            for competition in Competition.objects.filter(kkz=kkz):
+                try:
+                    comp2user = Competition2User.objects.get(
+                        competition=competition,
+                        user=user
+                    )
+                    total_tasks_for_user += comp2user.tasks.count()
+                except Competition2User.DoesNotExist:
+                    pass
+            
+            self.assertLessEqual(
+                total_tasks_for_user,
+                max_tasks_limit,
+                f"User {user.username} has {total_tasks_for_user} tasks, "
+                f"but max_tasks_limit is {max_tasks_limit}"
+            )
+            
+            # проверяем что задания вообще назначены (не 0)
+            self.assertGreater(
+                total_tasks_for_user,
+                0,
+                f"User {user.username} should have at least 1 task"
+            )
