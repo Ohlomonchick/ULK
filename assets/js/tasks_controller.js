@@ -32,7 +32,6 @@ class TasksController {
         const $modal = $('#one-attempt-warning-modal');
         const $closeBtn = $('#one-attempt-modal-close');
         const $cancelBtn = $('#one-attempt-modal-cancel');
-        const $confirmBtn = $('#one-attempt-modal-confirm');
         
         // Закрытие модального окна
         const closeModal = () => {
@@ -43,11 +42,7 @@ class TasksController {
         $cancelBtn.on('click', closeModal);
         $modal.find('.modal-background').on('click', closeModal);
         
-        // Подтверждение - продолжаем проверку
-        $confirmBtn.on('click', () => {
-            closeModal();
-            this.proceedWithCheck();
-        });
+        // НЕ вешаем обработчик на confirmBtn здесь - он будет в showWarningModal()
     }
 
     /**
@@ -292,6 +287,11 @@ class TasksController {
      * Обработчик нажатия на кнопку "Проверить"
      */
     async handleCheckTasks() {
+        // Предотвращаем двойные клики
+        if (this.$checkBtn.prop('disabled')) {
+            return; // Уже обрабатывается
+        }
+        
         const hasQuestions = this.hasQuestions();
         const answers = this.collectAnswers();
         
@@ -300,6 +300,7 @@ class TasksController {
             try {
                 await this.showWarningModal();
                 // Пользователь подтвердил - продолжаем проверку
+                // proceedWithCheck() сам заблокирует кнопку
                 await this.proceedWithCheck();
             } catch {
                 // Пользователь отменил - ничего не делаем
@@ -307,6 +308,7 @@ class TasksController {
             }
         } else {
             // Обычная проверка без предупреждения
+            // proceedWithCheck() сам заблокирует кнопку
             await this.proceedWithCheck();
         }
     }
