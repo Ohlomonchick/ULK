@@ -1,14 +1,18 @@
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase, RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
 from django.test import Client
+from django.http import JsonResponse
 import json
+import threading
+import time
 
 from interface.models import (
     Competition, Platoon, User, Lab, LabTask, Answers,
-    Competition2User, TeamCompetition, Team, TeamCompetition2Team
+    Competition2User, TeamCompetition, Team, TeamCompetition2Team, TaskChecking
 )
+from interface.api import check_task_answers
 
 
 class BaseTaskAnswersTestCase(TestCase):
@@ -717,4 +721,262 @@ class CheckTaskAnswersWithFlagsTeamTestCase(TestCase):
         
         # Проверяем, что все ответы сохранены
         self.assertEqual(Answers.objects.filter(team=self.team, lab=self.lab).count(), 3)
+
+
+class CheckTaskAnswersRaceConditionTestCase(TransactionTestCase):
+    """
+    Тесты для проверки защиты от race condition в режиме ONE_ATTEMPT
+    
+    Использует TransactionTestCase вместо TestCase, так как TestCase использует
+    транзакции, которые не видны другим потокам при тестировании race condition.
+    """
+    
+    def setUp(self):
+        # Создаем все необходимые объекты (копируем логику из BaseTaskAnswersTestCase)
+        self.client = Client()
+        self.user = self._create_user()
+        self.lab = self._create_lab()
+        self.competition = self._create_competition()
+        self.competition_user = Competition2User.objects.create(
+            competition=self.competition,
+            user=self.user
+        )
+        self.client.login(username='testuser', password='testpass123')
+        self.url = reverse('interface_api:check_task_answers')
+        # Устанавливаем режим ONE_ATTEMPT для лаборатории
+        self.lab.task_checking = TaskChecking.ONE_ATTEMPT
+        self.lab.save()
+    
+    def _create_user(self, username='testuser', password='testpass123'):
+        """Создает и возвращает пользователя"""
+        return User.objects.create_user(
+            username=username,
+            password=password,
+            first_name='Test',
+            last_name='User',
+            pnet_login=username
+        )
+    
+    def _create_lab(self, name='Test Lab', slug='test-lab'):
+        """Создает и возвращает лабораторную работу"""
+        return Lab.objects.create(
+            name=name,
+            platform='NO',
+            slug=slug,
+            description='Test description'
+        )
+    
+    def _create_competition(self):
+        """Создает и возвращает соревнование"""
+        return Competition.objects.create(
+            slug='test-competition',
+            start=timezone.now() - timedelta(hours=1),
+            finish=timezone.now() + timedelta(hours=2),
+            lab=self.lab,
+            participants=5
+        )
+    
+    def _create_task(self, task_id, description='Task', question='', answer=''):
+        """Создает задание с указанными параметрами"""
+        return LabTask.objects.create(
+            lab=self.lab,
+            task_id=task_id,
+            description=description,
+            question=question,
+            answer=answer
+        )
+    
+    def _add_tasks_to_user(self, *tasks):
+        """Добавляет задания пользователю"""
+        self.competition_user.tasks.add(*tasks)
+    
+    def test_concurrent_requests_one_attempt_mode(self):
+        """
+        Тест: Проверка защиты от race condition при одновременных запросах
+        в режиме ONE_ATTEMPT. Должен создаться только один ответ.
+        """
+        task = self._create_task('task_1', question='What is 2+2?', answer='4')
+        self._add_tasks_to_user(task)
+        
+        # Результаты запросов (потокобезопасный список)
+        results = []
+        errors = []
+        results_lock = threading.Lock()
+        errors_lock = threading.Lock()
+        completed = threading.Event()
+        
+        def send_request(thread_id):
+            """Функция для отправки запроса в отдельном потоке"""
+            try:
+                # Используем RequestFactory для прямого вызова функции
+                # Это более надежно в многопоточных тестах
+                factory = RequestFactory()
+                request = factory.post(
+                    self.url,
+                    data=json.dumps({
+                        'competition_slug': self.competition.slug,
+                        'answers': {str(task.id): '4'}
+                    }),
+                    content_type='application/json'
+                )
+                # Устанавливаем пользователя в запрос
+                request.user = self.user
+                
+                # Вызываем функцию напрямую
+                response = check_task_answers(request)
+                
+                # Получаем статус код и данные ответа
+                status_code = response.status_code if hasattr(response, 'status_code') else 200
+                response_data = None
+                if isinstance(response, JsonResponse):
+                    try:
+                        import json as json_module
+                        response_data = json_module.loads(response.content.decode('utf-8'))
+                    except:
+                        pass
+                
+                with results_lock:
+                    results.append({
+                        'thread_id': thread_id,
+                        'status_code': status_code,
+                        'response_data': response_data
+                    })
+            except Exception as e:
+                import traceback
+                error_msg = f"Thread {thread_id}: {str(e)}\n{traceback.format_exc()}"
+                with errors_lock:
+                    errors.append(error_msg)
+        
+        # Создаем 5 потоков для одновременных запросов
+        threads = []
+        for i in range(5):
+            thread = threading.Thread(target=send_request, args=(i,))
+            thread.daemon = True  # Потоки-демоны завершатся при завершении основного потока
+            threads.append(thread)
+        
+        # Запускаем все потоки почти одновременно
+        for thread in threads:
+            thread.start()
+            time.sleep(0.01)  # Небольшая задержка для увеличения вероятности race condition
+        
+        # Ждем завершения всех потоков с таймаутом
+        for thread in threads:
+            thread.join(timeout=10.0)  # Таймаут 10 секунд
+            if thread.is_alive():
+                with errors_lock:
+                    errors.append(f"Thread {thread.name} did not complete within timeout")
+        
+        # Проверяем, что все запросы успешно выполнены
+        self.assertEqual(len(results), 5, 
+                        f"Не все запросы были выполнены. Выполнено: {len(results)}, ошибки: {errors}")
+        
+        # Проверяем статус коды
+        status_codes = [r['status_code'] for r in results]
+        self.assertTrue(all(status == 200 for status in status_codes), 
+                       f"Некоторые запросы завершились с ошибкой: {status_codes}")
+        
+        # Проверяем отсутствие ошибок
+        if errors:
+            self.fail(f"Произошли ошибки: {errors}")
+        
+        # КРИТИЧЕСКИ ВАЖНО: Должен быть создан только ОДИН ответ
+        answer_count = Answers.objects.filter(
+            user=self.user,
+            lab=self.lab,
+            lab_task=task
+        ).count()
+        self.assertEqual(answer_count, 1, 
+                        f"Должен быть создан только один ответ, но создано {answer_count}")
+    
+    def test_concurrent_requests_multiple_attempts_mode(self):
+        """
+        Тест: В режиме MULTIPLE_ATTEMPTS одновременные запросы должны создавать только один ответ
+        благодаря транзакции с блокировкой
+        """
+        # Устанавливаем режим MULTIPLE_ATTEMPTS
+        self.lab.task_checking = TaskChecking.MULTIPLE_ATTEMPTS
+        self.lab.save()
+        
+        task = self._create_task('task_1', question='What is 2+2?', answer='4')
+        self._add_tasks_to_user(task)
+        
+        # Результаты запросов (потокобезопасный список)
+        results = []
+        errors = []
+        results_lock = threading.Lock()
+        errors_lock = threading.Lock()
+        
+        def send_request(thread_id):
+            """Функция для отправки запроса в отдельном потоке"""
+            try:
+                # Используем RequestFactory для прямого вызова функции
+                factory = RequestFactory()
+                request = factory.post(
+                    self.url,
+                    data=json.dumps({
+                        'competition_slug': self.competition.slug,
+                        'answers': {str(task.id): '4'}
+                    }),
+                    content_type='application/json'
+                )
+                # Устанавливаем пользователя в запрос
+                request.user = self.user
+                
+                # Вызываем функцию напрямую
+                response = check_task_answers(request)
+                
+                # Получаем статус код
+                status_code = response.status_code if hasattr(response, 'status_code') else 200
+                
+                with results_lock:
+                    results.append({
+                        'thread_id': thread_id,
+                        'status_code': status_code
+                    })
+            except Exception as e:
+                import traceback
+                error_msg = f"Thread {thread_id}: {str(e)}\n{traceback.format_exc()}"
+                with errors_lock:
+                    errors.append(error_msg)
+        
+        # Создаем 3 потока для одновременных запросов
+        threads = []
+        for i in range(3):
+            thread = threading.Thread(target=send_request, args=(i,))
+            thread.daemon = True
+            threads.append(thread)
+        
+        # Запускаем все потоки почти одновременно
+        for thread in threads:
+            thread.start()
+            time.sleep(0.01)
+        
+        # Ждем завершения всех потоков с таймаутом
+        for thread in threads:
+            thread.join(timeout=10.0)
+            if thread.is_alive():
+                with errors_lock:
+                    errors.append(f"Thread {thread.name} did not complete within timeout")
+        
+        # Проверяем, что все запросы успешно выполнены
+        self.assertEqual(len(results), 3, 
+                        f"Не все запросы были выполнены. Выполнено: {len(results)}, ошибки: {errors}")
+        
+        # Проверяем статус коды
+        status_codes = [r['status_code'] for r in results]
+        self.assertTrue(all(status == 200 for status in status_codes), 
+                       f"Некоторые запросы завершились с ошибкой: {status_codes}")
+        
+        # Проверяем отсутствие ошибок
+        if errors:
+            self.fail(f"Произошли ошибки: {errors}")
+        
+        # Благодаря транзакции с блокировкой должен быть создан только один ответ
+        answer_count = Answers.objects.filter(
+            user=self.user,
+            lab=self.lab,
+            lab_task=task
+        ).count()
+        self.assertEqual(answer_count, 1, 
+                        f"Должен быть создан только один ответ, но создано {answer_count}")
 
