@@ -1,11 +1,14 @@
 import json
 import re
 from collections import defaultdict
+from io import BytesIO
 
 import requests
 import urllib3
 import logging
 import random
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
 
 from interface.utils import get_kibana_url
 
@@ -83,6 +86,35 @@ def get_time(request, instance_type, instance_id):  # pragma: no cover
         return Response({'error': f'{instance_type.upper()} not found'}, status=404)
 
 
+def format_timedelta_ru(delta):
+    if not delta:
+        return ""
+    
+    days = delta.days
+    remaining_seconds = delta.seconds
+    hours, remainder = divmod(remaining_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    parts = []
+    
+    if days > 0:
+        if days == 1:
+            day_word = "день"
+        elif 2 <= days <= 4:
+            day_word = "дня"
+        else:
+            day_word = "дней"
+        parts.append(f"{days} {day_word}")
+    
+    # Форматируем время
+    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    
+    if parts:
+        return f"{', '.join(parts)}, {time_str}"
+    else:
+        return time_str
+
+
 def make_solution_data(solution, competition):
     user = User.objects.get(pk=solution["user_id"])
     return {
@@ -90,7 +122,7 @@ def make_solution_data(solution, competition):
         "user_first_name": user.first_name,
         "user_last_name": user.last_name,
         "user_platoon": str(user.platoon),
-        "spent": str(solution["datetime"] - competition.start).split(".")[0] if solution["datetime"] else "",
+        "spent": format_timedelta_ru(solution["datetime"] - competition.start) if solution["datetime"] else "",
         "datetime": solution["datetime"].strftime("%H:%M:%S") if solution["datetime"] else "",
         "raw_datetime": solution["datetime"],
         "team_name": "",
