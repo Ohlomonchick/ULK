@@ -1,0 +1,122 @@
+<h1 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">Экспортировать оценки</h1>
+
+<div id="export-rating-container" 
+     data-slug="{{ instance_slug }}" 
+     data-type="{{ instance_type }}">
+    
+    <!-- Tabs -->
+    <div class="tabs is-boxed mb-4">
+        <ul>
+            <li class="is-active" data-tab="by-tasks">
+                <a>По числу заданий</a>
+            </li>
+            <li data-tab="by-position">
+                <a>По позиции в таблице лидеров</a>
+            </li>
+        </ul>
+    </div>
+
+    <div style="display: flex; align-items: flex-start; gap: 2rem;">
+        <div id="export-grades-forms" style="flex: 1;">
+            <!-- Tab Content: By Tasks -->
+            <div id="tab-by-tasks" class="tab-content">
+                <h3 class="title is-5 mb-4">Настройте оценки в зависимости от баллов</h3>
+                <p class="help mb-4">Укажите минимальное количество решенных заданий для каждой оценки. Остальным студентам будет выставлена оценка "2".</p>
+                
+                <div class="field">
+                    <div class="control">
+                        <label style="display: inline-block">Оценка "5" начиная с</label>
+                        <input class="input" type="number" id="grade-5-tasks" min="0" value="1" required maxlength="2" style="width: 3.5em; display: inline-block; vertical-align: middle;">
+                        <label style="display: inline-block;">заданий</label>
+                    </div>
+                </div>
+                
+                <div class="field">
+                    <div class="control">
+                        <label style="display: inline-block">Оценка "4" начиная с</label>
+                        <input class="input" type="number" id="grade-4-tasks" min="0" value="1" required maxlength="2" style="width: 3.5em; display: inline-block; vertical-align: middle;">
+                        <label style="display: inline-block;">заданий</label>
+                    </div>
+                </div>
+                
+                <div class="field">    
+                    <div class="control">
+                        <label style="display: inline-block">Оценка "3" начиная с</label>
+                        <input class="input" type="number" id="grade-3-tasks" min="0" value="1" required maxlength="2" style="width: 3.5em; display: inline-block; vertical-align: middle;">
+                        <label style="display: inline-block;">заданий</label>
+                    </div>
+                </div>
+                
+                <div class="field is-grouped mt-5" style="display: flex; align-items: center; gap: 1rem;">
+                    <div class="control">
+                        <button class="button is-dark" id="generate-grades-by-tasks">Выставить оценки</button>
+                    </div>
+                    <div class="control">
+                        <button class="button is-link download-xlsx-btn" style="display: none;">Скачать в xlsx</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: By Position -->
+            <div id="tab-by-position" class="tab-content" style="display: none;">
+                <h3 class="title is-5 mb-4">Настройте оценки в зависимости от позиции</h3>
+                <p class="help mb-4">Укажите количество студентов для каждой оценки. Остальным студентам будет выставлена оценка "2".</p>
+                
+                <div class="field">
+                    <div class="control">
+                        <label style="display: inline-block">Первым</label>
+                        <input class="input" type="number" id="grade-5-position" min="0" value="0" required maxlength="2" style="width: 3.5em;  display: inline-block; vertical-align: middle;">
+                        <span style="display: inline-block">студентам - оценка "5"</span>
+                    </div>
+                </div>
+                
+                <div class="field">
+                    <div class="control">
+                        <label style="display: inline-block">Следующим</label>
+                        <input class="input" type="number" id="grade-4-position" min="0" value="0" required maxlength="2" style="width: 3.5em;  display: inline-block; vertical-align: middle;">
+                        <span style="display: inline-block">студентам - оценка "4"</span>
+                    </div>
+                </div>
+                
+                <div class="field">
+                    <div class="control">
+                        <label style="display: inline-block">Следующим</label>
+                        <input class="input" type="number" id="grade-3-position" min="0" value="0" required maxlength="2" style="width: 3.5em;  display: inline-block; vertical-align: middle;">
+                        <span style="display: inline-block">студентам - оценка "3"</span>
+                    </div>
+                </div>
+                
+                <div class="field is-grouped mt-5" style="display: flex; align-items: center; gap: 1rem;">
+                    <div class="control">
+                        <button class="button is-dark" id="generate-grades-by-position">Выставить оценки</button>
+                    </div>
+                    <div class="control">
+                        <button class="button is-link download-xlsx-btn" style="display: none;">Скачать в xlsx</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview Section: always rendered, shown/hidden dynamically -->
+        <div id="preview-section" style="display: none; min-width: 390px;" class="mt-0">
+            <div id="preview-table-container">
+                <table class="table is-fullwidth is-striped" id="preview-table">
+                    <thead>
+                        <tr>
+                            <th>Фамилия</th>
+                            <th>Имя</th>
+                            <th>Оценка</th>
+                            <th>Позиция</th>
+                            <th>Решено заданий</th>
+                        </tr>
+                    </thead>
+                    <tbody id="preview-table-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Messages -->
+    <div id="error-message" class="notification is-danger" style="display: none; margin-top: 1rem;"></div>
+</div>

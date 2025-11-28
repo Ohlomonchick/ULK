@@ -17,11 +17,15 @@
     <div class="columns is-centered">
         <div class="column is-three-quarters">
             {% if user.is_superuser %}
-                <div class="box">
-                    {% include 'interface/_solutions_table.html' with instance_slug=object.slug instance_type='competition' show_team_column=is_team_competition show_max_tasks=False progress=progress max_progress=max_progress %}
-                
+                {% include 'interface/_solutions_table.html' with instance_slug=object.slug instance_type='competition' show_team_column=is_team_competition show_max_tasks=False progress=progress max_progress=max_progress %}
+                <div style="margin-bottom: 1rem;">
                     {% include 'interface/_control_buttons.html' with button_start_now=button_start_now button_end_now=button_end_now button_resume=button_resume instance=object instance_type='competition' start_time=object.start finish_time=object.finish %}
                 </div>
+                {% if available == False %}
+                    <div class="box">
+                        {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' %}
+                    </div>
+                {% endif %}
             {% elif object.lab.platform == "PN" or object.lab.platform == "CMD" %}
                 <div class="iframe-container" style="position: relative;">
                     <button class="iframe-toggle-slider" id="expandIframeBtn">
@@ -118,6 +122,9 @@
     
     {% if user.is_superuser %}
         <script src="{% static 'js/control_buttons.js' %}"></script>
+        {% if available == False %}
+            <script src="{% static 'js/export_rating.js' %}"></script>
+        {% endif %}
     {% else %}
         <script src="{% static 'js/tasks_controller.js' %}"></script>
     {% endif %}

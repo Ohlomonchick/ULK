@@ -350,8 +350,9 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             context['delta'] = {"hours": "00", "minutes": "00", "seconds": "00"}
 
         context['labs_data'] = labs_data
-        context['total_possible'] = total_possible
-        context['total_completed'] = total_completed
+        context['now'] = timezone.now()
+        context['max_progress'] = total_possible
+        context['total_progress'] = total_completed
 
         return context
 
