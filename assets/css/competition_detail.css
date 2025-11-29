@@ -54,6 +54,9 @@
     overflow: hidden;
     white-space: nowrap;
     transform: translateX(100%);
+    /* Фиксируем позицию относительно правого края контейнера */
+    margin-right: 0;
+    will-change: transform; /* Оптимизация для плавной анимации */
 }
 
 /* Кнопка обновления консоли */
@@ -77,6 +80,9 @@
     overflow: hidden;
     white-space: nowrap;
     transform: translateX(100%);
+    /* Фиксируем позицию относительно правого края контейнера */
+    margin-right: 0;
+    will-change: transform; /* Оптимизация для плавной анимации */
 }
 
 /* Общие стили для кнопок слайдеров */
@@ -113,6 +119,7 @@
 /* Контейнер iframe */
 .iframe-container {
     position: relative;
+    overflow: visible; /* Позволяем кнопкам выходить за границы контейнера */
 }
 
 /* Улучшаем захват фокуса iframe */
@@ -448,4 +455,25 @@ body.iframe-fullscreen-active.description-panel-active.sidebar-panel-active #pne
 
 .description-collapse-btn:active {
     transform: scale(0.95);
+}
+
+/* Фиксируем позицию кнопки "Проверить" в списке заданий */
+#tasks-list-box > div:first-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: nowrap; /* Предотвращаем перенос элементов */
+    min-width: 0; /* Позволяем flex-элементам сжиматься при необходимости */
+}
+
+#tasks-list-box > div:first-child h3 {
+    flex: 1 1 auto;
+    min-width: 0; /* Позволяет заголовку сжиматься */
+    margin-right: 1rem; /* Отступ от кнопки */
+}
+
+#check-tasks-btn {
+    flex: 0 0 auto; /* Кнопка не сжимается и не растягивается */
+    white-space: nowrap; /* Текст кнопки не переносится */
 }
