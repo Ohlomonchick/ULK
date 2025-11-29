@@ -968,6 +968,7 @@ def create_pnet_lab_session_with_console(request):
 
         # Импортируем функции из eveFunctions
         from .eveFunctions import pf_login, create_pnet_lab_session_common, get_lab_topology, get_guacamole_url, turn_on_node
+        from .lab_topology import LabTopology
 
         # Получаем URL PNET
         pnet_url = get_pnet_url()
@@ -982,42 +983,56 @@ def create_pnet_lab_session_with_console(request):
         if not success:
             return JsonResponse({'error': message}, status=500)
 
-        # Получаем топологию лаборатории
-        topology = get_lab_topology(pnet_url, cookies)
-        if not topology or topology.get('code') != 200:
+        # Получаем топологию лаборатории и инкапсулируем в класс
+        topology_data = get_lab_topology(pnet_url, cookies)
+        if not topology_data or topology_data.get('code') != 200:
             return JsonResponse({'error': 'Failed to get lab topology'}, status=500)
 
-        # Ищем ноду по имени
-        nodes = topology.get('data', {}).get('nodes', {})
-        target_node_id = None
-        
-        for node_id, node_data in nodes.items():
-            if node_data.get('name') == node_name:
-                target_node_id = int(node_id)
-                break
+        topology = LabTopology(topology_data)
 
-        if target_node_id is None:
+        # Ищем целевую ноду по имени
+        target_node = topology.get_node_by_name(node_name)
+        if target_node is None:
             return JsonResponse({'error': f'SSH node "{node_name}" not found in topology'}, status=404)
 
-        # Включаем ноду перед получением ссылки на консоль
-        logger.info(f'Starting node {target_node_id}...')
-        node_start_success, node_start_message = turn_on_node(pnet_url, target_node_id, cookies)
-        if not node_start_success:
-            logger.error(f'Failed to start node: {node_start_message}')
-            return JsonResponse({'error': f'Failed to start node: {node_start_message}'}, status=500)
+        target_node_id = target_node['id']
 
-        # Получаем ссылку на Guacamole консоль
+        # Включаем все ноды в топологии
+        all_node_ids = topology.get_all_node_ids()
+        logger.info(f'Starting all nodes in topology: {all_node_ids}')
+        
+        failed_nodes = []
+        for node_id in all_node_ids:
+            node_start_success, node_start_message = turn_on_node(pnet_url, node_id, cookies)
+            if not node_start_success:
+                logger.warning(f'Failed to start node {node_id}: {node_start_message}')
+                failed_nodes.append({'node_id': node_id, 'error': node_start_message})
+            else:
+                logger.info(f'Node {node_id} started successfully')
+
+        # Если не удалось включить целевую ноду, возвращаем ошибку
+        if any(failed['node_id'] == target_node_id for failed in failed_nodes):
+            logger.error(f'Failed to start target node {target_node_id}')
+            return JsonResponse({
+                'error': f'Failed to start target node: {next(f["error"] for f in failed_nodes if f["node_id"] == target_node_id)}'
+            }, status=500)
+
+        # Получаем ссылку на Guacamole консоль для целевой ноды
         guacamole_url = get_guacamole_url(pnet_url, target_node_id, cookies)
         if not guacamole_url:
             return JsonResponse({'error': 'Failed to get console URL'}, status=500)
 
-        return JsonResponse({
+        response_data = {
             'success': True,
             'node_id': target_node_id,
             'node_name': node_name,
             'guacamole_url': guacamole_url,
-            'lab_path': lab_path
-        })
+            'lab_path': lab_path,
+            'all_nodes_started': len(all_node_ids),
+            'failed_nodes': failed_nodes if failed_nodes else None
+        }
+        
+        return JsonResponse(response_data)
 
     except Competition.DoesNotExist:
         return JsonResponse({'error': 'Competition not found'}, status=404)

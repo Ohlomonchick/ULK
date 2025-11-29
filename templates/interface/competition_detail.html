@@ -31,6 +31,19 @@
                         <button class="console-refresh-slider" id="refreshConsoleBtn" onclick="refreshConsoleSession()">
                             <i class="fas fa-sync-alt"></i><span class="slider-text"> Обновить консоль</span>
                         </button>
+                        <!-- Загрузчик для CMD консоли -->
+                        <div class="cmd-console-loader" id="cmdConsoleLoader">
+                            <div class="cmd-console-loader-spinner"></div>
+                            <p class="cmd-console-loader-text">Инициализация консоли...</p>
+                            <p class="cmd-console-loader-subtext">Включение виртуальных машин</p>
+                        </div>
+                    {% elif object.lab.platform == "PN" %}
+                        <!-- Загрузчик для PNET консоли -->
+                        <div class="cmd-console-loader" id="pnetConsoleLoader">
+                            <div class="cmd-console-loader-spinner"></div>
+                            <p class="cmd-console-loader-text">Инициализация PNET...</p>
+                            <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
+                        </div>
                     {% endif %}
                     <iframe
                         id="pnetFrame"
@@ -125,6 +138,7 @@
     {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
         {% if not user.is_superuser %}
             <script src="{% static 'js/common_utils.js' %}"></script>
+            <script src="{% static 'js/console_loader.js' %}"></script>
             <script src="{% static 'js/pnet_iframe_controller.js' %}"></script>
             {% if object.lab.platform == "PN" %}
                 <script src="{% static 'js/pnet_controller.js' %}"></script>

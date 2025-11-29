@@ -477,3 +477,70 @@ body.iframe-fullscreen-active.description-panel-active.sidebar-panel-active #pne
     flex: 0 0 auto; /* Кнопка не сжимается и не растягивается */
     white-space: nowrap; /* Текст кнопки не переносится */
 }
+
+/* Стили для загрузчика консоли CMD */
+.cmd-console-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(2px);
+    border-radius: 13px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    transition: opacity 0.3s ease;
+}
+
+.cmd-console-loader.active {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+
+.cmd-console-loader-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #0069d1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+.cmd-console-loader-text {
+    color: #363636;
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    margin: 0;
+}
+
+.cmd-console-loader-subtext {
+    color: #7a7a7a;
+    font-size: 13px;
+    text-align: center;
+    margin-top: 8px;
+    margin: 0;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
