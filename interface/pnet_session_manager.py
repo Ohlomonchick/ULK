@@ -123,7 +123,7 @@ class PNetSessionManager:
       или использовать в контекстном менеджере with_pnet_session_if_needed для автоматического управления
     """
 
-    def __init__(self):
+    def __init__(self, do_logout=False):
         self._session = None
         self._url = None
         self._cookie = None
@@ -131,6 +131,7 @@ class PNetSessionManager:
         self._is_authenticated = False
         self._pnet_login = None  # Логин текущей сессии
         self._lock = threading.Lock()  # Блокировка для thread-safety
+        self._do_logout = do_logout
 
     def __enter__(self):
         """Контекстный менеджер для автоматического логина/логаута"""
@@ -139,7 +140,8 @@ class PNetSessionManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Автоматический логаут при выходе из контекста"""
-        self.logout()
+        if self._do_logout:
+            self.logout()
 
     def login(self):
         """Логин в PNet если еще не залогинены"""

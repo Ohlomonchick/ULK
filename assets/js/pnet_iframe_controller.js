@@ -6,6 +6,8 @@ function initializeIframeControls() {
     let isFullscreen = false;
     let originalIframeStyles = null;
     let sidebarExpanded = false;
+    let descriptionExpanded = false;
+    let descriptionScrollPosition = 0; // Сохраняем позицию скролла
     
     /**
      * Клонирует содержимое правой панели в выдвижную панель
@@ -169,6 +171,7 @@ function initializeIframeControls() {
         
         const sidebarPanel = $('#sidebarPanel');
         sidebarPanel.addClass('active');
+        $('body').addClass('sidebar-panel-active');
         sidebarExpanded = true;
         
         // Скрываем кнопку разворачивания
@@ -176,6 +179,9 @@ function initializeIframeControls() {
         
         // Обновляем содержимое при каждом открытии (на случай изменений)
         cloneSidebarContent();
+        
+        // Обновляем размер iframe
+        updateIframeSize();
     }
     
     /**
@@ -186,12 +192,93 @@ function initializeIframeControls() {
         
         const sidebarPanel = $('#sidebarPanel');
         sidebarPanel.removeClass('active');
+        $('body').removeClass('sidebar-panel-active');
         sidebarExpanded = false;
         
         // Показываем кнопку разворачивания обратно
         if (isFullscreen) {
             $('#sidebarExpandBtn').fadeIn(200);
         }
+        
+        // Обновляем размер iframe
+        updateIframeSize();
+    }
+    
+    /**
+     * Показывает левую панель с описанием (split-screen режим)
+     */
+    function expandDescription() {
+        if (descriptionExpanded) return;
+        
+        const descriptionPanel = $('#descriptionPanel');
+        descriptionPanel.addClass('active');
+        $('body').addClass('description-panel-active');
+        descriptionExpanded = true;
+        
+        // Скрываем кнопку разворачивания
+        $('#descriptionExpandBtn').fadeOut(200);
+        
+        // Восстанавливаем позицию скролла
+        const descriptionContent = $('#descriptionPanelContent');
+        if (descriptionContent.length) {
+            setTimeout(() => {
+                descriptionContent.scrollTop(descriptionScrollPosition);
+            }, 50);
+        }
+        
+        // Обновляем размер iframe
+        updateIframeSize();
+    }
+    
+    /**
+     * Скрывает левую панель с описанием
+     */
+    function collapseDescription() {
+        if (!descriptionExpanded) return;
+        
+        const descriptionPanel = $('#descriptionPanel');
+        const descriptionContent = $('#descriptionPanelContent');
+        
+        // Сохраняем позицию скролла перед закрытием
+        if (descriptionContent.length) {
+            descriptionScrollPosition = descriptionContent.scrollTop();
+        }
+        
+        descriptionPanel.removeClass('active');
+        $('body').removeClass('description-panel-active');
+        descriptionExpanded = false;
+        
+        // Показываем кнопку разворачивания обратно
+        if (isFullscreen) {
+            $('#descriptionExpandBtn').fadeIn(200);
+        }
+        
+        // Обновляем размер iframe
+        updateIframeSize();
+    }
+    
+    /**
+     * Обновляет размер iframe в зависимости от открытых панелей
+     */
+    function updateIframeSize() {
+        if (!isFullscreen) return;
+        
+        const iframe = $('#pnetFrame');
+        let leftOffset = '0';
+        let width = '100vw';
+        
+        if (descriptionExpanded) {
+            leftOffset = '40vw';
+            width = sidebarExpanded ? 'calc(100vw - 40vw - 400px)' : 'calc(100vw - 40vw)';
+        } else if (sidebarExpanded) {
+            width = 'calc(100vw - 400px)';
+        }
+        
+        iframe.css({
+            'left': leftOffset,
+            'width': width,
+            'transition': 'left 0.3s ease, width 0.3s ease'
+        });
     }
     
     function expandIframe() {
@@ -233,8 +320,9 @@ function initializeIframeControls() {
         $('#collapseIframeBtn').fadeIn(300);
         $('#expandIframeBtn').fadeOut(200);
         
-        // Показываем кнопку разворачивания панели
+        // Показываем кнопки разворачивания панелей
         $('#sidebarExpandBtn').fadeIn(300);
+        $('#descriptionExpandBtn').fadeIn(300);
         
         $('body, html').addClass('iframe-fullscreen-active');
         
@@ -259,8 +347,9 @@ function initializeIframeControls() {
         
         const iframe = $('#pnetFrame');
         
-        // Скрываем выдвижную панель, если она открыта
+        // Скрываем выдвижные панели, если они открыты
         collapseSidebar();
+        collapseDescription();
         
         // Очищаем интервалы и наблюдатели
         if (window.timerSyncInterval) {
@@ -292,10 +381,11 @@ function initializeIframeControls() {
         $('#collapseIframeBtn').fadeOut(300);
         $('#expandIframeBtn').fadeIn(200);
         
-        // Скрываем кнопку разворачивания панели
+        // Скрываем кнопки разворачивания панелей
         $('#sidebarExpandBtn').fadeOut(300);
+        $('#descriptionExpandBtn').fadeOut(300);
         
-        $('body, html').removeClass('iframe-fullscreen-active');
+        $('body, html').removeClass('iframe-fullscreen-active description-panel-active sidebar-panel-active');
         
         // Восстанавливаем фокус на iframe после выхода из полноэкранного режима
         setTimeout(() => {
@@ -347,6 +437,29 @@ function initializeIframeControls() {
         e.stopPropagation();
     });
     
+    // Обработчики событий для левой панели с описанием
+    $('#descriptionExpandBtn').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        expandDescription();
+    });
+    
+    $('#descriptionCollapseBtn').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        collapseDescription();
+    });
+    
+    // Предотвращаем закрытие панели при клике внутри неё
+    $('#descriptionPanel').on('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Сохраняем позицию скролла при скролле левой панели
+    $('#descriptionPanelContent').on('scroll', function() {
+        descriptionScrollPosition = $(this).scrollTop();
+    });
+    
     $(document).on('keydown', function(e) {
         if (e.key === 'Escape' && isFullscreen) {
             collapseIframe();
@@ -355,7 +468,7 @@ function initializeIframeControls() {
     
     // Обработчик для восстановления фокуса в полноэкранном режиме
     $(document).on('click', function(e) {
-        if (isFullscreen && !$(e.target).closest('#pnetFrame, #collapseIframeBtn, #iframeOverlay, #sidebarPanel, #sidebarExpandBtn').length) {
+        if (isFullscreen && !$(e.target).closest('#pnetFrame, #collapseIframeBtn, #iframeOverlay, #sidebarPanel, #sidebarExpandBtn, #descriptionPanel, #descriptionExpandBtn').length) {
             // Если клик не по iframe, кнопкам или панели, восстанавливаем фокус на iframe
             setTimeout(() => {
                 const iframe = $('#pnetFrame')[0];
