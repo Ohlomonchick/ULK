@@ -684,7 +684,7 @@ def utils_console(request, slug, node_name):
 
 def kibana_dashboard(request, slug):
     competition = Competition.objects.get(slug=slug)
-    dashboard_url = get_kibana_url() + f"/app/dashboards#/view/78289c40-86da-11e8-b59d-21efb914e65c-ecs?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-90d%2Fd,to:now))&_a=(filters:!(),query:(language:kuery,query:'_index:{competition.lab.slug}-{request.user.pnet_login}*'))'"
+    dashboard_url = get_kibana_url() + f"/app/dashboards#/view/78289c40-86da-11e8-b59d-21efb914e65c-ecs?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-90d%2Fd,to:now))&_a=(filters:!(),query:(language:kuery,query:'_index:{competition.lab.slug}-{request.user.pnet_login}*'))"
     return render(request, 'interface/kibana_dashboard.html', {'dashboard_url': dashboard_url, 'slug': slug})
 
 # Кастомная форма для загрузки файлов (не только изображений)
