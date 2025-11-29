@@ -357,21 +357,22 @@ class KkzForm(forms.ModelForm):  # pragma: no cover
             kkz.save()
             self.save_m2m()
 
-            labs = self.cleaned_data['labs']
-            tasks = self.cleaned_data['tasks']
+            if 'labs' in self.cleaned_data and 'tasks' in self.cleaned_data:
+                labs = self.cleaned_data['labs']
+                tasks = self.cleaned_data['tasks']
 
-            labs_info = []
-            for lab in labs:
-                lab_tasks = list(tasks) if tasks else LabTask.objects.filter(lab=lab)
-                labs_info.append({
-                    'lab': lab,
-                    'lab_id': lab.id,
-                    'tasks': lab_tasks,
-                    'task_ids': [t.id for t in lab_tasks],
-                    'num_to_assign': len(lab_tasks)
-                })
+                labs_info = []
+                for lab in labs:
+                    lab_tasks = list(tasks) if tasks else LabTask.objects.filter(lab=lab)
+                    labs_info.append({
+                        'lab': lab,
+                        'lab_id': lab.id,
+                        'tasks': lab_tasks,
+                        'task_ids': [t.id for t in lab_tasks],
+                        'num_to_assign': len(lab_tasks)
+                    })
 
-            _create_kkz_competitions(kkz, labs_info)
+                _create_kkz_competitions(kkz, labs_info)
 
         return kkz
 
@@ -397,37 +398,48 @@ def _create_kkz_competitions(kkz, labs_info, preview_assignments=None):
         if task_ids:
             kkz_lab.tasks.set(LabTask.objects.filter(id__in=task_ids))
         
-        competition_data = {
-            'lab': lab.pk,
-            'start': kkz.start,
-            'finish': kkz.finish,
-            'platoons': [p.pk for p in kkz.platoons.all()],
-            'non_platoon_users': [u.pk for u in kkz.non_platoon_users.all()],
-            'tasks': task_ids,
-            'num_tasks': lab_data.get('num_to_assign', len(tasks))
-        }
+        competition = Competition.objects.filter(lab=lab, kkz=kkz).first()
         
-        competition_instance = Competition(kkz=kkz)
-        comp_form = CompetitionForm(data=competition_data, instance=competition_instance)
-        
-        if comp_form.is_valid():
-            competition = None
-            
-            def _save_competition():
-                nonlocal competition
-                competition = comp_form.save()
-            
-            with_pnet_session_if_needed(lab, _save_competition)
-            
-            if competition is None:
-                raise ValidationError(f"Не удалось создать соревнование для {lab.name}")
-            
-            competition.tasks.set(tasks)
-            created_competitions[lab_id] = competition
-            
-            logger.info(f"Created competition for lab {lab.name} in KKZ {kkz.name}")
+        if competition:
+            if competition.start != kkz.start or competition.finish != kkz.finish:
+                competition.start = kkz.start
+                competition.finish = kkz.finish
+                competition.save()
+            competition.platoons.set(kkz.platoons.all())
+            competition.non_platoon_users.set(kkz.non_platoon_users.all())
+            logger.info(f"Updated existing competition for lab {lab.name} in KKZ {kkz.name}")
         else:
-            raise ValidationError(f"Ошибка создания соревнования для {lab.name}: {comp_form.errors}")
+            competition_data = {
+                'lab': lab.pk,
+                'start': kkz.start,
+                'finish': kkz.finish,
+                'platoons': [p.pk for p in kkz.platoons.all()],
+                'non_platoon_users': [u.pk for u in kkz.non_platoon_users.all()],
+                'tasks': task_ids,
+                'num_tasks': lab_data.get('num_to_assign', len(tasks))
+            }
+            
+            competition_instance = Competition(kkz=kkz)
+            comp_form = CompetitionForm(data=competition_data, instance=competition_instance)
+            
+            if comp_form.is_valid():
+                competition = None
+                
+                def _save_competition():
+                    nonlocal competition
+                    competition = comp_form.save()
+                
+                with_pnet_session_if_needed(lab, _save_competition)
+                
+                if competition is None:
+                    raise ValidationError(f"Не удалось создать соревнование для {lab.name}")
+                
+                logger.info(f"Created competition for lab {lab.name} in KKZ {kkz.name}")
+            else:
+                raise ValidationError(f"Ошибка создания соревнования для {lab.name}: {comp_form.errors}")
+        
+        competition.tasks.set(tasks)
+        created_competitions[lab_id] = competition
     
     _assign_tasks_to_users(kkz, labs_info, created_competitions, users, preview_assignments)
     
@@ -455,16 +467,18 @@ def _assign_tasks_to_users(kkz, labs_info, competitions, users, preview_assignme
     
     assignments_by_user = {}
     if preview_assignments:
-        pass
+        logger.info(f"Using preview_assignments for KKZ {kkz.name}: {len(users)} users, {len(labs_info)} labs")
     elif kkz.unified_tasks:
         if len(all_available_tasks) >= total_tasks_to_assign:
             unified_picks = random.sample(all_available_tasks, total_tasks_to_assign)
         else:
             unified_picks = list(all_available_tasks)
         
+        logger.info(f"Assigning unified tasks for KKZ {kkz.name}: {len(unified_picks)} tasks to {len(users)} users")
         for user in users:
-            assignments_by_user[str(user. id)] = unified_picks
+            assignments_by_user[str(user.id)] = unified_picks
     else:
+        logger.info(f"Assigning individual tasks for KKZ {kkz.name}: {total_tasks_to_assign} tasks per user, {len(users)} users")
         for user in users:
             if len(all_available_tasks) >= total_tasks_to_assign:
                 picks = random.sample(all_available_tasks, total_tasks_to_assign)
@@ -506,10 +520,7 @@ def _create_previews_for_lab(kkz, lab_entry, competition, users, preview_assignm
                 tasks_for_user = list(LabTask.objects.filter(id__in=task_ids_for_user))
         else:
             user_tasks = assignments_by_user.get(user_id_str, [])
-            if user_tasks and hasattr(user_tasks[0], "lab_id"):
-                tasks_for_user = [t for t in user_tasks if t.lab_id == lab_id]
-            else:
-                tasks_for_user = [t for t in LabTask.objects.filter(id__in=user_tasks) if t.lab_id == lab_id]
+            tasks_for_user = [t for t in user_tasks if t.lab_id == lab_id]
         
         if tasks_for_user:
             preview, _ = KkzPreview.objects.get_or_create(

@@ -330,7 +330,7 @@ class TaskCountsTestCase(TransactionTestCase):
                 'name': self.lab.name,
                 'included': True,
                 'task_ids': [t.id for t in self.tasks], 
-                'num_tasks': len(self. tasks),
+                'num_tasks': len(self.tasks),
                 'max_tasks_limit': max_tasks_limit 
             }
         ]
@@ -367,7 +367,7 @@ class TaskCountsTestCase(TransactionTestCase):
         self.assertEqual(
             max_tasks_values[0],
             max_tasks_limit,
-            f"Expected 3 tasks per user with unified_tasks, got {max_tasks_values[0]}"
+            f"Expected {max_tasks_limit} tasks per user with unified_tasks, got {max_tasks_values[0]}"
         )
 
         competition = Competition.objects.get(kkz=kkz)
@@ -375,7 +375,7 @@ class TaskCountsTestCase(TransactionTestCase):
         
         for user in self.users:
             comp2user = Competition2User.objects.get(competition=competition, user=user)
-            user_task_ids = set(comp2user. tasks.values_list('id', flat=True))
+            user_task_ids = set(comp2user.tasks.values_list('id', flat=True))
             
             if first_user_tasks is None:
                 first_user_tasks = user_task_ids
@@ -383,7 +383,7 @@ class TaskCountsTestCase(TransactionTestCase):
                 self.assertEqual(
                     first_user_tasks,
                     user_task_ids,
-                    f"User {user. username} has different tasks than first user in unified mode"
+                    f"User {user.username} has different tasks than first user in unified mode"
                 )
 
     def test_max_total_progress_calculation(self):
@@ -495,7 +495,7 @@ class TaskCountsTestCase(TransactionTestCase):
         }
 
         form = SimpleKkzForm(data=form_data)
-        self.assertTrue(form. is_valid(), f"Form errors: {form.errors}")
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
         kkz = form.create_kkz()
 
         # Проверяем что у каждого пользователя не более max_tasks_limit заданий

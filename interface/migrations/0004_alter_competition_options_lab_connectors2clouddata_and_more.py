@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name='competition',
-            options={'verbose_name': 'Экзамен', 'verbose_name_plural': 'Работы'},
+            options={'verbose_name': 'Назначенная работа', 'verbose_name_plural': 'Назначенные работы'},
         ),
         migrations.AddField(
             model_name='lab',

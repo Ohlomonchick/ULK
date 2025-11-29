@@ -44,7 +44,7 @@
 </p>
 <div id="button-video-container" style="display: flex; align-items: center; gap: 0.75rem;">
     {% if button_end_now %}
-        <div id="button-video-container mb-3" style="display: flex; align-items: center;">
+        <div style="display: flex; align-items: center;">
             <button id="end-now" class="button is-danger is-medium control-button"
                     data-action="end"
                     data-instance-type="{{ instance_type }}"
@@ -58,7 +58,7 @@
         </div>
     {% endif %}
 
-    <div id="button-video-container mb-3" style="display: flex; align-items: center; gap: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
         <button id="resume" class="button is-success is-medium control-button"
                 data-action="resume"
                 data-instance-type="{{ instance_type }}"

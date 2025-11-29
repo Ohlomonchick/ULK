@@ -38,6 +38,39 @@
         text-decoration: line-through;
         color: #999;
     }
+    .lab-item .level {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .lab-item .level-left {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .lab-item .level-right {
+        flex: 0 0 auto;
+    }
+    .lab-item .level-item {
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .lab-name {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    #preview-tabs-list ul {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        white-space: normal;
+        max-width: 200px;
+        display: inline-block;
+    }
     .exclude-btn, .include-btn {
         cursor: pointer;
         transition: transform 0.4s, opacity 0.25s;
@@ -446,20 +479,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentLabs[labIndex].num_tasks = currentLabs[labIndex].task_ids.length;
                 updateHiddenField();
 
-
                 if (previewIsOpen) {
                     updatePreviewAfterLabChange();
                 }
             });
         });
 
-
         function updatePreviewAfterLabChange() {
             const includedLabs = currentLabs.filter(lab => lab.included);
 
             if (includedLabs.length === 0) {
                 previewContainer.style.display = 'none';
-                showPreviewCheckbox.checked = false;
+                previewIsOpen = false;
                 return;
             }
 
@@ -484,28 +515,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             loadCombinedPreview(includedLabs);
         }
-
-        document.querySelectorAll('.task-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                const labIndex = parseInt(this.dataset.labIndex);
-                const taskId = parseInt(this.dataset.taskId);
-
-                if (this.checked) {
-                    if (!currentLabs[labIndex].task_ids.includes(taskId)) {
-                        currentLabs[labIndex].task_ids.push(taskId);
-                    }
-                } else {
-                    currentLabs[labIndex].task_ids = currentLabs[labIndex].task_ids.filter(id => id !== taskId);
-                }
-
-                currentLabs[labIndex].num_tasks = currentLabs[labIndex].task_ids.length;
-                updateHiddenField();
-
-                if (showPreviewCheckbox && showPreviewCheckbox.checked) {
-                    updatePreviewAfterLabChange();
-                }
-            });
-        });
     }
 
     function updateHiddenField() {
