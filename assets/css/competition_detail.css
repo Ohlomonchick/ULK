@@ -224,32 +224,37 @@ html.iframe-fullscreen-active {
     background: rgba(0, 0, 0, 0.3);
 }
 
-/* Кнопка разворачивания панели */
+/* Кнопка разворачивания правой панели - полукруглая, у края */
 .sidebar-expand-btn {
     position: fixed;
     top: 50%;
-    right: 20px;
+    right: 0;
     transform: translateY(-50%);
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.7);
     color: white;
     border: none;
-    border-radius: 50%;
+    border-radius: 50% 0 0 50%; /* Полукруг слева */
     width: 50px;
-    height: 50px;
+    height: 80px;
     font-size: 20px;
     cursor: pointer;
     z-index: 10000;
     transition: all 0.3s ease;
     display: none;
-    opacity: 0.8;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    opacity: 0.6;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
+    padding-left: 5px;
+    line-height: 80px;
+    text-align: center;
 }
 
 .sidebar-expand-btn:hover {
     background: rgba(0, 0, 0, 0.9);
-    transform: translateY(-50%) scale(1.1);
+    transform: translateY(-50%);
     opacity: 1;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.5);
+    width: 60px;
+    /* При right: 0 увеличение ширины автоматически расширяет кнопку влево (внутрь экрана) */
 }
 
 .sidebar-expand-btn:active {
@@ -308,4 +313,139 @@ body.iframe-fullscreen-active .column.is-one-quarter {
 #one-attempt-warning-modal .modal-card {
     z-index: 10004 !important;
     position: relative;
+}
+
+/* Левая панель с описанием (split-screen режим) - 40% экрана */
+.description-panel {
+    position: fixed;
+    top: 0;
+    left: -40vw; /* Скрыта по умолчанию */
+    width: 40vw;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 10001;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    display: none;
+}
+
+.description-panel.active {
+    left: 0;
+    display: block;
+}
+
+/* Когда правая панель открыта, уменьшаем iframe */
+body.iframe-fullscreen-active.sidebar-panel-active #pnetFrame {
+    width: calc(100vw - 400px) !important;
+    transition: left 0.3s ease, width 0.3s ease;
+}
+
+/* Когда левая панель открыта, сдвигаем iframe вправо */
+body.iframe-fullscreen-active.description-panel-active #pnetFrame {
+    left: 40vw !important;
+    width: calc(100vw - 40vw) !important;
+    transition: left 0.3s ease, width 0.3s ease;
+}
+
+/* Если обе панели открыты, уменьшаем iframe еще больше */
+body.iframe-fullscreen-active.description-panel-active.sidebar-panel-active #pnetFrame {
+    left: 40vw !important;
+    width: calc(100vw - 40vw - 400px) !important;
+    transition: left 0.3s ease, width 0.3s ease;
+}
+
+.description-panel-content {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px;
+    padding-top: 60px; /* Место для кнопки сворачивания */
+}
+
+.description-panel-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.description-panel-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+.description-panel-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.description-panel-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Кнопка разворачивания левой панели - полукруглая, у края */
+.description-expand-btn {
+    position: fixed;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 0 50% 50% 0; /* Полукруг справа */
+    width: 50px;
+    height: 80px;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 10000;
+    transition: all 0.3s ease;
+    display: none;
+    opacity: 0.6;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+    padding-right: 5px;
+    line-height: 80px;
+    text-align: center;
+}
+
+.description-expand-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: translateY(-50%);
+    opacity: 1;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.5);
+    width: 60px;
+    /* При left: 0 увеличение ширины автоматически расширяет кнопку вправо (внутрь экрана) */
+}
+
+.description-expand-btn:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+/* Скрываем кнопку разворачивания, когда панель открыта */
+.description-panel.active ~ .description-expand-btn {
+    display: none !important;
+}
+
+/* Кнопка сворачивания левой панели */
+.description-collapse-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 10002;
+    transition: all 0.3s ease;
+    opacity: 0.8;
+}
+
+.description-collapse-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: scale(1.1);
+    opacity: 1;
+}
+
+.description-collapse-btn:active {
+    transform: scale(0.95);
 }

@@ -142,6 +142,11 @@
                 <i class="fas fa-chevron-left"></i>
             </button>
             
+            <!-- Кнопка разворачивания левой панели с описанием -->
+            <button class="description-expand-btn" id="descriptionExpandBtn" title="Показать описание">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            
             <!-- Выдвижная правая панель -->
             <div class="sidebar-panel" id="sidebarPanel">
                 <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Скрыть информацию">
@@ -149,6 +154,21 @@
                 </button>
                 <div class="sidebar-panel-content" id="sidebarPanelContent">
                     <!-- Контент будет скопирован из правой колонки -->
+                </div>
+            </div>
+            
+            <!-- Левая панель с описанием (split-screen) -->
+            <div class="description-panel" id="descriptionPanel">
+                <button class="description-collapse-btn" id="descriptionCollapseBtn" title="Скрыть описание">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="description-panel-content" id="descriptionPanelContent">
+                    <h2 class="title is-4 mb-4">Описание лабораторной работы</h2>
+                    <div class="content">
+                        {% with object=object.lab %}
+                            {{ object.description | safe }}
+                        {% endwith %}
+                    </div>
                 </div>
             </div>
         {% endif %}
