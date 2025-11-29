@@ -2,10 +2,91 @@ import requests
 from slugify import slugify
 import logging
 import json
+from functools import wraps
 
 from .config import *
 
 logger = logging.getLogger(__name__)
+
+
+def retry_pnet_request(max_attempts=3):
+    """
+    Декоратор для повторных попыток HTTP запросов к PNET.
+    Делает ретраи при не-200/не-300 ответах или таймаутах.
+    
+    Args:
+        max_attempts: Количество попыток (по умолчанию 3)
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            last_response = None
+            # Используем wrapper.__name__ так как @wraps копирует метаданные из func
+            # С fallback на func.__name__ и затем на 'unknown_function'
+            func_name = getattr(wrapper, '__name__', getattr(func, '__name__', 'unknown_function'))
+            
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    result = func(*args, **kwargs)
+                    
+                    # Если функция возвращает response объект, проверяем статус код
+                    if isinstance(result, requests.Response):
+                        status_code = result.status_code
+                        if 200 <= status_code < 400:
+                            return result
+                        else:
+                            # Неуспешный статус код - поднимаем исключение для ретрая
+                            if attempt == max_attempts:
+                                logger.error(
+                                    f"Error in {func_name}: HTTP {status_code} response after {max_attempts} attempts"
+                                )
+                                return result
+                            # Для ретрая поднимаем исключение
+                            raise requests.exceptions.HTTPError(
+                                f"HTTP {status_code} response", response=result
+                            )
+                    
+                    # Если функция не возвращает response или возвращает что-то другое
+                    return result
+                    
+                except requests.exceptions.Timeout as e:
+                    last_exception = e
+                    if attempt == max_attempts:
+                        logger.error(
+                            f"Error in {func_name}: Timeout after {max_attempts} attempts: {str(e)}",
+                            exc_info=True
+                        )
+                        raise
+                    continue
+                    
+                except requests.exceptions.RequestException as e:
+                    last_exception = e
+                    if attempt == max_attempts:
+                        logger.error(
+                            f"Error in {func_name}: Request exception after {max_attempts} attempts: {str(e)}",
+                            exc_info=True
+                        )
+                        raise
+                    continue
+                    
+                except Exception as e:
+                    last_exception = e
+                    if attempt == max_attempts:
+                        logger.error(
+                            f"Error in {func_name}: Exception after {max_attempts} attempts: {str(e)}",
+                            exc_info=True
+                        )
+                        raise
+                    continue
+            
+            # Если все попытки исчерпаны и мы дошли сюда (не должно быть), поднимаем последнее исключение
+            if last_exception is not None:
+                raise last_exception
+            return last_response
+                
+        return wrapper
+    return decorator
 
 
 def get_user_workspace_relative_path():
@@ -272,37 +353,36 @@ def join_session(url, lab_session_id, cookie):
     logger.debug(r)
 
 
+@retry_pnet_request(max_attempts=3)
 def create_node(url, node_params, cookie, xsrf):
-    try:
-        r = requests.post(
-            url + '/api/labs/session/nodes/add',
-            json=node_params,
-            cookies=cookie,
-            verify=False,
-            timeout=4  # 4 секунды таймаут для создания узла
-        )
+    r = requests.post(
+        url + '/api/labs/session/nodes/add',
+        json=node_params,
+        cookies=cookie,
+        verify=False,
+        timeout=4  # 4 секунды таймаут для создания узла
+    )
+    if r.status_code in range(200, 400):
         logger.debug(
             "Node {} has been created\nServer response\t{}".format(node_params["template"], r.json()["message"]))
-    except Exception as e:
-        r = "False"
-        logger.debug("Error with creating node\n{}\n".format(e))
+    return r
 
 
+@retry_pnet_request(max_attempts=3)
 def create_p2p(url, p2p_params, cookie):
-    try:
-        r = requests.post(
-            url + '/api/labs/session/networks/p2p',
-            json=p2p_params,
-            cookies=cookie,
-            verify=False,
-            timeout=4  # 4 секунды таймаут для создания P2P соединения
-        )
+    r = requests.post(
+        url + '/api/labs/session/networks/p2p',
+        json=p2p_params,
+        cookies=cookie,
+        verify=False,
+        timeout=4  # 4 секунды таймаут для создания P2P соединения
+    )
+    if r.status_code in range(200, 400):
         logger.debug("P2P {} has been created \nServer response\t{}".format(p2p_params["name"], r.json()["message"]))
-    except Exception as e:
-        r = "False"
-        logger.debug("Error with creating P2P\n{}\n".format(e))
+    return r
 
 
+@retry_pnet_request(max_attempts=3)
 def destroy_session(url, lab_session_id, cookie):
     lab_session_id = '{"lab_session":"' + str(lab_session_id) + '"}'
     r = requests.post(
@@ -310,9 +390,10 @@ def destroy_session(url, lab_session_id, cookie):
         data=lab_session_id,
         headers={'content-type': 'application/json'},
         cookies=cookie, verify=False,
-        timeout=4  # 4 секунды таймаут для уничтожения сессии
+        timeout=6
     )
     logger.debug(r)
+    return r
 
 
 def leave_session(url, lab_session_id, cookie):
@@ -328,36 +409,34 @@ def leave_session(url, lab_session_id, cookie):
     logger.debug(r)
 
 
+@retry_pnet_request(max_attempts=3)
 def create_network(url, net_params, cookie):
-    try:
-        r = requests.post(
-            url + '/api/labs/session/networks/add',
-            json=net_params,
-            cookies=cookie,
-            verify=False,
-            timeout=4  # 4 секунды таймаут для создания сети
-        )
+    r = requests.post(
+        url + '/api/labs/session/networks/add',
+        json=net_params,
+        cookies=cookie,
+        verify=False,
+        timeout=4  # 4 секунды таймаут для создания сети
+    )
+    if r.status_code in range(200, 400):
         logger.debug(
             "Network {} has been created \nServer response\t{}".format(net_params["name"], r.json()["message"]))
-    except Exception as e:
-        r = "False"
-        logger.debug("Error with creating network\n{}\n".format(e))
+    return r
 
 
+@retry_pnet_request(max_attempts=3)
 def create_p2p_nat(url, p2p_params, cookie):
-    try:
-        r = requests.post(
-            url + '/api/labs/session/interfaces/edit',
-            json=p2p_params,
-            cookies=cookie,
-            verify=False,
-            timeout=4  # 4 секунды таймаут для редактирования интерфейса
-        )
+    r = requests.post(
+        url + '/api/labs/session/interfaces/edit',
+        json=p2p_params,
+        cookies=cookie,
+        verify=False,
+        timeout=4  # 4 секунды таймаут для редактирования интерфейса
+    )
+    if r.status_code in range(200, 400):
         logger.debug(
             "P2P_NAT {} has been created\nServer response\t{}".format(p2p_params["node_id"], r.json()["message"]))
-    except Exception as e:
-        r = "False"
-        logger.debug("Error with creating P2P_NAT\n{}\n".format(e))
+    return r
 
 
 def delete_lab(url, cookie, lab_path):

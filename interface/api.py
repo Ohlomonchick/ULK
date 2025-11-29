@@ -1380,7 +1380,7 @@ def check_task_answers(request):
                 # В режиме ONE_ATTEMPT используем транзакцию с блокировкой для предотвращения race condition
                 with transaction.atomic():
                     # Блокируем существующий ответ, если он есть
-                    existing_answer = Answers.objects.get_or_create(
+                    Answers.objects.get_or_create(
                         lab=competition.lab,
                         lab_task=task,
                         datetime__lte=competition.finish,
