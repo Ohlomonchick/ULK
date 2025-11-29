@@ -1,67 +1,8 @@
 // Контроллер для CMD режима
 
-// Кэш для хранения ссылок на Guacamole консоль (с localStorage)
-const consoleCache = {
-    CACHE_DURATION: 3 * 60 * 1000, // 3 минуты в миллисекундах
-    STORAGE_KEY: 'cmd_console_cache',
-    
-    // Сохранить в кэш
-    set(slug, data) {
-        try {
-            const cacheData = this.getAll();
-            cacheData[slug] = {
-                data: data,
-                timestamp: Date.now()
-            };
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(cacheData));
-            console.log('Console session cached in localStorage');
-        } catch (error) {
-            console.error('Failed to save to localStorage:', error);
-        }
-    },
-    
-    // Получить из кэша
-    get(slug) {
-        try {
-            const cacheData = this.getAll();
-            const cached = cacheData[slug];
-            if (!cached) return null;
-            
-            // Проверяем, не истек ли кэш
-            if (Date.now() - cached.timestamp > this.CACHE_DURATION) {
-                delete cacheData[slug];
-                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(cacheData));
-                return null;
-            }
-            
-            return cached.data;
-        } catch (error) {
-            console.error('Failed to read from localStorage:', error);
-            return null;
-        }
-    },
-    
-    // Получить все данные кэша
-    getAll() {
-        try {
-            const stored = localStorage.getItem(this.STORAGE_KEY);
-            return stored ? JSON.parse(stored) : {};
-        } catch (error) {
-            console.error('Failed to parse localStorage data:', error);
-            return {};
-        }
-    },
-    
-    // Очистить кэш
-    clear() {
-        try {
-            localStorage.removeItem(this.STORAGE_KEY);
-            console.log('Console cache cleared from localStorage');
-        } catch (error) {
-            console.error('Failed to clear localStorage:', error);
-        }
-    }
-};
+// Ограничение частоты обновлений консоли (1 минута)
+let lastRefreshTime = 0;
+const REFRESH_COOLDOWN = 60 * 1000; // 1 минута в миллисекундах
 
 // CMD контроллер - использует общие утилиты
 
@@ -91,22 +32,11 @@ function initializeCMDIframe() {
     }
 
     log('Competition slug:', competitionSlug);
-
-    // Проверяем кэш
-    const cachedData = consoleCache.get(competitionSlug);
-    if (cachedData) {
-        log('✅ Using cached console session');
-        iframe.src = cachedData.guacamole_url;
-        return;
-    }
-
     log('Creating new CMD console session...');
     
     createCMDConsoleSession(competitionSlug)
         .then(sessionData => {
             if (sessionData && sessionData.guacamole_url) {
-                consoleCache.set(competitionSlug, sessionData);
-                log('Console session cached for 5 minutes');
                 iframe.src = sessionData.guacamole_url;
                 log('CMD console session created successfully');
             } else {
@@ -118,46 +48,27 @@ function initializeCMDIframe() {
         });
 }
 
-// Функция для принудительного обновления консоли (очистка кэша и перезагрузка)
+// Функция для принудительного обновления консоли с ограничением частоты
 function refreshConsoleSession() {
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTime;
+    
+    if (timeSinceLastRefresh < REFRESH_COOLDOWN) {
+        const remainingSeconds = Math.ceil((REFRESH_COOLDOWN - timeSinceLastRefresh) / 1000);
+        log(`Обновление консоли доступно через ${remainingSeconds} секунд`);
+        return;
+    }
+    
     const competitionSlug = getCompetitionSlugFromURL();
     if (competitionSlug) {
         log('Refreshing console session...');
-        consoleCache.clear();
+        lastRefreshTime = now;
         initializeCMDIframe();
-    }
-}
-
-
-// Функция очистки устаревших записей из кэша
-function cleanupExpiredCache() {
-    try {
-        const cacheData = consoleCache.getAll();
-        let hasExpired = false;
-        
-        for (const slug in cacheData) {
-            const cached = cacheData[slug];
-            if (Date.now() - cached.timestamp > consoleCache.CACHE_DURATION) {
-                delete cacheData[slug];
-                hasExpired = true;
-            }
-        }
-        
-        if (hasExpired) {
-            localStorage.setItem(consoleCache.STORAGE_KEY, JSON.stringify(cacheData));
-            console.log('Cleaned up expired cache entries');
-        }
-    } catch (error) {
-        console.error('Failed to cleanup expired cache:', error);
     }
 }
 
 // Инициализация при загрузке DOM
 $(document).ready(function() {
     log('CMD controller loaded, initializing...');
-    
-    // Очищаем устаревшие записи из кэша
-    cleanupExpiredCache();
-    
     initializeCMDIframe();
 });
