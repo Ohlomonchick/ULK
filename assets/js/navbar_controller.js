@@ -35,9 +35,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 utm_sources: ['history']
             },
             'лабораторн': {
-                paths: [window.navbarUrls['lab-menu'] || '', window.navbarUrls['lab-list'] || ''],
+                paths: [window.navbarUrls['lab-list'] || ''],
                 pathPrefixes: ['/labs/'], // Для страниц деталей лабораторных работ
-                utm_sources: ['labs', 'lab-menu']
+                utm_sources: ['labs']
             },
             'взвод': {
                 paths: [window.navbarUrls['platoon-list'] || '', window.navbarUrls['user-detail'] || ''],

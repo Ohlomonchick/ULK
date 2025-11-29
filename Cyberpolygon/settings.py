@@ -186,7 +186,7 @@ SUMMERNOTE_CONFIG = {
     'attachment_filesize_limit': 500 * 1024 * 1024,
 }
 
-LOGIN_REDIRECT_URL = "interface:lab-menu"
+LOGIN_REDIRECT_URL = "interface:lab-list"
 LOGOUT_REDIRECT_URL = "/"
 AUTH_USER_MODEL = 'interface.User'
 
