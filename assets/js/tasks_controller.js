@@ -54,6 +54,12 @@ class TasksController {
             const $confirmBtn = $('#one-attempt-modal-confirm');
             const $cancelBtn = $('#one-attempt-modal-cancel');
             
+            // Перемещаем модальное окно в конец body, чтобы оно было поверх всего
+            // Это особенно важно для полноэкранного режима iframe
+            if ($modal.parent()[0] !== document.body) {
+                $modal.appendTo('body');
+            }
+            
             // Удаляем старые обработчики
             $confirmBtn.off('click.warning');
             $cancelBtn.off('click.warning');

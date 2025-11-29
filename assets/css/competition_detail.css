@@ -293,3 +293,19 @@ html.iframe-fullscreen-active {
 body.iframe-fullscreen-active .column.is-one-quarter {
     display: none !important;
 }
+
+/* Модальное окно предупреждения должно быть поверх полноэкранного iframe */
+#one-attempt-warning-modal {
+    z-index: 10003 !important;
+    position: fixed !important;
+}
+
+#one-attempt-warning-modal .modal-background {
+    z-index: 10003 !important;
+    position: fixed !important;
+}
+
+#one-attempt-warning-modal .modal-card {
+    z-index: 10004 !important;
+    position: relative;
+}
