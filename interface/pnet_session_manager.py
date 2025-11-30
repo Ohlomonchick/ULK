@@ -146,9 +146,6 @@ class PNetSessionManager:
     def login(self):
         """Логин в PNet если еще не залогинены"""
         with self._lock:  # Атомарная проверка и установка флага
-            if self._is_authenticated:
-                return
-
             self._url = get_pnet_url()
             if not self._url:
                 raise ValueError("PNet URL не настроен")
@@ -157,7 +154,7 @@ class PNetSessionManager:
             worker_id = get_gunicorn_worker_id()
             login = 'pnet_scripts'
             password = 'eve'
-            
+
             if worker_id is not None:
                 worker_creds = _get_cached_worker_credentials(worker_id)
                 if worker_creds:
