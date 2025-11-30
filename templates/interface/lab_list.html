@@ -19,11 +19,12 @@
             </div>
         </div>
 
-        <!-- Контейнеры для карточек каждой программы -->
-        {% for program_key, program_data in programs_data.items %}
-            <div class="program-content columns is-multiline" 
-                 data-program="{{ program_key }}" 
-                 style="display: none;">
+        <!-- Обертка для контента программ с фиксированной высотой -->
+        <div class="program-content-wrapper">
+            <!-- Контейнеры для карточек каждой программы -->
+            {% for program_key, program_data in programs_data.items %}
+                <div class="program-content columns is-multiline" 
+                     data-program="{{ program_key }}">
                 {% for lab_bundle in program_data.bundles %}
                     <div class="column is-3-desktop is-6-tablet is-12-mobile">
                         <div class="card lab-card">
@@ -65,8 +66,9 @@
                         </div>
                     </div>
                 {% endfor %}
-            </div>
-        {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
     </div>
 
     <!-- Стили -->
@@ -152,14 +154,30 @@
             box-shadow: 0 0.5rem 1rem rgba(10, 10, 10, 0.15);
         }
 
-        /* Анимация появления/исчезновения контента */
-        .program-content {
-            opacity: 0;
-            transition: opacity 0.25s ease-in-out;
+        /* Обертка для контента программ - фиксированная минимальная высота */
+        .program-content-wrapper {
+            position: relative;
+            min-height: 750px; /* Фиксированная высота предотвращает "прыжки" при переключении */
         }
 
+        /* Скрытые контенты абсолютно позиционированы, чтобы не влиять на высоту */
+        .program-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease-in-out, visibility 0.25s ease-in-out;
+            pointer-events: none;
+        }
+
+        /* Видимый контент в потоке документа определяет высоту обертки */
         .program-content.visible {
+            position: relative;
             opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
         }
     </style>
 
@@ -188,7 +206,6 @@
                 return;
             }
 
-            const oldProgram = currentProgram;
             currentProgram = programKey;
 
             // Обновляем активность вкладок (используем класс Bulma is-active)
@@ -208,20 +225,11 @@
             allContents.forEach(content => {
                 if (content !== newContent) {
                     content.classList.remove('visible');
-                    // Скрываем через небольшую задержку после анимации
-                    setTimeout(() => {
-                        if (!content.classList.contains('visible')) {
-                            content.style.display = 'none';
-                        }
-                    }, 250);
                 }
             });
 
             // Показываем новый контент
             if (newContent) {
-                newContent.style.display = 'flex';
-                // Принудительный reflow для корректной работы transition
-                void newContent.offsetHeight;
                 newContent.classList.add('visible');
             }
 

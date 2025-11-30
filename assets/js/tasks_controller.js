@@ -9,6 +9,7 @@ class TasksController {
         
         if (this.$checkBtn.length) {
             this.competitionSlug = this.$checkBtn.data('competition-slug');
+            this.isOneAttempt = this.$checkBtn.data('one-attempt') === true;
             this.init();
         }
     }
@@ -17,8 +18,100 @@ class TasksController {
         // Привязываем обработчик к кнопке проверки
         this.$checkBtn.on('click', () => this.handleCheckTasks());
         
+        // Инициализируем модальное окно предупреждения
+        this.initWarningModal();
+        
         // Загружаем начальный статус заданий
         this.loadTasksStatus();
+    }
+
+    /**
+     * Инициализирует модальное окно предупреждения для режима ONE_ATTEMPT
+     */
+    initWarningModal() {
+        const $modal = $('#one-attempt-warning-modal');
+        const $closeBtn = $('#one-attempt-modal-close');
+        const $cancelBtn = $('#one-attempt-modal-cancel');
+        
+        // Закрытие модального окна
+        const closeModal = () => {
+            $modal.removeClass('is-active');
+        };
+        
+        $closeBtn.on('click', closeModal);
+        $cancelBtn.on('click', closeModal);
+        $modal.find('.modal-background').on('click', closeModal);
+        
+        // НЕ вешаем обработчик на confirmBtn здесь - он будет в showWarningModal()
+    }
+
+    /**
+     * Показывает модальное окно предупреждения
+     */
+    showWarningModal() {
+        return new Promise((resolve, reject) => {
+            const $modal = $('#one-attempt-warning-modal');
+            const $confirmBtn = $('#one-attempt-modal-confirm');
+            const $cancelBtn = $('#one-attempt-modal-cancel');
+            
+            // Перемещаем модальное окно в конец body, чтобы оно было поверх всего
+            // Это особенно важно для полноэкранного режима iframe
+            if ($modal.parent()[0] !== document.body) {
+                $modal.appendTo('body');
+            }
+            
+            // Удаляем старые обработчики
+            $confirmBtn.off('click.warning');
+            $cancelBtn.off('click.warning');
+            
+            // Добавляем новые обработчики
+            $confirmBtn.on('click.warning', () => {
+                $modal.removeClass('is-active');
+                resolve(true);
+            });
+            
+            $cancelBtn.on('click.warning', () => {
+                $modal.removeClass('is-active');
+                reject(false);
+            });
+            
+            // Показываем модальное окно
+            $modal.addClass('is-active');
+        });
+    }
+
+    /**
+     * Продолжает проверку после подтверждения в модальном окне
+     */
+    async proceedWithCheck() {
+        // Отключаем кнопку на время проверки
+        this.$checkBtn.prop('disabled', true).addClass('is-loading');
+        
+        try {
+            const hasQuestions = this.hasQuestions();
+            const answers = this.collectAnswers();
+            
+            if (hasQuestions && Object.keys(answers).length > 0) {
+                // Есть вопросы и заполнены ответы - проверяем их
+                const result = await this.checkAnswers(answers);
+                
+                if (result.success) {
+                    this.showCheckResults(result.results);
+                }
+            } else {
+                // Если не было ответов для проверки, показываем уведомление
+                this.showNotification('Обновлено', 'info');
+            }
+            
+            // Всегда обновляем статусы заданий из БД
+            await this.loadTasksStatus();
+        } catch (error) {
+            console.error('Error in proceedWithCheck:', error);
+            this.showNotification(`Ошибка: ${error.responseJSON?.error || error.message}`, 'danger');
+        } finally {
+            // Включаем кнопку обратно
+            this.$checkBtn.prop('disabled', false).removeClass('is-loading');
+        }
     }
 
     /**
@@ -94,6 +187,7 @@ class TasksController {
             if (!$taskElement.length) return;
 
             const $statusTag = $taskElement.find('.task-status-tag');
+            const $answerInput = $taskElement.find('.task-answer-input');
             
             // Проверяем, есть ли уже тег "Неверно" - если есть, не трогаем его
             const hasIncorrectTag = $statusTag.find('.tag.is-danger').length > 0;
@@ -110,6 +204,21 @@ class TasksController {
                 
                 // Убираем поле ввода для выполненного задания
                 $taskElement.find('.field').remove();
+            } else if (task.failed) {
+                // Задание с неверным ответом (failed_tasks)
+                if (!hasIncorrectTag) {
+                    $statusTag.html(`
+                        <span class="tag is-danger has-text-white title is-6">
+                            <span class="icon is-small">
+                                <i class="fas fa-times"></i>
+                            </span>
+                            <span>Неверный ответ</span>
+                        </span>
+                    `);
+                }
+                
+                // Скрываем поле ввода полностью
+                $taskElement.find('.field').hide();
             } else if (!hasIncorrectTag) {
                 // Очищаем только если нет тега "Неверно"
                 $statusTag.empty();
@@ -184,34 +293,29 @@ class TasksController {
      * Обработчик нажатия на кнопку "Проверить"
      */
     async handleCheckTasks() {
-        // Отключаем кнопку на время проверки
-        this.$checkBtn.prop('disabled', true).addClass('is-loading');
+        // Предотвращаем двойные клики
+        if (this.$checkBtn.prop('disabled')) {
+            return; // Уже обрабатывается
+        }
         
-        try {
-            const hasQuestions = this.hasQuestions();
-            const answers = this.collectAnswers();
-            
-            if (hasQuestions && Object.keys(answers).length > 0) {
-                // Есть вопросы и заполнены ответы - проверяем их
-                const result = await this.checkAnswers(answers);
-                
-                if (result.success) {
-                    this.showCheckResults(result.results);
-                }
-            } else {
-                // Если не было ответов для проверки, показываем уведомление
-                this.showNotification('Обновлено', 'info');
+        const hasQuestions = this.hasQuestions();
+        const answers = this.collectAnswers();
+        
+        // Если режим ONE_ATTEMPT и есть ответы для проверки, показываем предупреждение
+        if (this.isOneAttempt && hasQuestions && Object.keys(answers).length > 0) {
+            try {
+                await this.showWarningModal();
+                // Пользователь подтвердил - продолжаем проверку
+                // proceedWithCheck() сам заблокирует кнопку
+                await this.proceedWithCheck();
+            } catch {
+                // Пользователь отменил - ничего не делаем
+                return;
             }
-            
-            // Всегда обновляем статусы заданий из БД
-            // updateTasksUI теперь не затирает теги "Неверно"
-            await this.loadTasksStatus();
-        } catch (error) {
-            console.error('Error in handleCheckTasks:', error);
-            this.showNotification(`Ошибка: ${error.responseJSON?.error || error.message}`, 'danger');
-        } finally {
-            // Включаем кнопку обратно
-            this.$checkBtn.prop('disabled', false).removeClass('is-loading');
+        } else {
+            // Обычная проверка без предупреждения
+            // proceedWithCheck() сам заблокирует кнопку
+            await this.proceedWithCheck();
         }
     }
 }

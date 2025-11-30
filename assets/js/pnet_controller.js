@@ -1,6 +1,9 @@
 
 // PNET контроллер - использует общие утилиты
 
+// ID загрузчика для PNET режима
+const PNET_LOADER_ID = 'pnetConsoleLoader';
+
 // Функция аутентификации в PNET
 async function authenticatePNET() {
     localStorage.setItem('html_console_mode', '1');
@@ -25,50 +28,101 @@ function redirectToTopology(iframe) {
     }
 }
 
+// Флаг для отслеживания, была ли выполнена первая загрузка и перенаправление
+let pnetFrameInitialized = false;
+
 // Инициализируем iframe после аутентификации
 async function initializePNETFrame() {
     const iframe = document.getElementById('pnetFrame');
     if (!iframe) {
         log('PNET iframe not found');
+        hideConsoleLoader(PNET_LOADER_ID);
         return;
     }
 
     const competitionSlug = getCompetitionSlugFromURL();
     if (!competitionSlug) {
         console.error('Could not extract competition slug from URL:', window.location.pathname);
+        hideConsoleLoader(PNET_LOADER_ID);
         return;
     }
 
     log('Initializing PNET frame for slug:', competitionSlug);
 
-    // Аутентифицируемся в PNET
-    const authSuccess = await authenticatePNET();
-    if (!authSuccess) {
-        console.error('PNET authentication failed');
-        return;
-    }
-
-    // Создаем сессию лабы
-    const sessionData = await createLabSession(competitionSlug);
-    if (!sessionData) {
-        console.error('Lab session creation failed');
-        return;
-    }
-
-    // Устанавливаем контроль location для PNET iframe
-    setupIframeLocationControl(iframe);
-
-    // Загружаем iframe с базовым URL PNET
-    const targetSrc = iframe.getAttribute('data-src');
-    if (targetSrc) {
-        iframe.src = targetSrc + '?t=' + Date.now();
+    try {
+        // Показываем загрузчик
+        showConsoleLoader(PNET_LOADER_ID, 'Инициализация PNET...', 'Аутентификация в системе');
         
-        // После загрузки iframe перенаправляем на топологию
-        iframe.addEventListener('load', function() {
+        // Аутентифицируемся в PNET
+        updateLoaderText(PNET_LOADER_ID, 'Аутентификация...', 'Подключение к PNET');
+        const authSuccess = await authenticatePNET();
+        if (!authSuccess) {
+            console.error('PNET authentication failed');
+            updateLoaderText(PNET_LOADER_ID, 'Ошибка аутентификации', 'Не удалось войти в систему');
             setTimeout(() => {
-                redirectToTopology(iframe);
-            }, 1000);
-        }, { once: true });
+                hideConsoleLoader(PNET_LOADER_ID);
+            }, 3000);
+            return;
+        }
+
+        // Создаем сессию лабы
+        updateLoaderText(PNET_LOADER_ID, 'Создание сессии...', 'Инициализация лаборатории');
+        const sessionData = await createLabSession(competitionSlug);
+        if (!sessionData) {
+            console.error('Lab session creation failed');
+            updateLoaderText(PNET_LOADER_ID, 'Ошибка создания сессии', 'Не удалось создать сессию лаборатории');
+            setTimeout(() => {
+                hideConsoleLoader(PNET_LOADER_ID);
+            }, 3000);
+            return;
+        }
+
+        // Устанавливаем контроль location для PNET iframe
+        setupIframeLocationControl(iframe);
+
+        // Загружаем iframe с базовым URL PNET
+        updateLoaderText(PNET_LOADER_ID, 'Загрузка интерфейса...', 'Подключение к топологии');
+        const targetSrc = iframe.getAttribute('data-src');
+        if (targetSrc) {
+            // Устанавливаем обработчик только один раз при первой инициализации
+            if (!pnetFrameInitialized) {
+                const initialLoadHandler = function() {
+                    // Удаляем обработчик сразу, чтобы он не срабатывал при последующих загрузках
+                    iframe.onload = null;
+                    pnetFrameInitialized = true;
+                    
+                    log('PNET iframe loaded, redirecting to topology');
+                    setTimeout(() => {
+                        redirectToTopology(iframe);
+                        // Скрываем загрузчик после успешной загрузки
+                        setTimeout(() => {
+                            hideConsoleLoader(PNET_LOADER_ID);
+                        }, 500);
+                    }, 1000);
+                };
+                
+                iframe.onload = initialLoadHandler;
+                
+                iframe.onerror = function() {
+                    iframe.onerror = null; // Удаляем обработчик ошибок тоже
+                    console.error('Failed to load PNET iframe');
+                    updateLoaderText(PNET_LOADER_ID, 'Ошибка загрузки', 'Не удалось загрузить интерфейс');
+                    setTimeout(() => {
+                        hideConsoleLoader(PNET_LOADER_ID);
+                    }, 3000);
+                };
+            }
+            
+            iframe.src = targetSrc + '?t=' + Date.now();
+        } else {
+            hideConsoleLoader(PNET_LOADER_ID);
+        }
+    } catch (error) {
+        console.error('Error initializing PNET frame:', error);
+        updateLoaderText(PNET_LOADER_ID, 'Ошибка инициализации', error.message || 'Не удалось инициализировать PNET');
+        setTimeout(() => {
+            hideConsoleLoader(PNET_LOADER_ID);
+        }, 3000);
     }
 }
 

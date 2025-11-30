@@ -7,7 +7,6 @@ urlpatterns = [
     path("platoons/", PlatoonListView.as_view(), name="platoon-list"),
     path('user/<id>/', UserDetailView.as_view(), name = "user-detail"),
     path("labs/<slug:slug>/<str:lab_type>/", LabDetailView.as_view(), name="lab-detail"),
-    path("lab_menu/", lambda request: render(request, "interface/lab_menu.html"), name="lab-menu"),  # for /labs
     path("labs/", LabListView.as_view(), name="lab-list"),  # for /labs/?...
     path("competitions/<slug:slug>/kibana_dashboard/", kibana_dashboard, name="kibana-dashboard"),
     path("competitions/<slug:slug>/", CompetitionDetailView.as_view(), name="competition-detail"),
@@ -20,4 +19,5 @@ urlpatterns = [
     path('kkz/create/', CreateKkzView.as_view(), name='kkz-create'),
     path('kkz/create-from-lab/<str:lab_type>/<slug:slug>/', CreateKkzFromLabView.as_view(), name='kkz-create-from-lab'),
     path('kkz_detail/<int:pk>/', KkzDetailView.as_view(), name='kkz-detail'),
+    path('test/worker-id/', get_worker_id, name='test-worker-id'),  # Только для тестов
 ]

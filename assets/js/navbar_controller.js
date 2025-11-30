@@ -17,10 +17,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const pageMapping = {
             'экзамен': {
                 paths: [window.navbarUrls['competition-list'] || ''],
+                pathPrefixes: ['/competitions/'], // Для страниц деталей соревнований
+                utm_sources: ['competitions']
+            },
+            'выданные': {
+                paths: [window.navbarUrls['competition-list'] || ''],
+                pathPrefixes: ['/competitions/'], // Для страниц деталей соревнований
                 utm_sources: ['competitions']
             },
             'соревнован': {
                 paths: [window.navbarUrls['team-competition-list'] || ''],
+                pathPrefixes: ['/team_competitions/'], // Для страниц деталей командных соревнований
                 utm_sources: ['team_competitions']
             },
             'истори': {
@@ -28,11 +35,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 utm_sources: ['history']
             },
             'лабораторн': {
-                paths: [window.navbarUrls['lab-menu'] || '', window.navbarUrls['lab-list'] || ''],
-                utm_sources: ['labs', 'lab-menu']
+                paths: [window.navbarUrls['lab-list'] || ''],
+                pathPrefixes: ['/labs/'], // Для страниц деталей лабораторных работ
+                utm_sources: ['labs']
             },
             'взвод': {
                 paths: [window.navbarUrls['platoon-list'] || '', window.navbarUrls['user-detail'] || ''],
+                pathPrefixes: ['/platoons/', '/user/'], // Для страниц деталей взводов и пользователей
                 utm_sources: ['platoons', 'user']
             }
         };
@@ -49,8 +58,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (utmSource) {
                         isActive = mapping.utm_sources.includes(utmSource);
                     } else {
-                        // Fallback на проверку пути только если нет utm_source
-                        isActive = mapping.paths.some(path => currentPath.includes(path));
+                        // Проверяем точное совпадение пути
+                        const pathMatch = mapping.paths.some(path => currentPath.includes(path));
+                        // Проверяем, начинается ли путь с одного из префиксов (для страниц деталей)
+                        const prefixMatch = mapping.pathPrefixes && mapping.pathPrefixes.some(prefix => currentPath.startsWith(prefix));
+                        isActive = pathMatch || prefixMatch;
                     }
                     
                     if (isActive) {

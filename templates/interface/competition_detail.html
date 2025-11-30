@@ -35,6 +35,19 @@
                         <button class="console-refresh-slider" id="refreshConsoleBtn" onclick="refreshConsoleSession()">
                             <i class="fas fa-sync-alt"></i><span class="slider-text"> Обновить консоль</span>
                         </button>
+                        <!-- Загрузчик для CMD консоли -->
+                        <div class="cmd-console-loader" id="cmdConsoleLoader">
+                            <div class="cmd-console-loader-spinner"></div>
+                            <p class="cmd-console-loader-text">Инициализация консоли...</p>
+                            <p class="cmd-console-loader-subtext">Включение виртуальных машин</p>
+                        </div>
+                    {% elif object.lab.platform == "PN" %}
+                        <!-- Загрузчик для PNET консоли -->
+                        <div class="cmd-console-loader" id="pnetConsoleLoader">
+                            <div class="cmd-console-loader-spinner"></div>
+                            <p class="cmd-console-loader-text">Инициализация PNET...</p>
+                            <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
+                        </div>
                     {% endif %}
                     <iframe
                         id="pnetFrame"
@@ -42,7 +55,7 @@
                         {% if object.lab.platform == "PN" %}data-src="/pnetlab/"{% endif %}
                         width="100%"
                         class="mb-5"
-                        height="600px"
+                        height="680px"
                         frameborder="0"
                         tabindex="0">
                     </iframe>
@@ -78,11 +91,11 @@
 
             {% if user.is_superuser %}
                 {% if assigned_tasks %}
-                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Задания" is_superuser=user.is_superuser competition_slug=object.slug %}
+                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Задания" is_superuser=user.is_superuser competition_slug=object.slug lab=object.lab %}
                 {% endif %}
             {% else %}
                 {% if assigned_tasks %}
-                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Ваши задания" is_superuser=user.is_superuser competition_slug=object.slug %}
+                    {% include 'interface/_tasks_list.html' with tasks=assigned_tasks title="Ваши задания" is_superuser=user.is_superuser competition_slug=object.slug lab=object.lab %}
                 {% endif %}
             {% endif %}
 
@@ -132,6 +145,7 @@
     {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
         {% if not user.is_superuser %}
             <script src="{% static 'js/common_utils.js' %}"></script>
+            <script src="{% static 'js/console_loader.js' %}"></script>
             <script src="{% static 'js/pnet_iframe_controller.js' %}"></script>
             {% if object.lab.platform == "PN" %}
                 <script src="{% static 'js/pnet_controller.js' %}"></script>
@@ -143,6 +157,41 @@
             <button class="iframe-collapse-btn" id="collapseIframeBtn">
                 <i class="fas fa-compress"></i>
             </button>
+            
+            <!-- Кнопка разворачивания правой панели -->
+            <button class="sidebar-expand-btn" id="sidebarExpandBtn" title="Показать информацию">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            
+            <!-- Кнопка разворачивания левой панели с описанием -->
+            <button class="description-expand-btn" id="descriptionExpandBtn" title="Показать описание">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            
+            <!-- Выдвижная правая панель -->
+            <div class="sidebar-panel" id="sidebarPanel">
+                <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Скрыть информацию">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="sidebar-panel-content" id="sidebarPanelContent">
+                    <!-- Контент будет скопирован из правой колонки -->
+                </div>
+            </div>
+            
+            <!-- Левая панель с описанием (split-screen) -->
+            <div class="description-panel" id="descriptionPanel">
+                <button class="description-collapse-btn" id="descriptionCollapseBtn" title="Скрыть описание">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="description-panel-content" id="descriptionPanelContent">
+                    <h2 class="title is-4 mb-4">Описание лабораторной работы</h2>
+                    <div class="content">
+                        {% with object=object.lab %}
+                            {{ object.description | safe }}
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
         {% endif %}
     {% endif %}
 

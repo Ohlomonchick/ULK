@@ -12,7 +12,7 @@ from interface.ssh_manager import process_ssh_tasks, create_ssh_tasks_for_lab_no
 from interface.eveFunctions import (
     get_node_status, filter_user, get_sessions_count, filter_session,
     login_user_to_pnet, create_pnet_lab_session_common, get_lab_topology,
-    join_session, turn_on_node, leave_session
+    get_session_id, turn_on_node, leave_session
 )
 from interface.flag_generator import generate_flags_for_tasks
 from interface.lab_topology import LabTopology
@@ -211,12 +211,7 @@ def _pnet_session_context(pnet_url, pnet_login, pnet_password, lab_path):
         yield None, None
         return
     
-    sess_id = get_lab_session_id(pnet_url, lab_path, session.cookies, xsrf)
-    if not sess_id:
-        yield None, None
-        return
-    
-    join_session(pnet_url, sess_id, session.cookies)
+    sess_id = get_session_id(pnet_url, session.cookies)
     try:
         yield session, sess_id
     finally:

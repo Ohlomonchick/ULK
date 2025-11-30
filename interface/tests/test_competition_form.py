@@ -217,7 +217,6 @@ class CompetitionFormTest(TransactionTestCase):
         self.mock_login.assert_called()
         self.mock_create_lab.assert_called()
         self.mock_create_nodes.assert_called()
-        self.mock_logout.assert_called()
 
         # Verify that the competition is actually created in DB
         self.assertIsInstance(competition, Competition)

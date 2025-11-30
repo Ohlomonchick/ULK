@@ -98,4 +98,13 @@ class LabTopology:
             return node['port_2nd']
         
         return None
+    
+    def get_all_node_ids(self) -> List[int]:
+        """
+        Получает список ID всех нод в топологии.
+        
+        Returns:
+            List[int]: Список ID нод
+        """
+        return [int(node_id) for node_id in self.nodes.keys()]
 

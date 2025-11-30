@@ -5,6 +5,281 @@
 function initializeIframeControls() {
     let isFullscreen = false;
     let originalIframeStyles = null;
+    let sidebarExpanded = false;
+    let descriptionExpanded = false;
+    let descriptionScrollPosition = 0; // Сохраняем позицию скролла
+    
+    /**
+     * Клонирует содержимое правой панели в выдвижную панель
+     * Использует глубокое клонирование для сохранения всех элементов и атрибутов
+     */
+    function cloneSidebarContent() {
+        const originalSidebar = $('.column.is-one-quarter');
+        const sidebarPanelContent = $('#sidebarPanelContent');
+        
+        if (originalSidebar.length === 0 || sidebarPanelContent.length === 0) {
+            return;
+        }
+        
+        // Очищаем предыдущее содержимое
+        sidebarPanelContent.empty();
+        
+        // Глубоко клонируем содержимое с сохранением всех атрибутов и обработчиков
+        const clonedContent = originalSidebar.clone(true, true);
+        
+        // Удаляем классы, которые могут конфликтовать
+        clonedContent.removeClass('is-one-quarter column');
+        
+        // Изменяем ID элементов, чтобы избежать конфликтов
+        // Особенно важно для таймера и других элементов с уникальными ID
+        clonedContent.find('[id]').each(function() {
+            const originalId = $(this).attr('id');
+            if (originalId) {
+                $(this).attr('id', originalId + '-clone');
+                $(this).attr('data-original-id', originalId);
+            }
+        });
+        
+        // Добавляем клонированное содержимое в панель
+        sidebarPanelContent.append(clonedContent);
+        
+        // Восстанавливаем обработчики событий для динамически созданных элементов
+        // Это важно для элементов, которые были созданы после загрузки страницы
+        restoreEventHandlers();
+        
+        // Синхронизируем таймер
+        syncTimer();
+    }
+    
+    /**
+     * Синхронизирует таймер между оригинальной и клонированной панелью
+     */
+    function syncTimer() {
+        const originalCountdown = $('#countdown');
+        const clonedCountdown = $('#countdown-clone');
+        
+        if (originalCountdown.length && clonedCountdown.length) {
+            // Используем интервал для синхронизации таймера каждую секунду
+            if (window.timerSyncInterval) {
+                clearInterval(window.timerSyncInterval);
+            }
+            
+            window.timerSyncInterval = setInterval(function() {
+                if (sidebarExpanded && clonedCountdown.length) {
+                    clonedCountdown.text(originalCountdown.text());
+                }
+            }, 1000);
+            
+            // Синхронизируем сразу
+            clonedCountdown.text(originalCountdown.text());
+        }
+    }
+    
+    /**
+     * Восстанавливает обработчики событий для элементов в выдвижной панели
+     * Использует делегирование событий для обеспечения работоспособности
+     */
+    function restoreEventHandlers() {
+        const sidebarPanel = $('#sidebarPanel');
+        
+        // Восстанавливаем обработчики для кнопок проверки заданий
+        sidebarPanel.off('click', '#check-tasks-btn-clone').on('click', '#check-tasks-btn-clone', function() {
+            const originalBtn = $('.column.is-one-quarter #check-tasks-btn');
+            if (originalBtn.length) {
+                originalBtn.trigger('click');
+            }
+        });
+        
+        // Восстанавливаем обработчики для полей ввода ответов на задания
+        sidebarPanel.off('input change', '.task-answer-input').on('input change', '.task-answer-input', function() {
+            const taskId = $(this).data('task-id');
+            const originalInput = $(`.column.is-one-quarter .task-answer-input[data-task-id="${taskId}"]`);
+            if (originalInput.length) {
+                originalInput.val($(this).val());
+                originalInput.trigger('input');
+            }
+        });
+        
+        // Восстанавливаем обработчики для форм
+        sidebarPanel.off('submit', 'form').on('submit', 'form', function(e) {
+            e.preventDefault();
+            const form = $(this);
+            const originalForm = $('.column.is-one-quarter form');
+            if (originalForm.length) {
+                // Копируем значения из клонированной формы в оригинальную
+                form.find('input, select, textarea').each(function() {
+                    const name = $(this).attr('name');
+                    const value = $(this).val();
+                    const originalField = originalForm.find(`[name="${name}"]`);
+                    if (originalField.length) {
+                        originalField.val(value);
+                    }
+                });
+                // Отправляем оригинальную форму
+                originalForm.submit();
+            }
+        });
+        
+        // Синхронизируем обновления UI заданий
+        syncTasksUI();
+    }
+    
+    /**
+     * Синхронизирует обновления UI заданий между оригинальной и клонированной панелью
+     */
+    function syncTasksUI() {
+        // Используем MutationObserver для отслеживания изменений в оригинальной панели
+        const originalTasksContainer = $('.column.is-one-quarter #tasks-container');
+        const clonedTasksContainer = $('#sidebarPanel #tasks-container-clone');
+        
+        if (originalTasksContainer.length && clonedTasksContainer.length) {
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList' || mutation.type === 'attributes') {
+                        // Клонируем обновленное содержимое
+                        const updatedContent = originalTasksContainer.clone(true, true);
+                        updatedContent.find('[id]').each(function() {
+                            const originalId = $(this).attr('id');
+                            if (originalId) {
+                                $(this).attr('id', originalId + '-clone');
+                            }
+                        });
+                        clonedTasksContainer.html(updatedContent.html());
+                    }
+                });
+            });
+            
+            observer.observe(originalTasksContainer[0], {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class']
+            });
+            
+            // Сохраняем наблюдатель
+            if (!window.tasksObserver) {
+                window.tasksObserver = observer;
+            }
+        }
+    }
+    
+    /**
+     * Показывает выдвижную панель
+     */
+    function expandSidebar() {
+        if (sidebarExpanded) return;
+        
+        const sidebarPanel = $('#sidebarPanel');
+        sidebarPanel.addClass('active');
+        $('body').addClass('sidebar-panel-active');
+        sidebarExpanded = true;
+        
+        // Скрываем кнопку разворачивания
+        $('#sidebarExpandBtn').fadeOut(200);
+        
+        // Обновляем содержимое при каждом открытии (на случай изменений)
+        cloneSidebarContent();
+        
+        // Обновляем размер iframe
+        updateIframeSize();
+    }
+    
+    /**
+     * Скрывает выдвижную панель
+     */
+    function collapseSidebar() {
+        if (!sidebarExpanded) return;
+        
+        const sidebarPanel = $('#sidebarPanel');
+        sidebarPanel.removeClass('active');
+        $('body').removeClass('sidebar-panel-active');
+        sidebarExpanded = false;
+        
+        // Показываем кнопку разворачивания обратно
+        if (isFullscreen) {
+            $('#sidebarExpandBtn').fadeIn(200);
+        }
+        
+        // Обновляем размер iframe
+        updateIframeSize();
+    }
+    
+    /**
+     * Показывает левую панель с описанием (split-screen режим)
+     */
+    function expandDescription() {
+        if (descriptionExpanded) return;
+        
+        const descriptionPanel = $('#descriptionPanel');
+        descriptionPanel.addClass('active');
+        $('body').addClass('description-panel-active');
+        descriptionExpanded = true;
+        
+        // Скрываем кнопку разворачивания
+        $('#descriptionExpandBtn').fadeOut(200);
+        
+        // Восстанавливаем позицию скролла
+        const descriptionContent = $('#descriptionPanelContent');
+        if (descriptionContent.length) {
+            setTimeout(() => {
+                descriptionContent.scrollTop(descriptionScrollPosition);
+            }, 50);
+        }
+        
+        // Обновляем размер iframe
+        updateIframeSize();
+    }
+    
+    /**
+     * Скрывает левую панель с описанием
+     */
+    function collapseDescription() {
+        if (!descriptionExpanded) return;
+        
+        const descriptionPanel = $('#descriptionPanel');
+        const descriptionContent = $('#descriptionPanelContent');
+        
+        // Сохраняем позицию скролла перед закрытием
+        if (descriptionContent.length) {
+            descriptionScrollPosition = descriptionContent.scrollTop();
+        }
+        
+        descriptionPanel.removeClass('active');
+        $('body').removeClass('description-panel-active');
+        descriptionExpanded = false;
+        
+        // Показываем кнопку разворачивания обратно
+        if (isFullscreen) {
+            $('#descriptionExpandBtn').fadeIn(200);
+        }
+        
+        // Обновляем размер iframe
+        updateIframeSize();
+    }
+    
+    /**
+     * Обновляет размер iframe в зависимости от открытых панелей
+     */
+    function updateIframeSize() {
+        if (!isFullscreen) return;
+        
+        const iframe = $('#pnetFrame');
+        let leftOffset = '0';
+        let width = '100vw';
+        
+        if (descriptionExpanded) {
+            leftOffset = '40vw';
+            width = sidebarExpanded ? 'calc(100vw - 40vw - 400px)' : 'calc(100vw - 40vw)';
+        } else if (sidebarExpanded) {
+            width = 'calc(100vw - 400px)';
+        }
+        
+        iframe.css({
+            'left': leftOffset,
+            'width': width,
+            'transition': 'left 0.3s ease, width 0.3s ease'
+        });
+    }
     
     function expandIframe() {
         if (isFullscreen) return;
@@ -45,6 +320,10 @@ function initializeIframeControls() {
         $('#collapseIframeBtn').fadeIn(300);
         $('#expandIframeBtn').fadeOut(200);
         
+        // Показываем кнопки разворачивания панелей
+        $('#sidebarExpandBtn').fadeIn(300);
+        $('#descriptionExpandBtn').fadeIn(300);
+        
         $('body, html').addClass('iframe-fullscreen-active');
         
         // Принудительно устанавливаем фокус на iframe в полноэкранном режиме
@@ -68,6 +347,20 @@ function initializeIframeControls() {
         
         const iframe = $('#pnetFrame');
         
+        // Скрываем выдвижные панели, если они открыты
+        collapseSidebar();
+        collapseDescription();
+        
+        // Очищаем интервалы и наблюдатели
+        if (window.timerSyncInterval) {
+            clearInterval(window.timerSyncInterval);
+            window.timerSyncInterval = null;
+        }
+        if (window.tasksObserver) {
+            window.tasksObserver.disconnect();
+            window.tasksObserver = null;
+        }
+        
         // Восстанавливаем оригинальные стили
         if (originalIframeStyles) {
             iframe.css({
@@ -88,7 +381,11 @@ function initializeIframeControls() {
         $('#collapseIframeBtn').fadeOut(300);
         $('#expandIframeBtn').fadeIn(200);
         
-        $('body, html').removeClass('iframe-fullscreen-active');
+        // Скрываем кнопки разворачивания панелей
+        $('#sidebarExpandBtn').fadeOut(300);
+        $('#descriptionExpandBtn').fadeOut(300);
+        
+        $('body, html').removeClass('iframe-fullscreen-active description-panel-active sidebar-panel-active');
         
         // Восстанавливаем фокус на iframe после выхода из полноэкранного режима
         setTimeout(() => {
@@ -105,7 +402,7 @@ function initializeIframeControls() {
         isFullscreen = false;
     }
     
-    // Обработчики событий
+    // Обработчики событий для iframe
     $('#expandIframeBtn').on('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -122,6 +419,47 @@ function initializeIframeControls() {
         collapseIframe();
     });
     
+    // Обработчики событий для выдвижной панели
+    $('#sidebarExpandBtn').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        expandSidebar();
+    });
+    
+    $('#sidebarCollapseBtn').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        collapseSidebar();
+    });
+    
+    // Предотвращаем закрытие панели при клике внутри неё
+    $('#sidebarPanel').on('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Обработчики событий для левой панели с описанием
+    $('#descriptionExpandBtn').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        expandDescription();
+    });
+    
+    $('#descriptionCollapseBtn').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        collapseDescription();
+    });
+    
+    // Предотвращаем закрытие панели при клике внутри неё
+    $('#descriptionPanel').on('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Сохраняем позицию скролла при скролле левой панели
+    $('#descriptionPanelContent').on('scroll', function() {
+        descriptionScrollPosition = $(this).scrollTop();
+    });
+    
     $(document).on('keydown', function(e) {
         if (e.key === 'Escape' && isFullscreen) {
             collapseIframe();
@@ -130,8 +468,8 @@ function initializeIframeControls() {
     
     // Обработчик для восстановления фокуса в полноэкранном режиме
     $(document).on('click', function(e) {
-        if (isFullscreen && !$(e.target).closest('#pnetFrame, #collapseIframeBtn, #iframeOverlay').length) {
-            // Если клик не по iframe или кнопкам, восстанавливаем фокус на iframe
+        if (isFullscreen && !$(e.target).closest('#pnetFrame, #collapseIframeBtn, #iframeOverlay, #sidebarPanel, #sidebarExpandBtn, #descriptionPanel, #descriptionExpandBtn').length) {
+            // Если клик не по iframe, кнопкам или панели, восстанавливаем фокус на iframe
             setTimeout(() => {
                 const iframe = $('#pnetFrame')[0];
                 if (iframe) {

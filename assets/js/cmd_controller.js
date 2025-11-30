@@ -1,77 +1,45 @@
 // Контроллер для CMD режима
 
-// Кэш для хранения ссылок на Guacamole консоль (с localStorage)
-const consoleCache = {
-    CACHE_DURATION: 5 * 60 * 1000, // 5 минут в миллисекундах
-    STORAGE_KEY: 'cmd_console_cache',
-    
-    // Сохранить в кэш
-    set(slug, data) {
-        try {
-            const cacheData = this.getAll();
-            cacheData[slug] = {
-                data: data,
-                timestamp: Date.now()
-            };
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(cacheData));
-            console.log('Console session cached in localStorage');
-        } catch (error) {
-            console.error('Failed to save to localStorage:', error);
-        }
-    },
-    
-    // Получить из кэша
-    get(slug) {
-        try {
-            const cacheData = this.getAll();
-            const cached = cacheData[slug];
-            if (!cached) return null;
-            
-            // Проверяем, не истек ли кэш
-            if (Date.now() - cached.timestamp > this.CACHE_DURATION) {
-                delete cacheData[slug];
-                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(cacheData));
-                return null;
-            }
-            
-            return cached.data;
-        } catch (error) {
-            console.error('Failed to read from localStorage:', error);
-            return null;
-        }
-    },
-    
-    // Получить все данные кэша
-    getAll() {
-        try {
-            const stored = localStorage.getItem(this.STORAGE_KEY);
-            return stored ? JSON.parse(stored) : {};
-        } catch (error) {
-            console.error('Failed to parse localStorage data:', error);
-            return {};
-        }
-    },
-    
-    // Очистить кэш
-    clear() {
-        try {
-            localStorage.removeItem(this.STORAGE_KEY);
-            console.log('Console cache cleared from localStorage');
-        } catch (error) {
-            console.error('Failed to clear localStorage:', error);
-        }
-    }
-};
+// Ограничение частоты обновлений консоли (1 минута)
+let lastRefreshTime = 0;
+const REFRESH_COOLDOWN = 60 * 1000; // 1 минута в миллисекундах
 
-// CMD контроллер - использует общие утилиты
+// ID загрузчика для CMD режима
+const CMD_LOADER_ID = 'cmdConsoleLoader';
+
+// CMD контроллер - использует общие утилиты из console_loader.js
 
 // Функция создания сессии консоли для CMD режима
 async function createCMDConsoleSession(slug) {
-    const result = await makeAPIRequest('/api/create_pnet_lab_session_with_console/', {
-        body: JSON.stringify({ slug: slug })
-    });
+    // Показываем загрузчик с начальным сообщением
+    showConsoleLoader(CMD_LOADER_ID, 'Инициализация консоли...', 'Создание сессии лаборатории');
     
-    return result.success ? result.data : null;
+    try {
+        // Обновляем текст во время создания сессии
+        updateLoaderText(CMD_LOADER_ID, 'Создание сессии...', 'Подключение к PNET');
+        
+        const result = await makeAPIRequest('/api/create_pnet_lab_session_with_console/', {
+            body: JSON.stringify({ slug: slug })
+        });
+        
+        if (result.success && result.data) {
+            // Обновляем текст во время включения ВМ
+            const nodeCount = result.data.all_nodes_started || 0;
+            updateLoaderText(CMD_LOADER_ID, 'Включение виртуальных машин...', `Запуск ${nodeCount} нод в топологии`);
+            
+            return result.data;
+        } else {
+            throw new Error(result.error || 'Failed to create console session');
+        }
+    } catch (error) {
+        // Обновляем текст при ошибке
+        updateLoaderText(CMD_LOADER_ID, 'Ошибка инициализации', error.message || 'Не удалось создать сессию');
+        // Скрываем загрузчик через 3 секунды после ошибки
+        setTimeout(() => {
+            hideConsoleLoader(CMD_LOADER_ID);
+        }, 3000);
+        throw error;
+    }
 }
 
 // Функция инициализации iframe для CMD режима
@@ -81,83 +49,80 @@ function initializeCMDIframe() {
     const iframe = document.getElementById('pnetFrame');
     if (!iframe) {
         console.error('PNET iframe not found!');
+        hideConsoleLoader(CMD_LOADER_ID);
         return;
     }
 
     const competitionSlug = getCompetitionSlugFromURL();
     if (!competitionSlug) {
         console.error('Could not extract competition slug from URL:', window.location.pathname);
+        hideConsoleLoader(CMD_LOADER_ID);
         return;
     }
 
     log('Competition slug:', competitionSlug);
-
-    // Проверяем кэш
-    const cachedData = consoleCache.get(competitionSlug);
-    if (cachedData) {
-        log('✅ Using cached console session');
-        iframe.src = cachedData.guacamole_url;
-        return;
-    }
-
     log('Creating new CMD console session...');
     
     createCMDConsoleSession(competitionSlug)
         .then(sessionData => {
             if (sessionData && sessionData.guacamole_url) {
-                consoleCache.set(competitionSlug, sessionData);
-                log('Console session cached for 5 minutes');
+                // Обновляем текст перед загрузкой консоли
+                updateLoaderText(CMD_LOADER_ID, 'Загрузка консоли...', 'Подключение к SSH терминалу');
+                
+                // Устанавливаем обработчики ДО установки src
+                iframe.onload = function() {
+                    log('CMD console session created successfully');
+                    // Скрываем загрузчик после успешной загрузки
+                    setTimeout(() => {
+                        hideConsoleLoader(CMD_LOADER_ID);
+                    }, 500);
+                };
+                
+                iframe.onerror = function() {
+                    console.error('Failed to load console iframe');
+                    updateLoaderText(CMD_LOADER_ID, 'Ошибка загрузки', 'Не удалось загрузить консоль');
+                    setTimeout(() => {
+                        hideConsoleLoader(CMD_LOADER_ID);
+                    }, 3000);
+                };
+                
+                // Устанавливаем src после установки обработчиков
                 iframe.src = sessionData.guacamole_url;
-                log('CMD console session created successfully');
             } else {
                 console.error('Failed to create CMD console session - no guacamole_url in response');
+                updateLoaderText(CMD_LOADER_ID, 'Ошибка', 'Не получена ссылка на консоль');
+                setTimeout(() => {
+                    hideConsoleLoader(CMD_LOADER_ID);
+                }, 3000);
             }
         })
         .catch(error => {
             console.error('Error creating CMD console session:', error);
+            // Загрузчик уже обновлён в createCMDConsoleSession при ошибке
         });
 }
 
-// Функция для принудительного обновления консоли (очистка кэша и перезагрузка)
+// Функция для принудительного обновления консоли с ограничением частоты
 function refreshConsoleSession() {
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTime;
+    
+    if (timeSinceLastRefresh < REFRESH_COOLDOWN) {
+        const remainingSeconds = Math.ceil((REFRESH_COOLDOWN - timeSinceLastRefresh) / 1000);
+        log(`Обновление консоли доступно через ${remainingSeconds} секунд`);
+        return;
+    }
+    
     const competitionSlug = getCompetitionSlugFromURL();
     if (competitionSlug) {
         log('Refreshing console session...');
-        consoleCache.clear();
+        lastRefreshTime = now;
         initializeCMDIframe();
-    }
-}
-
-
-// Функция очистки устаревших записей из кэша
-function cleanupExpiredCache() {
-    try {
-        const cacheData = consoleCache.getAll();
-        let hasExpired = false;
-        
-        for (const slug in cacheData) {
-            const cached = cacheData[slug];
-            if (Date.now() - cached.timestamp > consoleCache.CACHE_DURATION) {
-                delete cacheData[slug];
-                hasExpired = true;
-            }
-        }
-        
-        if (hasExpired) {
-            localStorage.setItem(consoleCache.STORAGE_KEY, JSON.stringify(cacheData));
-            console.log('Cleaned up expired cache entries');
-        }
-    } catch (error) {
-        console.error('Failed to cleanup expired cache:', error);
     }
 }
 
 // Инициализация при загрузке DOM
 $(document).ready(function() {
     log('CMD controller loaded, initializing...');
-    
-    // Очищаем устаревшие записи из кэша
-    cleanupExpiredCache();
-    
     initializeCMDIframe();
 });

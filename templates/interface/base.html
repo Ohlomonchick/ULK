@@ -28,7 +28,7 @@
           </div>
             <div class="navbar-start">
               {% if request.user.is_superuser %}
-                  <a class="navbar-item" href="{% url 'interface:lab-menu' %}">
+                  <a class="navbar-item" href="{% url 'interface:lab-list' %}">
                       Лабораторные работы
                   </a>
               {% endif %}
@@ -126,7 +126,6 @@
             'competition-list': "{% url 'interface:competition-list' %}",
             'team-competition-list': "{% url 'interface:team-competition-list' %}",
             'competition-history-list': "{% url 'interface:competition-history-list' %}",
-            'lab-menu': "{% url 'interface:lab-menu' %}",
             'lab-list': "{% url 'interface:lab-list' %}",
             'platoon-list': "{% url 'interface:platoon-list' %}",
             'user-detail': "/cyberpolygon/user/",

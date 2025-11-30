@@ -21,13 +21,14 @@ from django.http import JsonResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
+from django.db import transaction
 from datetime import timedelta, datetime
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User
+from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
@@ -544,6 +545,41 @@ def update_instance_time(instance, action, minutes=15):
     return message, None
 
 
+def delete_competition_from_platform(competition):
+    """
+    Удаляет соревнование с платформы: удаляет все competition2user и competition2team,
+    затем помечает competition как deleted.
+    """
+    import time
+    from .pnet_session_manager import with_pnet_session_if_needed
+    
+    # Получаем все competition2user и competition2team
+    competitions2users = Competition2User.objects.filter(competition=competition, deleted=False)
+    competitions2teams = TeamCompetition2Team.objects.filter(competition=competition, deleted=False)
+    
+    # Удаляем competition2user
+    if competitions2users.count() > 0:
+        def _delete_competitions2users_operation():
+            for competition2user in competitions2users:
+                competition2user.delete_from_platform()
+        
+        with_pnet_session_if_needed(competition.lab, _delete_competitions2users_operation)
+    
+    # Удаляем competition2team
+    if competitions2teams.count() > 0:
+        def _delete_competition2team_operation():
+            for competition2team in competitions2teams:
+                competition2team.delete_from_platform()
+        
+        with_pnet_session_if_needed(competition.lab, _delete_competition2team_operation)
+    
+    # Помечаем competition как deleted
+    competition.deleted = True
+    competition.save()
+    
+    return "deleted from platform"
+
+
 @api_view(['POST'])
 def press_button(request, action):
     try:
@@ -562,6 +598,19 @@ def press_button(request, action):
             redirect_url = reverse('interface:competition-detail', kwargs={'slug': slug})
         else:
             return JsonResponse({"error": "Missing slug or kkz_id"}, status=400)
+
+        # Обработка действия удаления с платформы
+        if action == "delete":
+            if isinstance(instance, Kkz):
+                return JsonResponse({"error": "Delete action is not supported for KKZ"}, status=400)
+            
+            message = delete_competition_from_platform(instance)
+            instance_type = "Competition"
+            cache.set("competitions_update", True, timeout=60)
+            return JsonResponse({
+                "message": f"{instance_type} {message}",
+                "redirect_url": redirect_url
+            }, status=200)
 
         message, error = update_instance_time(instance, action, minutes)
 
@@ -1034,6 +1083,7 @@ def create_pnet_lab_session_with_console(request):
 
         # Импортируем функции из eveFunctions
         from .eveFunctions import pf_login, create_pnet_lab_session_common, get_lab_topology, get_guacamole_url, turn_on_node
+        from .lab_topology import LabTopology
 
         # Получаем URL PNET
         pnet_url = get_pnet_url()
@@ -1048,42 +1098,56 @@ def create_pnet_lab_session_with_console(request):
         if not success:
             return JsonResponse({'error': message}, status=500)
 
-        # Получаем топологию лаборатории
-        topology = get_lab_topology(pnet_url, cookies)
-        if not topology or topology.get('code') != 200:
+        # Получаем топологию лаборатории и инкапсулируем в класс
+        topology_data = get_lab_topology(pnet_url, cookies)
+        if not topology_data or topology_data.get('code') != 200:
             return JsonResponse({'error': 'Failed to get lab topology'}, status=500)
 
-        # Ищем ноду по имени
-        nodes = topology.get('data', {}).get('nodes', {})
-        target_node_id = None
-        
-        for node_id, node_data in nodes.items():
-            if node_data.get('name') == node_name:
-                target_node_id = int(node_id)
-                break
+        topology = LabTopology(topology_data)
 
-        if target_node_id is None:
+        # Ищем целевую ноду по имени
+        target_node = topology.get_node_by_name(node_name)
+        if target_node is None:
             return JsonResponse({'error': f'SSH node "{node_name}" not found in topology'}, status=404)
 
-        # Включаем ноду перед получением ссылки на консоль
-        logger.info(f'Starting node {target_node_id}...')
-        node_start_success, node_start_message = turn_on_node(pnet_url, target_node_id, cookies)
-        if not node_start_success:
-            logger.error(f'Failed to start node: {node_start_message}')
-            return JsonResponse({'error': f'Failed to start node: {node_start_message}'}, status=500)
+        target_node_id = target_node['id']
 
-        # Получаем ссылку на Guacamole консоль
+        # Включаем все ноды в топологии
+        all_node_ids = topology.get_all_node_ids()
+        logger.info(f'Starting all nodes in topology: {all_node_ids}')
+        
+        failed_nodes = []
+        for node_id in all_node_ids:
+            node_start_success, node_start_message = turn_on_node(pnet_url, node_id, cookies)
+            if not node_start_success:
+                logger.warning(f'Failed to start node {node_id}: {node_start_message}')
+                failed_nodes.append({'node_id': node_id, 'error': node_start_message})
+            else:
+                logger.info(f'Node {node_id} started successfully')
+
+        # Если не удалось включить целевую ноду, возвращаем ошибку
+        if any(failed['node_id'] == target_node_id for failed in failed_nodes):
+            logger.error(f'Failed to start target node {target_node_id}')
+            return JsonResponse({
+                'error': f'Failed to start target node: {next(f["error"] for f in failed_nodes if f["node_id"] == target_node_id)}'
+            }, status=500)
+
+        # Получаем ссылку на Guacamole консоль для целевой ноды
         guacamole_url = get_guacamole_url(pnet_url, target_node_id, cookies)
         if not guacamole_url:
             return JsonResponse({'error': 'Failed to get console URL'}, status=500)
 
-        return JsonResponse({
+        response_data = {
             'success': True,
             'node_id': target_node_id,
             'node_name': node_name,
             'guacamole_url': guacamole_url,
-            'lab_path': lab_path
-        })
+            'lab_path': lab_path,
+            'all_nodes_started': len(all_node_ids),
+            'failed_nodes': failed_nodes if failed_nodes else None
+        }
+        
+        return JsonResponse(response_data)
 
     except Competition.DoesNotExist:
         return JsonResponse({'error': 'Competition not found'}, status=404)
@@ -1364,9 +1428,19 @@ def check_task_answers(request):
             return JsonResponse({'error': 'User is not a participant of this competition'}, status=403)
         
         tasks = issue.tasks.all()
+        lab = competition.lab
+        
+        # Проверяем режим проверки заданий
+        is_one_attempt = lab.task_checking == TaskChecking.ONE_ATTEMPT
+        
+        # Получаем список заданий, на которые больше нельзя отвечать
+        failed_tasks_list = issue.failed_tasks if issue.failed_tasks else []
+        failed_tasks_set = set(failed_tasks_list) if isinstance(failed_tasks_list, list) else set()
         
         # Результаты проверки
         results = {}
+        new_failed_tasks = []
+        issue_needs_save = False
         
         # Извлекаем флаги из generated_flags
         flags_dict = {}
@@ -1382,9 +1456,18 @@ def check_task_answers(request):
         
         for task in tasks:
             task_id = str(task.id)
+            task_pk = task.id
             
             # Проверяем, есть ли вопрос у задания
             if not task.question or task.question.strip() == '':
+                continue
+            
+            # Проверяем, не находится ли задание в списке failed_tasks
+            if task_pk in failed_tasks_set:
+                results[task_id] = {
+                    'status': 'failed',
+                    'message': 'На это задание больше нельзя отвечать'
+                }
                 continue
             
             # Получаем ответ пользователя
@@ -1422,14 +1505,31 @@ def check_task_answers(request):
             }
             
             # Если ответ правильный, создаем объект Answers
-            answer_filters = {'team':issue.team} if is_team_competition else {'user':request.user} 
+            answer_filters = {'team':issue.team} if is_team_competition else {'user':request.user}
             if is_correct:
-                Answers.objects.get_or_create(
-                    lab=competition.lab,
-                    lab_task=task,
-                    defaults={'datetime': timezone.now()},
-                    **answer_filters
-                )
+                # В режиме ONE_ATTEMPT используем транзакцию с блокировкой для предотвращения race condition
+                with transaction.atomic():
+                    # Блокируем существующий ответ, если он есть
+                    Answers.objects.get_or_create(
+                        lab=competition.lab,
+                        lab_task=task,
+                        datetime__lte=competition.finish,
+                        datetime__gte=competition.start,
+                        defaults={'datetime': timezone.now()},
+                        **answer_filters
+                    )
+                    
+            elif is_one_attempt and not is_correct:
+                # Если режим ONE_ATTEMPT и ответ неверный, добавляем задание в failed_tasks
+                if task_pk not in failed_tasks_set:
+                    new_failed_tasks.append(task_pk)
+                    failed_tasks_set.add(task_pk)
+                    issue_needs_save = True
+        
+        # Сохраняем обновленный список failed_tasks
+        if issue_needs_save:
+            issue.failed_tasks = list(failed_tasks_set)
+            issue.save(update_fields=['failed_tasks'])
         
         return JsonResponse({
             'success': True,
@@ -1475,6 +1575,10 @@ def get_user_tasks_status(request):
             ).values_list('lab_task_id', flat=True)
         )
         
+        # Получаем список заданий, на которые больше нельзя отвечать
+        failed_tasks_list = issue.failed_tasks if issue.failed_tasks else []
+        failed_tasks_set = set(failed_tasks_list) if isinstance(failed_tasks_list, list) else set()
+        
         # Формируем данные о заданиях
         tasks_data = []
         has_questions = False
@@ -1482,6 +1586,7 @@ def get_user_tasks_status(request):
         for idx, task in enumerate(tasks, 1):
             is_completed = task.id in completed_task_ids
             has_question = bool(task.question and task.question.strip())
+            is_failed = task.id in failed_tasks_set
             
             if has_question:
                 has_questions = True
@@ -1492,7 +1597,8 @@ def get_user_tasks_status(request):
                 'description': task.description or '',
                 'question': task.question or '',
                 'has_question': has_question,
-                'done': is_completed
+                'done': is_completed,
+                'failed': is_failed
             })
         
         return JsonResponse({

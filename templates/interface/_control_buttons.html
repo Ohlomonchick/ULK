@@ -1,89 +1,126 @@
 {% load static %}
 
-{% if button_start_now %}
-    <p class="help mb-2">
-        {% if instance_type == 'kkz' %}
-            ККЗ будет доступен студентам в {{ start_time|date:"H:i" }}, но вы можете начать его сейчас
-        {% else %}
-            Работа будет доступна студентам в {{ start_time|date:"H:i" }}, но вы можете начать её сейчас
-        {% endif %}
-    </p>
-    <div id="button-video-container mb-3" style="display: flex; align-items: center;">
-        <button id="start-now" class="button is-danger is-medium control-button"
-                data-action="start"
-                data-instance-type="{{ instance_type }}"
-                {% if instance_type == 'kkz' %}
-                    data-kkz-id="{{ instance.id }}"
-                {% else %}
-                    data-slug="{{ instance.slug }}"
-                {% endif %}>
-            Начать сейчас
-        </button>
-        <div id="video-container" class="hidden">
-            <video id="exam-video" style="width: auto; height: 62px; border-radius: 4px;" class="is-hidden" autoplay muted>
-                <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
-            </video>
-        </div>
-    </div>
-{% endif %}
-
-<p class="help mb-2">
-    {% if instance_type == 'kkz' %}
-        {% if button_resume %}
-            ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его
-        {% else %}
-            ККЗ закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить его сейчас либо продлить на определённое время
-        {% endif %}
-    {% else %}
-        {% if button_resume %}
-            ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его
-        {% else %}
-            Работа закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить её сейчас либо продлить на определённое время
-        {% endif %}
-    {% endif %}
-</p>
-<div id="button-video-container" style="display: flex; align-items: center; gap: 0.75rem;">
-    {% if button_end_now %}
-        <div style="display: flex; align-items: center;">
-            <button id="end-now" class="button is-danger is-medium control-button"
-                    data-action="end"
+{% if instance_type == 'kkz' or instance_type == 'competition' and not instance.deleted %}
+    {% if button_start_now %}
+        <p class="help mb-2">
+            {% if instance_type == 'kkz' %}
+                ККЗ будет доступен студентам в {{ start_time|date:"H:i" }}, но вы можете начать его сейчас
+            {% else %}
+                Работа будет доступна студентам в {{ start_time|date:"H:i" }}, но вы можете начать её сейчас
+            {% endif %}
+        </p>
+        <div id="button-video-container" class="mb-3" style="display: flex; align-items: center;">
+            <button id="start-now" class="button is-danger is-medium control-button"
+                    data-action="start"
                     data-instance-type="{{ instance_type }}"
                     {% if instance_type == 'kkz' %}
                         data-kkz-id="{{ instance.id }}"
                     {% else %}
                         data-slug="{{ instance.slug }}"
                     {% endif %}>
-                Закончить сейчас
+                Начать сейчас
             </button>
+            <div id="video-container" class="hidden">
+                <video id="exam-video" style="width: auto; height: 62px; border-radius: 4px;" class="is-hidden" autoplay muted>
+                    <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
+                </video>
+            </div>
         </div>
     {% endif %}
 
-    <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <button id="resume" class="button is-success is-medium control-button"
-                data-action="resume"
-                data-instance-type="{{ instance_type }}"
-                {% if instance_type == 'kkz' %}
-                    data-kkz-id="{{ instance.id }}"
-                {% else %}
-                    data-slug="{{ instance.slug }}"
-                {% endif %}>
-            Продлить на 15 минут
-        </button>
-        <div class="field has-addons mb-0">
-            <div class="control">
-                <input id="resume-minutes"
-                       type="number"
-                       class="input is-medium"
-                       value="15"
-                       min="1"
-                       max="240"
-                       style="width: 5rem;">
+    <p class="help mb-2">
+        {% if instance_type == 'kkz' %}
+            {% if button_resume %}
+                ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его
+            {% else %}
+                ККЗ закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить его сейчас либо продлить на определённое время
+            {% endif %}
+        {% else %}
+            {% if button_resume %}
+                ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его
+            {% else %}
+                Работа закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить её сейчас либо продлить на определённое время
+            {% endif %}
+        {% endif %}
+    </p>
+    <div id="button-video-container" style="display: flex; align-items: center; gap: 0.75rem;">
+        {% if button_end_now %}
+            <div id="button-video-container" class="mb-3" style="display: flex; align-items: center;">
+                <button id="end-now" class="button is-danger is-medium control-button"
+                        data-action="end"
+                        data-instance-type="{{ instance_type }}"
+                        {% if instance_type == 'kkz' %}
+                            data-kkz-id="{{ instance.id }}"
+                        {% else %}
+                            data-slug="{{ instance.slug }}"
+                        {% endif %}>
+                    Закончить сейчас
+                </button>
             </div>
-            <div class="control">
-                <span class="button is-medium is-static">
-                    минут
-                </span>
+        {% endif %}
+
+        <div id="button-video-container" class="mb-3" style="display: flex; align-items: center; gap: 0.75rem;">
+            <button id="resume" class="button is-success is-medium control-button"
+                    data-action="resume"
+                    data-instance-type="{{ instance_type }}"
+                    {% if instance_type == 'kkz' %}
+                        data-kkz-id="{{ instance.id }}"
+                    {% else %}
+                        data-slug="{{ instance.slug }}"
+                    {% endif %}>
+                Продлить на 15 минут
+            </button>
+            <div class="field has-addons mb-0">
+                <div class="control">
+                    <input id="resume-minutes"
+                           type="number"
+                           class="input is-medium"
+                           value="15"
+                           min="1"
+                           max="240"
+                           style="width: 5rem;">
+                </div>
+                <div class="control">
+                    <span class="button is-medium is-static">
+                        минут
+                    </span>
+                </div>
             </div>
         </div>
+    </div>
+
+    {% if button_delete_from_platform %}
+        <div id="button-video-container" class="mb-3" style="display: flex; align-items: center;">
+            <button id="delete-from-platform" class="button is-danger is-medium control-button"
+                    data-action="delete"
+                    data-instance-type="{{ instance_type }}"
+                    {% if instance_type == 'kkz' %}
+                        data-kkz-id="{{ instance.id }}"
+                    {% else %}
+                        data-slug="{{ instance.slug }}"
+                    {% endif %}>
+                Удалить с платформы
+            </button>
+        </div>
+    {% endif %}
+{% endif %}
+
+<!-- Bulma Modal for Delete Confirmation -->
+<div class="modal" id="delete-confirm-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">Подтверждение удаления</p>
+            <button class="delete" aria-label="close" id="modal-close"></button>
+        </header>
+        <section class="modal-card-body">
+            <p class="content">
+                <strong>Внимание!</strong> При удалении с платформы лабораторную работу нельзя будет продолжить. Но это освободит ресурсы.
+            </p>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-danger" id="modal-confirm-delete">Удалить</button>
+            <button class="button" id="modal-cancel-delete">Отмена</button>
+        </footer>
     </div>
 </div>
