@@ -445,7 +445,6 @@ def delete_competition_from_platform(competition):
         def _delete_competitions2users_operation():
             for competition2user in competitions2users:
                 competition2user.delete_from_platform()
-                time.sleep(2)
         
         with_pnet_session_if_needed(competition.lab, _delete_competitions2users_operation)
     
@@ -454,7 +453,6 @@ def delete_competition_from_platform(competition):
         def _delete_competition2team_operation():
             for competition2team in competitions2teams:
                 competition2team.delete_from_platform()
-                time.sleep(2)
         
         with_pnet_session_if_needed(competition.lab, _delete_competition2team_operation)
     

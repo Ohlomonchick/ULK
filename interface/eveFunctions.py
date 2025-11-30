@@ -298,12 +298,35 @@ def get_sessions_count(url, cookie):
     return r
 
 
-def filter_session(url, cookie, xsrf, page_number=1, page_quantity=25):
+def get_auth_info(url, cookie):
+    """Получает информацию о текущем пользователе через /api/auth"""
+    r = requests.get(
+        url + '/api/auth',
+        headers={'content-type': 'application/json'},
+        cookies=cookie,
+        verify=False,
+        timeout=4
+    )
+    return r
+
+
+def filter_session(url, cookie, xsrf, page_number=1, page_quantity=25, path_contains=None):
     header = {
         "Content-Type": "application/json;charset=UTF-8",
         "X-XSRF-TOKEN": xsrf
         # 'Cookie': xsrf
     }
+    
+    # Формируем data_filter в зависимости от наличия path_contains
+    data_filter = {}
+    if path_contains:
+        data_filter = {
+            "lab_session_path": {
+                "logic": "and",
+                "data": [["contain", path_contains]]
+            }
+        }
+    
     payload = json.dumps(
         {
             "data": {
@@ -315,7 +338,7 @@ def filter_session(url, cookie, xsrf, page_number=1, page_quantity=25):
                 "data_sort": {
                     "lab_session_id": "desc"
                 },
-                "data_filter": {}
+                "data_filter": data_filter
             }
         }
     )
@@ -455,6 +478,28 @@ def delete_lab(url, cookie, lab_path):
     return r
 
 
+def get_session_id(url, cookie):
+        # Получаем session_id через /api/auth
+    auth_response = get_auth_info(url, cookie)
+    if auth_response.status_code != 200:
+        logger.error(f"Failed to get auth info: {auth_response.status_code} - {auth_response.text}")
+        raise Exception(f"Failed to get auth info: {auth_response.status_code}")
+    
+    auth_data = auth_response.json()
+    if auth_data.get("code") != 200 or "data" not in auth_data:
+        logger.error(f"Invalid auth response: {auth_data}")
+        raise Exception(f"Invalid auth response: {auth_data}")
+    
+    sess_id = auth_data["data"].get("lab")
+    if not sess_id:
+        logger.error(f"Session ID not found in auth response: {auth_data}")
+        raise Exception(f"Session ID not found in auth response")
+    
+    logger.debug(f"Session ID obtained from /api/auth: {sess_id}")
+
+    return sess_id
+
+
 def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username, post_nodes_callback=None, usb_device_ids=None, pnet_login=None):
     """
     Создание узлов и коннекторов лаборатории.
@@ -482,44 +527,7 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
     logger.debug(lab)
 
     create_session(url, lab, cookie)
-    filter_user(url, cookie, xsrf).text
-    users = filter_user(url, cookie, xsrf).json()
-
-    r = get_sessions_count(url, cookie).json()
-    count_labs = r["data"]
-    logger.debug(count_labs)
-
-    response_json = filter_session(url, cookie, xsrf, 1, count_labs).json()
-    session_list = []
-
-    for item in response_json["data"]["data_table"]:
-        if item["lab_session_path"] == lab + '.unl':
-            username = ""
-            for user in users["data"]["data_table"]:
-                if user["pod"] == item["lab_session_pod"]:
-                    username = user["username"]
-            session = [
-                item["lab_session_id"],
-                username,
-                item["lab_session_path"]
-            ]
-            session_list.append(session)
-
-    logger.debug(session_list)
-
-    # Используем переданный логин или fallback на 'pnet_scripts'
-    target_login = pnet_login if pnet_login else 'pnet_scripts'
-    
-    sess_id = 0
-    for session in session_list:
-        if session[1] == target_login:
-            sess_id = session[0]
-            break
-
-    if sess_id == 0:
-        logger.warning(f"Сессия для логина {target_login} не найдена в списке сессий")
-    
-    join_session(url, sess_id, cookie)
+    sess_id = get_session_id(url, cookie)
 
     # Модифицируем NodesData с USB device IDs, если они предоставлены
     nodes_data = lab_object.NodesData
@@ -566,11 +574,7 @@ def delete_lab_with_session_destroy(url: object, lab_name: object, lab_path: obj
     lab = lab_path + lab_slash_name
     logger.debug(lab)
 
-    r = get_sessions_count(url, cookie).json()
-    count_labs = r["data"]
-    logger.debug(count_labs)
-
-    response_json = filter_session(url, cookie, xsrf, 1, max(1, count_labs))
+    response_json = filter_session(url, cookie, xsrf, 1, 25, path_contains=lab + '.unl')
 
     if (
             response_json.status_code != 204 and
@@ -583,7 +587,7 @@ def delete_lab_with_session_destroy(url: object, lab_name: object, lab_path: obj
 
     for item in response_json["data"]["data_table"]:
         if item["lab_session_path"] == lab + '.unl':
-            logger.debug(destroy_session(url, item["lab_session_id"], cookie))
+            destroy_session(url, item["lab_session_id"], cookie)
 
     r = delete_lab(url, cookie, lab).json()
     logger.debug(r)
