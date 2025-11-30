@@ -28,36 +28,39 @@
         </div>
     {% endif %}
 
-    {% if button_end_now %}
-        <p class="help mb-2">
-            {% if instance_type == 'kkz' %}
-                ККЗ закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить его сейчас
-            {% else %}
-                Работа закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить её сейчас
-            {% endif %}
-        </p>
-        <div id="button-video-container" class="mb-3" style="display: flex; align-items: center;">
-            <button id="end-now" class="button is-danger is-medium control-button"
-                    data-action="end"
-                    data-instance-type="{{ instance_type }}"
-                    {% if instance_type == 'kkz' %}
-                        data-kkz-id="{{ instance.id }}"
-                    {% else %}
-                        data-slug="{{ instance.slug }}"
-                    {% endif %}>
-                Закончить сейчас
-            </button>
-        </div>
-    {% elif button_resume %}
-        <p class="help mb-2">
-            {% if instance_type == 'kkz' %}
+    <p class="help mb-2">
+        {% if instance_type == 'kkz' %}
+            {% if button_resume %}
                 ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его
             {% else %}
-                Работа закончилась в {{ finish_time|date:"H:i" }}, но вы можете продлить её
+                ККЗ закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить его сейчас либо продлить на определённое время
             {% endif %}
-        </p>
+        {% else %}
+            {% if button_resume %}
+                ККЗ закончился в {{ finish_time|date:"H:i" }}, но вы можете продлить его
+            {% else %}
+                Работа закончится в {{ finish_time|date:"H:i" }}, но вы можете закончить её сейчас либо продлить на определённое время
+            {% endif %}
+        {% endif %}
+    </p>
+    <div id="button-video-container" style="display: flex; align-items: center; gap: 0.75rem;">
+        {% if button_end_now %}
+            <div id="button-video-container" class="mb-3" style="display: flex; align-items: center;">
+                <button id="end-now" class="button is-danger is-medium control-button"
+                        data-action="end"
+                        data-instance-type="{{ instance_type }}"
+                        {% if instance_type == 'kkz' %}
+                            data-kkz-id="{{ instance.id }}"
+                        {% else %}
+                            data-slug="{{ instance.slug }}"
+                        {% endif %}>
+                    Закончить сейчас
+                </button>
+            </div>
+        {% endif %}
+
         <div id="button-video-container" class="mb-3" style="display: flex; align-items: center; gap: 0.75rem;">
-            <button id="resume" class="button is-danger is-medium control-button"
+            <button id="resume" class="button is-success is-medium control-button"
                     data-action="resume"
                     data-instance-type="{{ instance_type }}"
                     {% if instance_type == 'kkz' %}
@@ -84,7 +87,7 @@
                 </div>
             </div>
         </div>
-    {% endif %}
+    </div>
 
     {% if button_delete_from_platform %}
         <div id="button-video-container" class="mb-3" style="display: flex; align-items: center;">

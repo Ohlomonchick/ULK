@@ -24,6 +24,13 @@
             opacity: 1;
             padding: 1rem 0;
         }
+        .lab-header h3 {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            flex: 1;
+            min-width: 0;
+        }
     </style>
 {% endblock %}
 
@@ -36,11 +43,17 @@
 
     <div class="columns is-centered">
         <div class="column is-three-quarters">
-            <div class="box">
+            <div style="padding-bottom: 1.5rem;">
                 {% if user.is_superuser %}
                     {% include 'interface/_solutions_table.html' with instance_slug=kkz.id instance_type='kkz' show_team_column=False show_max_tasks=True progress=total_progress max_progress=max_progress %}
-
-                    {% include 'interface/_control_buttons.html' with button_start_now=button_start_now button_end_now=lab_data.button_end_now button_resume=lab_data.button_resume instance=kkz instance_type='kkz' start_time=kkz.start finish_time=kkz.finish %}
+                    <div style="margin-bottom: 1rem;">
+                        {% include 'interface/_control_buttons.html' with button_start_now=button_start_now button_end_now=lab_data.button_end_now button_resume=lab_data.button_resume instance=kkz instance_type='kkz' start_time=kkz.start finish_time=kkz.finish %}
+                    </div>
+                    {% if kkz.finish < now %}
+                        <div class="box">
+                            {% include 'interface/_export_rating.html' with instance_slug=kkz.id instance_type='kkz' lab_name=kkz.name finish_date=kkz.finish platoon_number=platoon_number %}
+                        </div>
+                    {% endif %}
                 {% endif %}
             </div>
             {% for lab_data in labs_data %}
@@ -91,6 +104,9 @@
 
     {% if user.is_superuser %}
         <script src="{% static 'js/control_buttons.js' %}"></script>
+        {% if kkz.finish < now %}
+            <script src="{% static 'js/export_rating.js' %}"></script>
+        {% endif %}
     {% endif %}
 
     <script>

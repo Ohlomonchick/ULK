@@ -299,7 +299,7 @@ class KkzAdmin(admin.ModelAdmin):
 
     def platoons_display(self, obj):
         platoons = obj.platoons.all()
-        return (' ').join(str(platoon) for platoon in platoons)
+        return ' '.join(str(platoon) for platoon in platoons)
     platoons_display.short_description = 'Взводы'
 
     def duration(self, obj):
@@ -313,122 +313,53 @@ class KkzAdmin(admin.ModelAdmin):
     duration.short_description = 'Продолжительность'
 
     def save_related(self, request, form, formsets, change):
+        """
+        Обрабатывает сохранение связанных объектов.
+        Использует общую логику из _create_kkz_competitions.
+        """
         super().save_related(request, form, formsets, change)
+        
+        from .forms import _create_kkz_competitions
+        
         obj = form.instance
-
+        
         kkz_lab_formset = next((fs for fs in formsets if fs.model == KkzLab), None)
         if not kkz_lab_formset:
             return
-
-        for kkz_lab_index, kkz_lab in enumerate(obj.kkz_labs.all()):
-            competition, created = Competition.objects.get_or_create(
-                defaults={'start': obj.start, 'finish': obj.finish},
-                lab=kkz_lab.lab,
-                kkz=obj
-            )
-            if not created:
-                competition.start = obj.start
-                competition.finish = obj.finish
-                competition.save()
-
-            competition.platoons.set(obj.platoons.all())
-            competition.non_platoon_users.set(obj.non_platoon_users.all())
-            users = list(obj.get_users())
-
-            lab_obj = kkz_lab.lab
-            inline_form = kkz_lab_formset.forms[kkz_lab_index]
-            assignments_str = inline_form.cleaned_data.get('assignments')
-            assignments_from_form = {}
-            if assignments_str:
-                try:
-                    assignments_from_form = json.loads(assignments_str)
-                    print(f"Got assignments from form: {assignments_from_form}")
-                except json.JSONDecodeError:
-                    pass
-
-            all_tasks = list(LabTask.objects.filter(lab=lab_obj))
-
-            if assignments_from_form:
-                if obj.unified_tasks:
-                    uniform_task_ids = next(iter(assignments_from_form.values()), [])
-                    for user in users:
-                        preview, _ = KkzPreview.objects.get_or_create(
-                            kkz=obj,
-                            lab=lab_obj,
-                            user=user,
-                            defaults={}
-                        )
-                        preview.tasks.set(uniform_task_ids)
-                else:
-                    for user in users:
-                        user_id_str = str(user.id)
-                        if user_id_str in assignments_from_form:
-                            task_ids = assignments_from_form[user_id_str]
-                            preview, _ = KkzPreview.objects.get_or_create(
-                                kkz=obj,
-                                lab=lab_obj,
-                                user=user,
-                                defaults={}
-                            )
-                            preview.tasks.set(task_ids)
-                        else:
-                            if all_tasks:
-                                sel = random.sample(all_tasks, min(kkz_lab.num_tasks, len(all_tasks)))
-                                s_ids = [t.id for t in sel]
-                                preview, _ = KkzPreview.objects.get_or_create(
-                                    kkz=obj,
-                                    lab=lab_obj,
-                                    user=user,
-                                    defaults={}
-                                )
-                                preview.tasks.set(s_ids)
-
-            else:
-                if obj.unified_tasks:
-                    if all_tasks:
-                        picked = random.sample(all_tasks, min(kkz_lab.num_tasks, len(all_tasks)))
-                        p_ids = [t.id for t in picked]
-                        for user in users:
-                            preview, _ = KkzPreview.objects.get_or_create(
-                                kkz=obj,
-                                lab=lab_obj,
-                                user=user,
-                                defaults={}
-                            )
-                            preview.tasks.set(p_ids)
-                else:
-                    for user in users:
-                        if all_tasks:
-                            sel = random.sample(all_tasks, min(kkz_lab.num_tasks, len(all_tasks)))
-                            s_ids = [t.id for t in sel]
-                            preview, _ = KkzPreview.objects.get_or_create(
-                                kkz=obj,
-                                lab=lab_obj,
-                                user=user,
-                                defaults={}
-                            )
-                            preview.tasks.set(s_ids)
-
-            for user in users:
-                try:
-                    preview = KkzPreview.objects.get(
-                        kkz=obj,
-                        lab=kkz_lab.lab,
-                        user=user
-                    )
-                    assigned_tasks = list(preview.tasks.all())
-                    comp2user, created = Competition2User.objects.get_or_create(
-                        competition=competition,
-                        user=user
-                    )
-                    comp2user.tasks.set(assigned_tasks)
-
-                except KkzPreview.DoesNotExist:
-                    print(f"No preview found for user {user.id}")
-                    comp2user, _ = Competition2User.objects.get_or_create(
-                        competition=competition,
-                        user=user
-                    )
+        
+        labs_info = []
+        preview_assignments = {}
+        
+        for kkz_lab_index, kkz_lab_form in enumerate(kkz_lab_formset.forms):
+            if kkz_lab_form.cleaned_data.get('DELETE', False):
+                continue
+            
+            if not kkz_lab_form.cleaned_data.get('lab'):
+                continue
+            
+            lab = kkz_lab_form.cleaned_data['lab']
+            tasks = list(kkz_lab_form.cleaned_data.get('tasks', [])) or list(LabTask.objects.filter(lab=lab))
+            num_tasks = kkz_lab_form.cleaned_data.get('num_tasks') or len(tasks)
+            
+            labs_info.append({
+                'lab': lab,
+                'lab_id': lab.id,
+                'tasks': tasks,
+                'task_ids': [t.id for t in tasks],
+                'num_to_assign': num_tasks
+            })
+            
+            # Получаем assignments из inline-формы
+            assignments_str = kkz_lab_form.cleaned_data.get('assignments', '{}')
+            try:
+                assignments_from_form = json.loads(assignments_str) if assignments_str else {}
+                if assignments_from_form:
+                    preview_assignments[lab.id] = assignments_from_form
+            except json.JSONDecodeError:
+                pass
+        
+        if labs_info:
+            _create_kkz_competitions(obj, labs_info, preview_assignments if preview_assignments else None)
 
 
 class TeamAdmin(admin.ModelAdmin):

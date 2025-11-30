@@ -284,6 +284,9 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             context["assigned_tasks"] = assigned_tasks
 
         patch_lab_description(context["object"], self.request.user)
+        
+        first_platoon = competition.platoons.all().first()
+        context["platoon_number"] = first_platoon.number if first_platoon else None
 
         return context
 
@@ -317,10 +320,26 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
                 datetime__lte=kkz.finish
             ).count()
 
+            assigned_tasks = []
+            if kkz.unified_tasks:
+                if comp2users.exists():
+                    all_user_task_sets = [
+                        set(comp2user.tasks.values_list('id', flat=True))
+                        for comp2user in comp2users
+                    ]
+                    
+                    if all_user_task_sets:
+                        # Находим пересечение - задания, которые есть у всех пользователей
+                        common_task_ids = set.intersection(*all_user_task_sets)
+                        if all(tasks_user == common_task_ids for tasks_user in all_user_task_sets):
+                            assigned_tasks = list(LabTask.objects.filter(id__in=common_task_ids))
+            else:
+                assigned_tasks = list(comp.tasks.all())
+
             labs_data.append({
                 'lab': comp.lab,
                 'competition': comp,
-                'assigned_tasks': comp_context.get('assigned_tasks', []),
+                'assigned_tasks': assigned_tasks,
                 'delta': comp_context['delta'],
                 'button_start_now': comp_context['button_start_now'],
                 'button_end_now': comp_context['button_end_now'],
@@ -334,8 +353,12 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             context['delta'] = {"hours": "00", "minutes": "00", "seconds": "00"}
 
         context['labs_data'] = labs_data
-        context['total_possible'] = total_possible
-        context['total_completed'] = total_completed
+        context['now'] = timezone.now()
+        context['max_progress'] = total_possible
+        context['total_progress'] = total_completed
+        
+        first_platoon = kkz.platoons.all().first()
+        context["platoon_number"] = first_platoon.number if first_platoon else None
 
         return context
 

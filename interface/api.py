@@ -1,11 +1,14 @@
 import json
 import re
 from collections import defaultdict
+from io import BytesIO
 
 import requests
 import urllib3
 import logging
 import random
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
 
 from interface.utils import get_kibana_url
 
@@ -84,6 +87,35 @@ def get_time(request, instance_type, instance_id):  # pragma: no cover
         return Response({'error': f'{instance_type.upper()} not found'}, status=404)
 
 
+def format_timedelta_ru(delta):
+    if not delta:
+        return ""
+    
+    days = delta.days
+    remaining_seconds = delta.seconds
+    hours, remainder = divmod(remaining_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    parts = []
+    
+    if days > 0:
+        if days == 1:
+            day_word = "день"
+        elif 2 <= days <= 4:
+            day_word = "дня"
+        else:
+            day_word = "дней"
+        parts.append(f"{days} {day_word}")
+    
+    # Форматируем время
+    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    
+    if parts:
+        return f"{', '.join(parts)}, {time_str}"
+    else:
+        return time_str
+
+
 def make_solution_data(solution, competition):
     user = User.objects.get(pk=solution["user_id"])
     return {
@@ -91,7 +123,7 @@ def make_solution_data(solution, competition):
         "user_first_name": user.first_name,
         "user_last_name": user.last_name,
         "user_platoon": str(user.platoon),
-        "spent": str(solution["datetime"] - competition.start).split(".")[0] if solution["datetime"] else "",
+        "spent": format_timedelta_ru(solution["datetime"] - competition.start) if solution["datetime"] else "",
         "datetime": solution["datetime"].strftime("%H:%M:%S") if solution["datetime"] else "",
         "raw_datetime": solution["datetime"],
         "team_name": "",
@@ -365,6 +397,86 @@ def get_kkz_solutions(request, kkz_id):
     })
 
 
+@api_view(['POST'])
+def export_grades_xlsx(request):
+    try:
+        if hasattr(request, 'data'):
+            data = request.data
+        else:
+            body = request.body.decode('utf-8')
+            data = json.loads(body)
+        
+        grades_data = data.get('grades', [])
+        instance_type = data.get('type')
+        slug = data.get('slug')
+        
+        if not grades_data:
+            return JsonResponse({'error': 'No grades data provided'}, status=400)
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Оценки"
+        headers = ['Фамилия', 'Имя', 'Оценка', 'Позиция', 'Решено заданий']
+        ws.append(headers)
+        
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+        
+        for grade_item in grades_data:
+            row = [
+                grade_item.get('last_name', ''),
+                grade_item.get('first_name', ''),
+                grade_item.get('grade', ''),
+                grade_item.get('position', ''),
+                grade_item.get('tasks_solved', 0)
+            ]
+            ws.append(row)
+        
+        column_widths = {
+            'A': 20,  # Фамилия
+            'B': 20,  # Имя
+            'C': 10,  # Оценка
+            'D': 10,  # Позиция
+            'E': 15   # Решено заданий
+        }
+        for col, width in column_widths.items():
+            ws.column_dimensions[col].width = width
+        
+        for row_num in range(2, ws.max_row + 1):
+            ws[f'A{row_num}'].alignment = Alignment(horizontal="center")
+            ws[f'B{row_num}'].alignment = Alignment(horizontal="center")
+            ws[f'C{row_num}'].alignment = Alignment(horizontal="center")
+            ws[f'D{row_num}'].alignment = Alignment(horizontal="center")
+            ws[f'E{row_num}'].alignment = Alignment(horizontal="center")
+                
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        from django.http import HttpResponse
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        # Filename is generated on client side, so we just set a simple one
+        response['Content-Disposition'] = 'attachment; filename="grades.xlsx"'
+        
+        return response
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logging.error(f"Error exporting grades: {str(e)}")
+        return JsonResponse({'error': f'Error exporting grades: {str(e)}'}, status=500)
+
+
 @api_view(['GET'])
 def load_levels(request, lab_name):  # pragma: no cover
     try:
@@ -412,7 +524,12 @@ def update_instance_time(instance, action, minutes=15):
         field = "finish"
         message = "ended"
     elif action == "resume":
-        time = timezone.now() + timedelta(minutes=minutes)
+        current_finish = getattr(instance, 'finish', None)
+        now = timezone.now()
+        if current_finish > now:
+            time = current_finish + timedelta(minutes=minutes)
+        else:
+            time = now + timedelta(minutes=minutes)
         field = "finish"
         message = f"resumed for {minutes} minutes"
     else:
