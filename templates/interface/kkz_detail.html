@@ -51,7 +51,7 @@
                     </div>
                     {% if kkz.finish < now %}
                         <div class="box">
-                            {% include 'interface/_export_rating.html' with instance_slug=kkz.id instance_type='kkz' %}
+                            {% include 'interface/_export_rating.html' with instance_slug=kkz.id instance_type='kkz' lab_name=kkz.name finish_date=kkz.finish platoon_number=platoon_number %}
                         </div>
                     {% endif %}
                 {% endif %}

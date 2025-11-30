@@ -454,50 +454,18 @@ def export_grades_xlsx(request):
             ws[f'D{row_num}'].alignment = Alignment(horizontal="center")
             ws[f'E{row_num}'].alignment = Alignment(horizontal="center")
                 
-        try:
-            if instance_type == 'kkz':
-                try:
-                    kkz = Kkz.objects.get(id=slug)
-                    filename = f"Оценки за {kkz.name}.xlsx"
-                except Kkz.DoesNotExist:
-                    filename = f"Оценки за ККЗ в {timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            else:
-                try:
-                    competition = Competition.objects.get(slug=slug)
-                    filename = f"Оценки за {competition.lab.name}.xlsx"
-                except Competition.DoesNotExist:
-                    filename = f"Оценки за работу в {timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        except Exception as e:
-            logging.error(f"Error generating filename: {str(e)}")
-            filename = f"Оценки за {timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-                
         output = BytesIO()
         wb.save(output)
         output.seek(0)
         
         from django.http import HttpResponse
-        from urllib.parse import quote
         
         response = HttpResponse(
             output.read(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        # Properly encode filename for Content-Disposition header
-        # Use both formats for maximum browser compatibility
-        # ASCII fallback (for older browsers)
-        ascii_filename = filename.encode('ascii', 'ignore').decode('ascii') or 'grades'
-        if not ascii_filename.endswith('.xlsx'):
-            ascii_filename += '.xlsx'
-        
-        # RFC 5987 format for UTF-8 (for modern browsers)
-        filename_bytes = filename.encode('utf-8')
-        encoded_filename = quote(filename_bytes, safe='')
-        
-        # Set both formats
-        response['Content-Disposition'] = f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{encoded_filename}'
-        
-        # Log for debugging
-        logging.info(f"Export filename: {filename}, ASCII: {ascii_filename}, encoded: {encoded_filename}")
+        # Filename is generated on client side, so we just set a simple one
+        response['Content-Disposition'] = 'attachment; filename="grades.xlsx"'
         
         return response
         

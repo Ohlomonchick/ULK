@@ -299,7 +299,7 @@ class KkzAdmin(admin.ModelAdmin):
 
     def platoons_display(self, obj):
         platoons = obj.platoons.all()
-        return (' ').join(str(platoon) for platoon in platoons)
+        return ' '.join(str(platoon) for platoon in platoons)
     platoons_display.short_description = 'Взводы'
 
     def duration(self, obj):
@@ -313,105 +313,53 @@ class KkzAdmin(admin.ModelAdmin):
     duration.short_description = 'Продолжительность'
 
     def save_related(self, request, form, formsets, change):
+        """
+        Обрабатывает сохранение связанных объектов.
+        Использует общую логику из _create_kkz_competitions.
+        """
         super().save_related(request, form, formsets, change)
+        
+        from .forms import _create_kkz_competitions
+        
         obj = form.instance
-
+        
         kkz_lab_formset = next((fs for fs in formsets if fs.model == KkzLab), None)
         if not kkz_lab_formset:
             return
-
-        users = list(obj.get_users())
         
-        for kkz_lab_index, kkz_lab in enumerate(obj.kkz_labs.all()):
-            # Получаем или создаем Competition
-            competition, created = Competition.objects.get_or_create(
-                lab=kkz_lab.lab,
-                kkz=obj,
-                defaults={'start': obj.start, 'finish': obj.finish}
-            )
+        labs_info = []
+        preview_assignments = {}
+        
+        for kkz_lab_index, kkz_lab_form in enumerate(kkz_lab_formset.forms):
+            if kkz_lab_form.cleaned_data.get('DELETE', False):
+                continue
             
-            if not created:
-                if competition.start != obj.start or competition.finish != obj.finish:
-                    competition.start = obj.start
-                    competition.finish = obj.finish
-                    competition.save()
-
-            competition.platoons.set(obj.platoons.all())
-            competition.non_platoon_users.set(obj.non_platoon_users.all())
-
+            if not kkz_lab_form.cleaned_data.get('lab'):
+                continue
+            
+            lab = kkz_lab_form.cleaned_data['lab']
+            tasks = list(kkz_lab_form.cleaned_data.get('tasks', [])) or list(LabTask.objects.filter(lab=lab))
+            num_tasks = kkz_lab_form.cleaned_data.get('num_tasks') or len(tasks)
+            
+            labs_info.append({
+                'lab': lab,
+                'lab_id': lab.id,
+                'tasks': tasks,
+                'task_ids': [t.id for t in tasks],
+                'num_to_assign': num_tasks
+            })
+            
             # Получаем assignments из inline-формы
-            assignments_from_form = {}
-            if kkz_lab_index < len(kkz_lab_formset.forms):
-                inline_form = kkz_lab_formset.forms[kkz_lab_index]
-                assignments_str = inline_form.cleaned_data.get('assignments', '{}')
-                
-                try:
-                    assignments_from_form = json.loads(assignments_str) if assignments_str else {}
-                except json.JSONDecodeError:
-                    assignments_from_form = {}
-            
-            if assignments_from_form:
-                self._apply_assignments(obj, kkz_lab, competition, users, assignments_from_form)
-            elif created:
-                self._generate_random_assignments(obj, kkz_lab, competition, users)
-
-    def _apply_assignments(self, kkz, kkz_lab, competition, users, assignments):
-        """Применяет распределение заданий из формы."""
-        lab_obj = kkz_lab.lab
+            assignments_str = kkz_lab_form.cleaned_data.get('assignments', '{}')
+            try:
+                assignments_from_form = json.loads(assignments_str) if assignments_str else {}
+                if assignments_from_form:
+                    preview_assignments[lab.id] = assignments_from_form
+            except json.JSONDecodeError:
+                pass
         
-        if kkz.unified_tasks:
-            uniform_task_ids = next(iter(assignments.values()), [])
-            for user in users:
-                self._set_user_tasks(kkz, lab_obj, competition, user, uniform_task_ids)
-        else:
-            all_tasks = list(LabTask.objects.filter(lab=lab_obj))
-            for user in users:
-                user_id_str = str(user.id)
-                if user_id_str in assignments:
-                    task_ids = assignments[user_id_str]
-                else:
-                    if all_tasks:
-                        sel = random.sample(all_tasks, min(kkz_lab.num_tasks, len(all_tasks)))
-                        task_ids = [t.id for t in sel]
-                    else:
-                        task_ids = []
-                
-                self._set_user_tasks(kkz, lab_obj, competition, user, task_ids)
-
-    def _generate_random_assignments(self, kkz, kkz_lab, competition, users):
-        """Генерирует случайное распределение заданий."""
-        lab_obj = kkz_lab.lab
-        all_tasks = list(LabTask.objects.filter(lab=lab_obj))
-        
-        if not all_tasks:
-            return
-        
-        if kkz.unified_tasks:
-            picked = random.sample(all_tasks, min(kkz_lab.num_tasks, len(all_tasks)))
-            task_ids = [t.id for t in picked]
-            for user in users:
-                self._set_user_tasks(kkz, lab_obj, competition, user, task_ids)
-        else:
-            for user in users:
-                sel = random.sample(all_tasks, min(kkz_lab.num_tasks, len(all_tasks)))
-                task_ids = [t.id for t in sel]
-                self._set_user_tasks(kkz, lab_obj, competition, user, task_ids)
-
-    def _set_user_tasks(self, kkz, lab, competition, user, task_ids):
-        """Устанавливает задания для пользователя."""
-        preview, _ = KkzPreview.objects.get_or_create(
-            kkz=kkz,
-            lab=lab,
-            user=user,
-            defaults={}
-        )
-        preview.tasks.set(task_ids)
-        
-        comp2user, _ = Competition2User.objects.get_or_create(
-            competition=competition,
-            user=user
-        )
-        comp2user.tasks.set(LabTask.objects.filter(id__in=task_ids))
+        if labs_info:
+            _create_kkz_competitions(obj, labs_info, preview_assignments if preview_assignments else None)
 
 
 class TeamAdmin(admin.ModelAdmin):

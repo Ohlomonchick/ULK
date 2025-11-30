@@ -284,6 +284,9 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
             context["assigned_tasks"] = assigned_tasks
 
         patch_lab_description(context["object"], self.request.user)
+        
+        first_platoon = competition.platoons.all().first()
+        context["platoon_number"] = first_platoon.number if first_platoon else None
 
         return context
 
@@ -353,6 +356,9 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         context['now'] = timezone.now()
         context['max_progress'] = total_possible
         context['total_progress'] = total_completed
+        
+        first_platoon = kkz.platoons.all().first()
+        context["platoon_number"] = first_platoon.number if first_platoon else None
 
         return context
 

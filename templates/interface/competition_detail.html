@@ -23,7 +23,7 @@
                 </div>
                 {% if available == False %}
                     <div class="box">
-                        {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' %}
+                        {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' lab_name=object.lab.name finish_date=object.finish platoon_number=platoon_number %}
                     </div>
                 {% endif %}
             {% elif object.lab.platform == "PN" or object.lab.platform == "CMD" %}

@@ -2,7 +2,10 @@
 
 <div id="export-rating-container" 
      data-slug="{{ instance_slug }}" 
-     data-type="{{ instance_type }}">
+     data-type="{{ instance_type }}"
+     data-lab-name="{{ lab_name }}"
+     data-finish-date="{{ finish_date|date:'Y-m-d' }}"
+     data-platoon-number="{{ platoon_number|default:'' }}">
     
     <!-- Tabs -->
     <div class="tabs is-boxed mb-4">

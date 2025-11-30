@@ -3,6 +3,9 @@ class ExportRating {
         this.$container = $(containerElement);
         this.slug = this.$container.data('slug');
         this.type = this.$container.data('type');
+        this.labName = this.$container.data('lab-name') || '';
+        this.finishDate = this.$container.data('finish-date') || '';
+        this.platoonNumber = this.$container.data('platoon-number') || '';
         this.solutions = [];
         this.grades = [];
         this.maxTasks = 0;
@@ -31,8 +34,7 @@ class ExportRating {
         $('#generate-grades-by-tasks').on('click', () => this.generateGradesByTasks());
         $('#generate-grades-by-position').on('click', () => this.generateGradesByPosition());
         
-        // Add click handlers to all download buttons
-        this.$container.find('.download-xlsx-btn').on('click', () => this.downloadXlsx());
+        // Download button handler will be bound when button is shown
         
         // Hide download buttons by default
         this.$container.find('.download-xlsx-btn').hide();
@@ -225,8 +227,15 @@ class ExportRating {
         }
 
         $previewSection.show();
-        if ($downloadButton) {
+        if ($downloadButton && $downloadButton.length) {
             $downloadButton.show();
+            // Bind click handler only once with namespace to avoid duplicates
+            const self = this;
+            $downloadButton.off('click.download').on('click.download', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                self.downloadXlsx();
+            });
         }
         
         // Scroll to preview
@@ -268,32 +277,23 @@ class ExportRating {
                 responseType: 'blob'
             },
             success: (data, status, xhr) => {
-                // Get filename from Content-Disposition header
-                const contentDisposition = xhr.getResponseHeader('Content-Disposition');
-                let filename = 'grades.xlsx';
+                // Generate filename on client side
+                let filename = 'Оценки';
                 
-                if (contentDisposition) {
-                    // Try RFC 5987 format first
-                    const rfc5987Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
-                    if (rfc5987Match && rfc5987Match[1]) {
-                        try {
-                            filename = decodeURIComponent(rfc5987Match[1]);
-                        } catch (e) {
-                            console.error('Error decoding RFC 5987 filename:', e);
-                        }
-                    }
-                    
-                    // Fallback to regular format
-                    if (filename === 'grades.xlsx') {
-                        let filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-                        if (!filenameMatch) {
-                            filenameMatch = contentDisposition.match(/filename=([^;]+)/);
-                        }
-                        if (filenameMatch && filenameMatch[1]) {
-                            filename = filenameMatch[1].trim().replace(/^["']|["']$/g, '');
-                        }
-                    }
+                if (this.platoonNumber) {
+                    filename += ` взвода ${this.platoonNumber}`;
                 }
+                
+                if (this.labName) {
+                    filename += ` за ${this.labName}`;
+                }
+                
+                if (this.finishDate) {
+                    // Format date as YYYY-MM-DD
+                    filename += ` ${this.finishDate}`;
+                }
+                
+                filename += '.xlsx';
 
                 // Create download link
                 const url = window.URL.createObjectURL(data);
