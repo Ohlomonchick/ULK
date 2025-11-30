@@ -31,6 +31,26 @@ def require_pnet_url(func):
     return wrapper
 
 
+def exclusive_session_lock(func):
+    """
+    Декоратор для методов класса PNetSessionManager.
+    Обеспечивает эксклюзивное выполнение методов с этим декоратором.
+    
+    Все методы с этим декоратором будут выполняться последовательно:
+    - Ни одна другая функция с таким же декоратором не начнёт выполняться,
+      пока не закончится выполнение текущей функции
+    - Сама функция будет ждать, пока завершатся другие функции с таким же декоратором
+    
+    Использует блокировку на уровне экземпляра (self._exclusive_lock).
+    """
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # Выполняем функцию с эксклюзивной блокировкой
+        with self._exclusive_lock:
+            return func(self, *args, **kwargs)
+    return wrapper
+
+
 # Глобальная административная сессия PNet
 ADMIN_PNET_SESSION = None
 ADMIN_SESSION_LOCK = threading.Lock()
@@ -131,6 +151,7 @@ class PNetSessionManager:
         self._is_authenticated = False
         self._pnet_login = None  # Логин текущей сессии
         self._lock = threading.Lock()  # Блокировка для thread-safety
+        self._exclusive_lock = threading.Lock()  # Блокировка для эксклюзивного выполнения методов
         self._do_logout = do_logout
 
     def __enter__(self):
@@ -208,6 +229,7 @@ class PNetSessionManager:
         url, cookie, xsrf = self.session_data
         create_lab(url, lab_name, "", get_pnet_base_dir(), cookie, xsrf, username)
 
+    @exclusive_session_lock
     @require_pnet_url
     def create_lab_nodes_and_connectors(self, lab, lab_name, username, post_nodes_callback=None, usb_device_ids=None):
         """Создание узлов и коннекторов для пользователя"""
