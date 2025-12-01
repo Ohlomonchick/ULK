@@ -305,6 +305,7 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         labs_data = []
         total_possible = 0
         total_completed = 0
+        button_delete_from_platform = False
 
         for comp in competitions:
             comp_context = build_competition_context(self.request, comp, hasattr(comp, 'teamcompetition'))
@@ -316,6 +317,10 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
                 datetime__gte=kkz.start,
                 datetime__lte=kkz.finish
             ).count()
+
+            comp_button_delete = comp_context.get('button_delete_from_platform', False)
+            if comp_button_delete:
+                button_delete_from_platform = True
 
             labs_data.append({
                 'lab': comp.lab,
@@ -336,6 +341,7 @@ class KkzDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         context['labs_data'] = labs_data
         context['total_possible'] = total_possible
         context['total_completed'] = total_completed
+        context['button_delete_from_platform'] = button_delete_from_platform
 
         return context
 

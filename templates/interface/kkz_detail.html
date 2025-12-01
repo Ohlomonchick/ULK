@@ -40,7 +40,7 @@
                 {% if user.is_superuser %}
                     {% include 'interface/_solutions_table.html' with instance_slug=kkz.id instance_type='kkz' show_team_column=False show_max_tasks=True progress=total_progress max_progress=max_progress %}
 
-                    {% include 'interface/_control_buttons.html' with button_start_now=button_start_now button_end_now=lab_data.button_end_now button_resume=lab_data.button_resume instance=kkz instance_type='kkz' start_time=kkz.start finish_time=kkz.finish %}
+                    {% include 'interface/_control_buttons.html' with button_start_now=button_start_now button_end_now=lab_data.button_end_now button_resume=lab_data.button_resume button_delete_from_platform=button_delete_from_platform instance=kkz instance_type='kkz' start_time=kkz.start finish_time=kkz.finish %}
                 {% endif %}
             </div>
             {% for lab_data in labs_data %}

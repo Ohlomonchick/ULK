@@ -20,7 +20,7 @@
                 <div class="box">
                     {% include 'interface/_solutions_table.html' with instance_slug=object.slug instance_type='competition' show_team_column=is_team_competition show_max_tasks=False progress=progress max_progress=max_progress %}
                 
-                    {% include 'interface/_control_buttons.html' with button_start_now=button_start_now button_end_now=button_end_now button_resume=button_resume button_delete_from_platform=button_delete_from_platform instance=object instance_type='competition' start_time=object.start finish_time=object.finish %}
+                    {% include 'interface/_control_buttons.html' with button_delete_from_platform=button_delete_from_platform button_start_now=button_start_now button_end_now=button_end_now button_resume=button_resume instance=object instance_type='competition' start_time=object.start finish_time=object.finish %}
                 </div>
             {% elif object.lab.platform == "PN" or object.lab.platform == "CMD" %}
                 <div class="iframe-container" style="position: relative;">

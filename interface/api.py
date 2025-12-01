@@ -463,6 +463,27 @@ def delete_competition_from_platform(competition):
     return "deleted from platform"
 
 
+def delete_kkz_from_platform(kkz):
+    """
+    Удаляет ККЗ с платформы: удаляет все экзамены с платформы, если они завершены и платформа PN или CMD
+    """
+    now = timezone.now()
+    deleted_count = 0
+    
+    competitions = Competition.objects.filter(
+        kkz=kkz,
+        finish__lte=now,
+        deleted=False,
+        lab__platform__in=["PN", "CMD"]
+    ).select_related('lab')
+    
+    for competition in competitions:
+        delete_competition_from_platform(competition)
+        deleted_count += 1
+    
+    return f"deleted {deleted_count} competition(s) from platform"
+
+
 @api_view(['POST'])
 def press_button(request, action):
     try:
@@ -485,10 +506,12 @@ def press_button(request, action):
         # Обработка действия удаления с платформы
         if action == "delete":
             if isinstance(instance, Kkz):
-                return JsonResponse({"error": "Delete action is not supported for KKZ"}, status=400)
+                message = delete_kkz_from_platform(instance)
+                instance_type = "KKZ"
+            else:
+                message = delete_competition_from_platform(instance)
+                instance_type = "Competition"
             
-            message = delete_competition_from_platform(instance)
-            instance_type = "Competition"
             cache.set("competitions_update", True, timeout=60)
             return JsonResponse({
                 "message": f"{instance_type} {message}",
