@@ -28,7 +28,7 @@
 {% block content %}
     <div class="columns is-centered">
         <div class="column">
-            <h1 class="title is-2">{{ object.name }} <span class="tag {{ object.lab_type|lab_type_class }}" style='font-size: 1.35rem;' >{{ object.get_lab_type_display }}</span></h1>
+            <h1 class="title is-2">{{ object.name }} <span class="tag {{ object.lab_type|lab_type_class }}" style="font-size: 1.35rem;">{{ object.get_lab_type_display }}</span></h1>
         </div>
         {% if object.lab_type == 'EXAM' %}
             <div class="field mt-3" style="margin-left: 0.25rem;">

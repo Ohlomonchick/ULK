@@ -82,7 +82,7 @@ class Lab(models.Model):
     program = models.CharField('Образовательная программа', max_length=32, choices=LabProgram.choices)
     lab_type = models.CharField('Тип работы', max_length=32, choices=LabType.choices)
     learning_years = models.JSONField('Годы обучения', default=list, null=True, blank=True)
-    default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=7))
+    default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=1))
     tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
     need_kibana = models.BooleanField('Показывать дашборд в Kibana', default=False)
     task_checking = models.CharField('Метод проверки заданий', max_length=32, choices=TaskChecking.choices, default=TaskChecking.MULTIPLE_ATTEMPTS)

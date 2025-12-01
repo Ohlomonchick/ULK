@@ -15,7 +15,7 @@ class ControlButtons {
         document.querySelectorAll('.control-button').forEach(button => {
             button.addEventListener('click', (e) => this.handleClick(e));
         });
-        
+
         // Обновление текста кнопки при изменении значения в поле ввода
         if (this.resumeInput && this.resumeButton) {
             this.updateResumeButtonText();
@@ -126,7 +126,7 @@ class ControlButtons {
         const instanceType = button.dataset.instanceType;
         const slug = button.dataset.slug;
         const kkzId = button.dataset.kkzId;
-        
+
         if (action === 'end') {
             const confirmMessage = instanceType === 'kkz'
                 ? 'Вы уверены что хотите завершить ККЗ?'
@@ -191,7 +191,7 @@ class ControlButtons {
         if (action === 'resume' && this.resumeInput) {
             body.minutes = parseInt(this.resumeInput.value, 10) || 15;
         }
-        
+
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
         fetch(`/api/press_button/${action}/`, {
