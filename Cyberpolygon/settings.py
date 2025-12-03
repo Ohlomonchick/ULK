@@ -172,6 +172,17 @@ if DEBUG:
 else:
     MEDIA_ROOT = '/media/'
 
+# File upload settings
+# Максимальный размер данных, которые могут быть загружены в память (в байтах)
+# 50 MB для работы с изображениями в админ панели
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+
+# Максимальный размер файла, который может быть загружен в память перед записью на диск
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+
+# Максимальное количество полей в форме
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
 SUMMERNOTE_THEME = 'bs4'
 
 SUMMERNOTE_CONFIG = {

@@ -40,7 +40,11 @@
                                 <span class="task-status-tag ml-2"></span>
                                 
                                 <div class="mt-3">
-                                    {{ task.description|linebreaksbr }}
+                                    {% if task.description %}
+                                        {{ task.description|linebreaksbr }}
+                                    {% elif is_superuser and task.question %}
+                                        {{ task.question|linebreaksbr }}
+                                    {% endif %}
                                 </div>
                                 
                                 {% if not is_superuser and task.question and task.question != '' %}

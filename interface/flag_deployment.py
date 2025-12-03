@@ -10,8 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 
 from interface.ssh_manager import process_ssh_tasks, create_ssh_tasks_for_lab_nodes
 from interface.eveFunctions import (
-    get_node_status, filter_user, get_sessions_count, filter_session,
-    login_user_to_pnet, create_pnet_lab_session_common, get_lab_topology,
+    get_node_status, login_user_to_pnet, create_pnet_lab_session_common, get_lab_topology,
     get_session_id, turn_on_node, leave_session
 )
 from interface.flag_generator import generate_flags_for_tasks
@@ -260,23 +259,6 @@ def _deploy_flags_to_lab_from_task(task: FlagDeploymentTask):
     except Exception as e:
         logger.error(f"Error deploying flags for task {task.task_id}: {e}", exc_info=True)
         raise
-
-
-def get_lab_session_id(url, lab_path, cookie, xsrf):
-    """Получает session_id для лаборатории по пути"""
-    try:
-        users = filter_user(url, cookie, xsrf).json()
-        r = get_sessions_count(url, cookie).json()
-        count_labs = r["data"]
-        response_json = filter_session(url, cookie, xsrf, 1, count_labs).json()
-        
-        for item in response_json["data"]["data_table"]:
-            if item["lab_session_path"] == lab_path:
-                return item["lab_session_id"]
-        return None
-    except Exception as e:
-        logger.error(f"Error getting session ID: {e}", exc_info=True)
-        return None
 
 
 def wait_for_node_ready(url, node_id, cookie, max_wait_time=15):
