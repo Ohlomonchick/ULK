@@ -9,7 +9,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models import Q, IntegerField, QuerySet
-from django.db.models.functions import Cast
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.utils import timezone
 from django_summernote.models import AbstractAttachment
@@ -24,7 +23,7 @@ from interface.flag_deployment import (
     get_flag_deployment_queue,
     create_flag_deployment_task
 )
-from interface.utils import get_pnet_lab_name
+from interface.utils import get_pnet_lab_name, get_database_type
 from .elastic_utils import delete_elastic_user
 from .pnet_session_manager import ensure_admin_pnet_session, execute_pnet_operation_if_needed
 from .validators import validate_top_level_array, validate_lab_task_json_config
@@ -146,8 +145,26 @@ class LabLevel(models.Model):
 
 class LabTaskManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().annotate(
-            task_id_numeric=Cast('task_id', IntegerField())
+        db_type = get_database_type()
+        
+        if db_type == 'postgresql':
+            sql_expr = """
+                CASE 
+                    WHEN task_id ~ '^[0-9]+$' THEN task_id::integer 
+                    ELSE NULL 
+                END
+            """
+        else: 
+            sql_expr = """
+                CASE 
+                    WHEN task_id GLOB '[0-9]*' AND CAST(task_id AS INTEGER) = task_id 
+                    THEN CAST(task_id AS INTEGER)
+                    ELSE NULL 
+                END
+            """
+        
+        return super().get_queryset().extra(
+            select={'task_id_numeric': sql_expr}
         ).order_by('task_id_numeric', 'task_id')
 
 
@@ -166,7 +183,7 @@ class LabTask(models.Model):
     question = models.TextField("Вопрос", blank=True, null=True)
     answer = models.TextField("Ответ", blank=True, null=True, help_text="Правильный ответ на вопрос или регулярное выражение для проверки ответа")
 
-    objects = LabTaskManager
+    objects = LabTaskManager()
 
     class Meta:
         verbose_name = "Задание"
