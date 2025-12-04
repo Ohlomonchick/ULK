@@ -8,7 +8,8 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, IntegerField, QuerySet
+from django.db.models.functions import Cast
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.utils import timezone
 from django_summernote.models import AbstractAttachment
@@ -143,6 +144,13 @@ class LabLevel(models.Model):
         return f"Вариант {self.level_number} - {self.description}"
 
 
+class LabTaskManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().annotate(
+            task_id_numeric=Cast('task_id', IntegerField())
+        ).order_by('task_id_numeric', 'task_id')
+
+
 class LabTask(models.Model):
     lab = models.ForeignKey(Lab, related_name="options", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
     task_id = models.CharField("Идентификатор задания", max_length=255, null=True)
@@ -158,10 +166,11 @@ class LabTask(models.Model):
     question = models.TextField("Вопрос", blank=True, null=True)
     answer = models.TextField("Ответ", blank=True, null=True, help_text="Правильный ответ на вопрос или регулярное выражение для проверки ответа")
 
+    objects = LabTaskManager
+
     class Meta:
         verbose_name = "Задание"
         verbose_name_plural = "Задания"
-        ordering = ['task_id']
 
     def __str__(self):
         return self.description
