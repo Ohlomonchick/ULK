@@ -18,6 +18,7 @@ from .forms import (
     Competition2UserInlineForm,
     LabForm,
     MyAttachmentAdminForm,
+    LabTaskInlineForm,
 )
 from .admin_descriptions import LAB_NODE_DESCRIPTION, get_lab_task_description
 from django.db.models import DurationField, JSONField
@@ -51,10 +52,21 @@ class LabLevelInline(admin.TabularInline):
     fields = ["level_number", "description"]
 
 
+class LabTaskTypeInline(admin.TabularInline):
+    """Inline для создания типов заданий в карточке лабы"""
+    model = LabTaskType
+    extra = 1
+    fields = ['name']
+    verbose_name = "Тип задания"
+    verbose_name_plural = "Типы заданий"
+
+
 class LabTaskInline(TabularInlineWithDescription):
     model = LabTask
+    form = LabTaskInlineForm
     extra = 1
-    fields = ['task_id', 'description']  # Базовые поля по умолчанию
+    exclude = ['task_type']
+    fields = ['task_id', 'task_type', 'description']  # task_type - это поле из формы, не из модели
 
     formfield_overrides = {
         JSONField: {
@@ -88,7 +100,7 @@ class LabTaskInline(TabularInlineWithDescription):
     def get_fields(self, request, obj=None):
         """Динамически определяет поля в зависимости от типа заданий Lab"""
         parent_lab = self._get_parent_lab(request, obj)
-        base_fields = ['task_id', 'description']
+        base_fields = ['task_id', 'task_type', 'description']  
 
         # Добавляем json_config только для JSON_CONFIGURED типа
         if parent_lab:
@@ -143,10 +155,10 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
             'widget': TimeDurationWidget(show_days=True, show_hours=True, show_minutes=True, show_seconds=False, attrs={'style': 'width:5em;'})
         }
     }
-    inlines = [LabLevelInline, LabTaskInline, LabNodeInline]
+    inlines = [LabLevelInline, LabTaskTypeInline, LabTaskInline, LabNodeInline]
 
     class Media:
-        js = ('admin/js/jquery-3.7.1.min.js', "admin/js/load_lab_type.js")
+        js = ('admin/js/jquery-3.7.1.min.js', "admin/js/load_lab_type.js", "admin/js/task_type_selector.js")
 
     def get_learning_years(self, obj):
         return ", ".join(str(year) for year in obj.learning_years)
@@ -195,6 +207,47 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
                 if isinstance(inline, TabularInlineWithDescription):
                     inline.description = inline.get_description()
             yield inline, formset
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+
+        if formset.model == LabTaskType:
+            for obj in instances:
+                obj.save()
+            for obj in formset.deleted_objects:
+                obj.delete()
+            return
+
+        if formset.model == LabTask:
+            for subform in formset.forms:
+                if subform.instance.pk and subform.cleaned_data.get('DELETE'):
+                    subform.instance.delete()
+                    continue
+                
+                if subform.cleaned_data and not subform.cleaned_data.get('DELETE'):
+                    instance = subform.instance
+                    raw_value = subform.cleaned_data.get('task_type') 
+                    
+                    if raw_value:
+                        if raw_value.startswith('name:'):
+                            type_name = raw_value.split('name:', 1)[1]
+                            try:
+                                task_type = LabTaskType.objects.get(lab=form.instance, name=type_name)
+                                instance.task_type = task_type
+                            except LabTaskType.DoesNotExist:
+                                instance.task_type = None
+                        else:
+                            try:
+                                instance.task_type_id = int(raw_value)
+                            except (ValueError, TypeError):
+                                instance.task_type = None
+                    else:
+                        instance.task_type = None
+                    
+                    instance.save()
+            return
+
+        formset.save()
 
 
 class MyUserAdmin(UserAdmin):

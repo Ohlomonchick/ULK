@@ -21,6 +21,8 @@
                 padding: 0 8px;
                 border-radius: 3px;
             }
+            details > summary { list-style: none; outline: none; }
+            details > summary::-webkit-details-marker { display: none; }
         </style>
     {% endif %}
 {% endblock %}
@@ -45,8 +47,10 @@
             </div>
         {% endif %}
     </div>
-    <form method="post" action="">
-        {% csrf_token %}
+<form method="post" action="" id="create-lab-form">
+    {% csrf_token %}
+    {{ simple_form.task_type_counts }}
+
     <div class="columns is-centered">
         <div class="column is-two-thirds">
             <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
@@ -121,6 +125,79 @@
         </div>
 
         <div class="column is-one-third">
+            {% if has_typed_tasks %}
+            <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)" id="tasks-box" data-lab-id="{{ object.id }}">
+                <div class="level is-mobile mb-2">
+                    <div class="level-left"><h3 class="title is-4 mb-0">Задания</h3></div>
+                    <div class="level-right">
+                        <span class="tag is-info is-light is-medium" id="total-tasks-badge">Всего: 0</span>
+                    </div>
+                </div>
+                <p class="help mb-4">Выберите количество или отметьте конкретные задания.</p>
+
+                {% for group in task_groups %}
+                    <div class="box has-background-white task-group-block" 
+                         style="padding: 1rem; margin-bottom: 1rem; border: 1px solid #dbdbdb;"
+                         data-group-id="{{ group.id }}">
+                        
+                        <div class="level is-mobile mb-2">
+                            <div class="level-left" style="max-width: 65%;">
+                                <strong>{{ group.name }}</strong>
+                            </div>
+                            <div class="level-right">
+                                <div class="field has-addons mb-0">
+                                    <div class="control">
+                                        <input class="input is-small task-count-input has-text-centered" 
+                                               type="number" 
+                                               min="0" 
+                                               max="{{ group.count }}" 
+                                               value="0"
+                                               style="width: 3.5rem; font-weight: bold;">
+                                    </div>
+                                    <div class="control">
+                                        <a class="button is-static is-small">
+                                            / {{ group.count }}
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <details>
+                            <summary class="is-size-7 has-text-info" style="cursor: pointer; outline: none;">
+                                Показать список ({{ group.count }})
+                            </summary>
+                            <div class="pt-3 pl-1">
+                                {% for task in group.tasks %}
+                                    <article class="media" style="margin-bottom: 0.75rem; align-items: flex-start;">
+                                        <div class="media-left" style="margin-right: 0.75rem;">
+                                            <label class="checkbox">
+                                                <!-- РЕАЛЬНЫЙ КЛИКАБЕЛЬНЫЙ ЧЕКБОКС -->
+                                                <input type="checkbox" 
+                                                       class="task-checkbox" 
+                                                       name="tasks" 
+                                                       value="{{ task.pk }}">
+                                            </label>
+                                        </div>
+                                        <div class="media-content">
+                                            <div class="content is-small" style="margin-top: 2px;">
+                                                {% if task.description %}
+                                                    {{ task.description|linebreaksbr }}
+                                                {% elif task.question %}
+                                                    {{ task.question|linebreaksbr }}
+                                                {% else %}
+                                                    Задание {{ task.task_id }}
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </article>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% if simple_form.fields.tasks.queryset %}
                 <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
                     <h3 class="title is-4 mb-1">{{ simple_form.tasks.label }}</h3>
@@ -139,8 +216,6 @@
                                         <div class="mt-1">
                                             {% if task.description %}
                                                 {{ task.description | linebreaksbr }}
-                                            {% elif task.question %}
-                                                {{ task.question | linebreaksbr }}
                                             {% endif %}
                                         </div>
                                     </p>
@@ -152,9 +227,8 @@
                         <p class="help is-danger">{{ simple_form.tasks.errors.0 }}</p>
                     {% endif %}
                 </div>
-            {% endif %}
+            {% else %}
 
-            {% if simple_form.fields.level.queryset %}
                 <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1);">
                     <h3 class="title is-4 mb-1">{{ simple_form.level.label }}</h3>
                     <p class="help mb-2">Выберите вариант для работы.</p>

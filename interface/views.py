@@ -37,6 +37,9 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Lab
     slug_url_kwarg = 'slug'
 
+    class Media:
+        js = ('admin/js/task_type_selector.js',)
+
     def test_func(self):
         # Allow only admin users
         return self.request.user.is_staff
@@ -72,6 +75,40 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         # Provide empty form by default
         context["simple_form"] = SimpleCompetitionForm(lab=self.object)
         context["platoons"] = Platoon.objects.filter(learning_year__in=self.object.learning_years, number__gt=0)
+        
+        lab = self.object
+        task_groups = []
+        
+        task_types = LabTaskType.objects.filter(lab=self.object)
+        
+        task_groups = []
+        has_typed_tasks = False
+
+        for tt in task_types:
+            tasks = LabTask.objects.filter(lab=self.object, task_type=tt)
+            if tasks.exists():
+                task_groups.append({
+                    'id': tt.id,
+                    'name': tt.name,
+                    'count': tasks.count(),
+                    'tasks': tasks,
+                    'is_type': True
+                })
+                has_typed_tasks = True
+
+        no_type = LabTask.objects.filter(lab=self.object, task_type__isnull=True)
+        if no_type.exists():
+            task_groups.append({
+                'id': 'null', 
+                'name': 'Общие задания (без типа)',
+                'count': no_type.count(),
+                'tasks': no_type,
+                'is_type': False
+            })
+
+        context['task_groups'] = task_groups
+        context['has_typed_tasks'] = has_typed_tasks
+        
         return context
 
 

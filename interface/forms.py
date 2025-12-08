@@ -2,6 +2,7 @@ import logging
 import random
 import json
 from collections import defaultdict
+from itertools import groupby
 from typing import List
 from datetime import timedelta
 
@@ -171,6 +172,32 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
         return password2
 
 
+class LabTaskInlineForm(forms.ModelForm):
+    task_type = forms.CharField(
+        required=False,
+        widget=forms.Select(attrs={'class': 'task-type-dynamic-select'})
+    )
+
+    class Meta:
+        model = LabTask
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.task_type_id:
+            self.fields['task_type'].initial = str(self.instance.task_type_id)
+            self.fields['task_type'].widget.choices = [
+                (str(self.instance.task_type_id), self.instance.task_type.name)
+            ]
+        else:
+            self.fields['task_type'].widget.choices = [('', '---------')]
+
+    def clean_task_type(self):
+        data = self.cleaned_data.get('task_type')
+        if not data or data == '':
+            return None
+        return data
+
 class CompetitionForm(forms.ModelForm):
     class Meta:
         # Exclude fields that should be auto-handled or managed elsewhere
@@ -332,7 +359,7 @@ class CompetitionForm(forms.ModelForm):
                     Competition2User.objects.get(competition=instance, user_id=user_id).delete()
 
         with_pnet_session_if_needed(instance.lab, _delete_operation)
-
+        
 
 class KkzForm(forms.ModelForm):  # pragma: no cover
     class Meta:
@@ -766,7 +793,7 @@ class SimpleCompetitionForm(forms.Form):
         label="Задания",
         queryset=LabTask.objects.none(),
         required=False,
-        widget=forms.CheckboxSelectMultiple()
+        widget=forms.SelectMultiple(attrs={'class': 'select2', 'style': 'width: 100%'})
     )
     level = forms.ModelChoiceField(
         label="Вариант",
@@ -774,6 +801,11 @@ class SimpleCompetitionForm(forms.Form):
         required=False,
         empty_label=None,
         widget=forms.RadioSelect()
+    )
+    task_type_counts = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=False,
+        initial='{}'
     )
 
     def __init__(self, *args, **kwargs):
@@ -792,9 +824,22 @@ class SimpleCompetitionForm(forms.Form):
 
     def _setup_tasks_field(self):
         """Configure tasks field for the current lab"""
-        qs = LabTask.objects.filter(lab=self.lab)
-        self.fields["tasks"].queryset = qs
-        self.fields["tasks"].initial = list(qs.values_list("pk", flat=True))
+        tasks = LabTask.objects.filter(lab=self.lab).select_related('task_type').order_by('task_type__name', 'task_id')
+        self.fields["tasks"].queryset = tasks
+        
+        grouped_choices = []
+       
+        def get_type_name(t):
+            return t.task_type.name if t.task_type else "Без типа"
+
+        tasks_list = list(tasks)
+        tasks_list = sorted(tasks_list, key=get_type_name)
+
+        for type_name, group in groupby(tasks_list, key=get_type_name):
+            choices = [(str(t.id), f"{t.task_id if t.task_id else ''} {t.description[:50]}") for t in group]
+            grouped_choices.append((type_name, choices))
+
+        self.fields["tasks"].choices = grouped_choices
 
     def _setup_level_field(self):
         """Configure level field for the current lab"""
@@ -826,11 +871,50 @@ class SimpleCompetitionForm(forms.Form):
             help_text="Выберите отдельных пользователей для участия в соревновании"
         )
 
+    def clean_task_type_counts(self):
+        """Валидация JSON с количеством заданий по типам"""
+        data = self.cleaned_data.get('task_type_counts', '{}')
+        try:
+            return json.loads(data) if data else {}
+        except json.JSONDecodeError:
+            raise ValidationError("Некорректный формат данных типов заданий")
+
+    def select_tasks_by_type_counts(self, lab, task_type_counts):
+        """
+        Выбирает случайные задания согласно указанному количеству для каждого типа. 
+        """        
+        selected_tasks = []
+        
+        if isinstance(task_type_counts, list):
+            counts_dict = {item['type_id']: item['count'] for item in task_type_counts}
+        else:
+            counts_dict = task_type_counts
+        
+        for type_id, count in counts_dict.items():
+            if count <= 0:
+                continue
+                
+            if type_id is None:
+                available_tasks = list(LabTask.objects.filter(lab=lab, task_type__isnull=True))
+            else:
+                available_tasks = list(LabTask.objects.filter(lab=lab, task_type_id=type_id))
+            
+            selected = random.sample(available_tasks, min(count, len(available_tasks)))
+            selected_tasks.extend(selected)
+        
+        return selected_tasks
+
     def create_competition(self):
         if not self.lab:
             raise ValidationError("Лабораторная работа не указана")
 
-        selected_tasks = list(self.cleaned_data.get("tasks") or [])
+        task_type_counts = self.cleaned_data.get("task_type_counts", {})
+        
+        if task_type_counts:
+            selected_tasks = self.select_tasks_by_type_counts(self.lab, task_type_counts)
+        else:
+            selected_tasks = list(self.cleaned_data.get("tasks") or [])
+        
         base_data = self._build_base_competition_data(selected_tasks)
 
         if self.lab.lab_type == LabType.COMPETITION:

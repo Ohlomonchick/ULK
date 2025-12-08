@@ -168,6 +168,25 @@ class LabTaskManager(models.Manager):
         ).order_by('task_id_numeric', 'task_id')
 
 
+class LabTaskType(models.Model):
+    """Тип задания, привязанный к конкретной лабораторной работе"""
+    lab = models.ForeignKey(
+        Lab, 
+        on_delete=models.CASCADE, 
+        related_name='task_types',
+        verbose_name="Лабораторная работа"
+    )
+    name = models.CharField('Название типа', max_length=255)
+
+    class Meta:
+        verbose_name = 'Тип задания'
+        verbose_name_plural = 'Типы заданий'
+        unique_together = ['lab', 'name']
+
+    def __str__(self):
+        return self.name
+
+
 class LabTask(models.Model):
     lab = models.ForeignKey(Lab, related_name="options", on_delete=models.CASCADE, verbose_name="Лабораторная работа")
     task_id = models.CharField("Идентификатор задания", max_length=255, null=True)
@@ -184,6 +203,15 @@ class LabTask(models.Model):
     answer = models.TextField("Ответ", blank=True, null=True, help_text="Правильный ответ на вопрос или регулярное выражение для проверки ответа")
 
     objects = LabTaskManager()
+
+    task_type = models.ForeignKey(
+        'LabTaskType',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tasks',
+        verbose_name="Тип задания"
+    )
 
     class Meta:
         verbose_name = "Задание"
@@ -669,6 +697,28 @@ class TeamCompetition2Team(models.Model):
         logging.debug('on_through_delete call')
         instance.delete_from_platform(final=True)
 
+
+class CompetitionTaskTypeCount(models.Model):
+    """Количество заданий каждого типа для соревнования"""
+    competition = models.ForeignKey(
+        Competition,
+        on_delete=models.CASCADE,
+        related_name='task_type_counts'
+    )
+    task_type = models.ForeignKey(
+        LabTaskType,
+        on_delete=models. CASCADE,
+        verbose_name="Тип задания"
+    )
+    count = models.PositiveIntegerField("Количество заданий", default=0)
+
+    class Meta:
+        verbose_name = "Количество заданий по типу"
+        verbose_name_plural = "Количество заданий по типам"
+        unique_together = ['competition', 'task_type']
+
+    def __str__(self):
+        return f"{self.task_type.name}: {self.count}"
 
 
 class LabNode(models.Model):

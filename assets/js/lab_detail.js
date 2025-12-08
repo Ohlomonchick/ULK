@@ -83,7 +83,124 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Управление видео при отправке формы
     setupVideoForm();
+    
+    // Запускаем логику выбора заданий
+    // Небольшая задержка на случай, если DOM еще не полностью готов
+    setTimeout(function() {
+        setupTaskSelectionLogic();
+    }, 100);
 });
+
+// --- Логика для выбора заданий по группам ---
+function setupTaskSelectionLogic() {
+    const hiddenInput = document.getElementById('id_task_type_counts');
+    const totalBadge = document.getElementById('total-tasks-badge');
+    const groupBlocks = document.querySelectorAll('.task-group-block');
+
+    console.log('setupTaskSelectionLogic: Found', groupBlocks.length, 'task group blocks');
+
+    // Если на странице нет блоков с группами, выходим
+    if (!groupBlocks.length) {
+        console.log('setupTaskSelectionLogic: No task groups found, exiting');
+        return;
+    }
+
+    // Функция обновления глобального состояния (счетчик + скрытое поле)
+    function updateGlobalState() {
+        let total = 0;
+        let jsonData = {};
+        
+        // Переопределяем groupBlocks каждый раз, на случай если DOM изменился
+        const currentGroupBlocks = document.querySelectorAll('.task-group-block');
+
+        currentGroupBlocks.forEach(block => {
+            const groupId = block.getAttribute('data-group-id');
+            const input = block.querySelector('.task-count-input');
+            if (!input) {
+                console.warn('setupTaskSelectionLogic: Input not found in block');
+                return;
+            }
+            const count = parseInt(input.value) || 0;
+
+            total += count;
+            
+            // Формируем ключ для JSON (null если id="null", иначе int)
+            const key = (groupId === 'null') ? null : parseInt(groupId);
+            
+            // Добавляем в JSON всегда (как в оригинале)
+            jsonData[key] = count;
+        });
+
+        if (totalBadge) {
+            totalBadge.innerText = `Всего: ${total}`;
+            console.log('setupTaskSelectionLogic: Updated total badge to', total);
+        } else {
+            console.warn('setupTaskSelectionLogic: totalBadge not found');
+        }
+        
+        if (hiddenInput) {
+            hiddenInput.value = JSON.stringify(jsonData);
+            console.log('setupTaskSelectionLogic: Updated hidden input', jsonData);
+        } else {
+            console.warn('setupTaskSelectionLogic: hiddenInput not found');
+        }
+    }
+
+    // Навешиваем обработчики на каждую группу
+    groupBlocks.forEach((block, blockIndex) => {
+        const numberInput = block.querySelector('.task-count-input');
+        const checkboxes = Array.from(block.querySelectorAll('.task-checkbox'));
+        
+        if (!numberInput) {
+            console.warn('setupTaskSelectionLogic: numberInput not found in block', blockIndex);
+            return;
+        }
+        
+        console.log('setupTaskSelectionLogic: Block', blockIndex, 'has', checkboxes.length, 'checkboxes');
+        
+        // 1. ЛОГИКА: Чекбокс -> Инпут
+        checkboxes.forEach((cb, cbIndex) => {
+            cb.addEventListener('change', function() {
+                console.log('setupTaskSelectionLogic: Checkbox', cbIndex, 'changed, checked:', cb.checked);
+                const checkedCount = checkboxes.filter(c => c.checked).length;
+                numberInput.value = checkedCount;
+                console.log('setupTaskSelectionLogic: Updated input to', checkedCount);
+                updateGlobalState();
+            });
+        });
+
+        // 2. ЛОГИКА: Инпут -> Чекбоксы (Рандомизация)
+        numberInput.addEventListener('input', function() {
+            console.log('setupTaskSelectionLogic: Input changed to', numberInput.value);
+            let val = parseInt(numberInput.value);
+            const max = parseInt(numberInput.getAttribute('max'));
+
+            // Валидация
+            if (isNaN(val) || val < 0) val = 0;
+            if (val > max) val = max;
+            // Если валидация изменила число, обновляем поле визуально
+            if (val > max || val < 0) numberInput.value = val;
+
+            // Сброс всех галочек
+            checkboxes.forEach(cb => cb.checked = false);
+
+            // Случайный выбор N галочек
+            if (val > 0) {
+                // Копия массива и перемешивание
+                const shuffled = [...checkboxes].sort(() => 0.5 - Math.random());
+                // Ставим галочки первым N элементам
+                shuffled.slice(0, val).forEach(cb => cb.checked = true);
+                console.log('setupTaskSelectionLogic: Selected', val, 'random checkboxes');
+            }
+
+            updateGlobalState();
+        });
+    });
+
+    // Инициализация при загрузке (если браузер запомнил значения)
+    updateGlobalState();
+    console.log('setupTaskSelectionLogic: Initialization complete');
+}
 
 function setupVideoForm() {
     const submitButton = document.getElementById('create-lab-button');
