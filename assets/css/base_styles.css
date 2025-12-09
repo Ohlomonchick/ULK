@@ -142,25 +142,28 @@
 }
 
 .durationwidget .field.has-addons .control .button.is-static {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    font-size: 1rem;
 }
 
 .durationwidget .input {
-    height: 2.0rem;
-    font-size: 0.9rem;
+    height: 2.5rem;
+    font-size: 1.1rem;
 }
 
 .durationwidget input[type="number"] {
-    width: 4rem !important;
+    width: 5rem !important;
     text-align: center;
-    margin-right: 0.5rem;
+    margin-right: 0.75rem;
     vertical-align: middle;
+    font-size: 1.1rem !important;
+    font-weight: 500;
 }
 
 .durationwidget .duration-label {
     display: inline-block !important;
-    font-size: 0.875rem;
+    font-size: 1rem;
     font-weight: 600;
     margin-right: 1.5rem;
     vertical-align: middle;

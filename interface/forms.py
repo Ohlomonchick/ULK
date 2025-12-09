@@ -221,21 +221,21 @@ class CompetitionForm(forms.ModelForm):
         Если есть ошибки, добавляет их в форму.
         """
         from interface.flag_deployment import get_flag_deployment_queue, TaskStatus
-        
+
         queue = get_flag_deployment_queue()
         tasks = queue.get_tasks_by_competition(instance.slug)
-        
+
         if not tasks:
             return
-        
+
         task_ids = [task.task_id for task in tasks]
         results = queue.wait_for_tasks(task_ids, timeout=timeout)
-        
+
         failed_tasks = [
             task for task in results.values()
             if task.status == TaskStatus.FAILED
         ]
-        
+
         if failed_tasks:
             error_messages = [
                 f"Ошибка развертывания флагов для {task.instance_type} (ID: {task.instance_id}): {task.error}"
@@ -378,18 +378,18 @@ class KkzForm(forms.ModelForm):  # pragma: no cover
 
 def _create_kkz_competitions(kkz, labs_info, preview_assignments=None):
     """
-    Общая логика создания Competition и Competition2User для ККЗ. 
+    Общая логика создания Competition и Competition2User для ККЗ.
     """
     logger = logging.getLogger(__name__)
     users = list(kkz.get_users())
     created_competitions = {}
-    
+
     for lab_data in labs_info:
         lab = lab_data["lab"]
         lab_id = lab_data.get("lab_id", lab.id)
         tasks = lab_data.get("tasks", [])
         task_ids = lab_data.get("task_ids", [t.id for t in tasks])
-        
+
         kkz_lab, _ = KkzLab.objects.get_or_create(
             kkz=kkz,
             lab=lab,
@@ -397,9 +397,9 @@ def _create_kkz_competitions(kkz, labs_info, preview_assignments=None):
         )
         if task_ids:
             kkz_lab.tasks.set(LabTask.objects.filter(id__in=task_ids))
-        
+
         competition = Competition.objects.filter(lab=lab, kkz=kkz).first()
-        
+
         if competition:
             if competition.start != kkz.start or competition.finish != kkz.finish:
                 competition.start = kkz.start
@@ -418,53 +418,53 @@ def _create_kkz_competitions(kkz, labs_info, preview_assignments=None):
                 'tasks': task_ids,
                 'num_tasks': lab_data.get('num_to_assign', len(tasks))
             }
-            
+
             competition_instance = Competition(kkz=kkz)
             comp_form = CompetitionForm(data=competition_data, instance=competition_instance)
-            
+
             if comp_form.is_valid():
                 competition = None
-                
+
                 def _save_competition():
                     nonlocal competition
                     competition = comp_form.save()
-                
+
                 with_pnet_session_if_needed(lab, _save_competition)
-                
+
                 if competition is None:
                     raise ValidationError(f"Не удалось создать соревнование для {lab.name}")
-                
+
                 logger.info(f"Created competition for lab {lab.name} in KKZ {kkz.name}")
             else:
                 raise ValidationError(f"Ошибка создания соревнования для {lab.name}: {comp_form.errors}")
-        
+
         competition.tasks.set(tasks)
         created_competitions[lab_id] = competition
-    
+
     _assign_tasks_to_users(kkz, labs_info, created_competitions, users, preview_assignments)
-    
+
     return created_competitions
 
 
 def _assign_tasks_to_users(kkz, labs_info, competitions, users, preview_assignments=None):
     """
-    Назначает задания пользователям для ККЗ. 
+    Назначает задания пользователям для ККЗ.
     """
     logger = logging.getLogger(__name__)
-    
+
     max_tasks_limit = None
     if labs_info and len(labs_info) > 0:
         max_tasks_limit = labs_info[0].get("max_tasks_limit")
-    
+
     all_available_tasks = []
     for lab_info in labs_info:
         all_available_tasks.extend(lab_info.get('tasks', []))
-    
+
     if max_tasks_limit and max_tasks_limit > 0:
         total_tasks_to_assign = min(max_tasks_limit, len(all_available_tasks))
     else:
         total_tasks_to_assign = len(all_available_tasks)
-    
+
     assignments_by_user = {}
     if preview_assignments:
         logger.info(f"Using preview_assignments for KKZ {kkz.name}: {len(users)} users, {len(labs_info)} labs")
@@ -473,7 +473,7 @@ def _assign_tasks_to_users(kkz, labs_info, competitions, users, preview_assignme
             unified_picks = random.sample(all_available_tasks, total_tasks_to_assign)
         else:
             unified_picks = list(all_available_tasks)
-        
+
         logger.info(f"Assigning unified tasks for KKZ {kkz.name}: {len(unified_picks)} tasks to {len(users)} users")
         for user in users:
             assignments_by_user[str(user.id)] = unified_picks
@@ -485,22 +485,22 @@ def _assign_tasks_to_users(kkz, labs_info, competitions, users, preview_assignme
             else:
                 picks = list(all_available_tasks)
             assignments_by_user[str(user.id)] = picks
-                        
-    
+
+
     for lab_info in labs_info:
         lab = lab_info['lab']
         lab_id = lab_info.get('lab_id', lab.id)
         competition = competitions.get(lab_id)
-        
+
         if not competition:
             continue
-        
+
         def _create_previews(li=lab_info, comp=competition):
             _create_previews_for_lab(kkz, li, comp, users, preview_assignments, assignments_by_user)
-        
+
         with_pnet_session_if_needed(lab, _create_previews)
-        
-        
+
+
 def _create_previews_for_lab(kkz, lab_entry, competition, users, preview_assignments, assignments_by_user):
     """
     Создает KkzPreview и назначает задания в Competition2User для одной лабы.
@@ -508,10 +508,10 @@ def _create_previews_for_lab(kkz, lab_entry, competition, users, preview_assignm
     logger = logging.getLogger(__name__)
     lab = lab_entry["lab"]
     lab_id = lab_entry.get("lab_id", lab.id)
-    
+
     for user in users:
         user_id_str = str(user.id)
-        
+
         if preview_assignments:
             tasks_for_user = []
             preview_for_lab = preview_assignments.get(str(lab_id), preview_assignments.get(lab_id, {}))
@@ -521,7 +521,7 @@ def _create_previews_for_lab(kkz, lab_entry, competition, users, preview_assignm
         else:
             user_tasks = assignments_by_user.get(user_id_str, [])
             tasks_for_user = [t for t in user_tasks if t.lab_id == lab_id]
-        
+
         if tasks_for_user:
             preview, _ = KkzPreview.objects.get_or_create(
                 kkz=kkz,
@@ -529,13 +529,13 @@ def _create_previews_for_lab(kkz, lab_entry, competition, users, preview_assignm
                 user=user
             )
             preview.tasks.set(tasks_for_user)
-            
+
             try:
                 comp2user = Competition2User.objects.get(competition=competition, user=user)
                 comp2user.tasks.set(tasks_for_user)
             except Competition2User.DoesNotExist:
                 logger.warning(f"Competition2User not found for user {user.id} in competition {competition.id}")
-                
+
 
 
 class CustomFilteredSelectMultiple(FilteredSelectMultiple):
@@ -619,6 +619,11 @@ class LabForm(forms.ModelForm):
         self.fields['learning_years'].initial = [str(v) for v in current]
         self.fields['learning_years'].help_text = 'Можно выбрать несколько значений.'
         self.fields['pnet_slug'].help_text = 'При создании сгенерируется автоматически.'
+        if 'lab_elements_color' in self.fields:
+            self.fields['lab_elements_color'].widget = forms.TextInput(attrs={'type': 'color'})
+            if self.instance and self.instance.lab_elements_color:
+                self.fields['lab_elements_color'].initial = self.instance.lab_elements_color
+            self.fields['lab_elements_color'].help_text = 'Цвет подложки и инпутов формы.'
 
     def clean_learning_years(self):
         values = self.cleaned_data.get('learning_years') or []
@@ -759,7 +764,7 @@ class SimpleCompetitionForm(forms.Form):
             show_hours=True,
             show_minutes=True,
             show_seconds=False,
-            attrs={'class': 'input is-small', 'style': 'width: 6rem;'}
+            attrs={'class': 'input', 'style': 'width: 6rem;'}
         )
     )
     tasks = forms.ModelMultipleChoiceField(

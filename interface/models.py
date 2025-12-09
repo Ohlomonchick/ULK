@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
+from colorfield.fields import ColorField
 from django.db import models
 from django.db.models import Q, IntegerField, QuerySet
 from django.db.models.signals import post_save, post_delete, m2m_changed
@@ -89,6 +90,17 @@ class Lab(models.Model):
 
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
+    background_image = models.ImageField(
+        'Фоновое изображение',
+        upload_to='interface/labs/backgrounds/',
+        blank=True,
+        null=True,
+    )
+    lab_elements_color = ColorField(
+        'Цвет элементов формы',
+        default="#ffffff",
+        help_text="Цвет подложки и инпутов формы (по умолчанию белый).",
+    )
 
     NodesData = models.JSONField('Ноды', default=default_json, validators=[validate_top_level_array])
     ConnectorsData = models.JSONField('Коннекторы', default=default_json, validators=[validate_top_level_array])
@@ -146,23 +158,23 @@ class LabLevel(models.Model):
 class LabTaskManager(models.Manager):
     def get_queryset(self):
         db_type = get_database_type()
-        
+
         if db_type == 'postgresql':
             sql_expr = """
-                CASE 
-                    WHEN task_id ~ '^[0-9]+$' THEN task_id::integer 
-                    ELSE NULL 
+                CASE
+                    WHEN task_id ~ '^[0-9]+$' THEN task_id::integer
+                    ELSE NULL
                 END
             """
-        else: 
+        else:
             sql_expr = """
-                CASE 
-                    WHEN task_id GLOB '[0-9]*' AND CAST(task_id AS INTEGER) = task_id 
+                CASE
+                    WHEN task_id GLOB '[0-9]*' AND CAST(task_id AS INTEGER) = task_id
                     THEN CAST(task_id AS INTEGER)
-                    ELSE NULL 
+                    ELSE NULL
                 END
             """
-        
+
         return super().get_queryset().extra(
             select={'task_id_numeric': sql_expr}
         ).order_by('task_id_numeric', 'task_id')
@@ -503,31 +515,31 @@ class Competition2User(models.Model):
         def _create_operation(session_manager):
             lab_name = get_pnet_lab_name(instance.competition)
             username = instance.user.username
-            
+
             # Получаем USB device IDs из deploy_meta
             usb_device_ids = instance.deploy_meta.get('usb_device_ids', []) if instance.deploy_meta else []
-            
+
             session_manager.create_lab_for_user(lab_name, username)
             session_manager.create_lab_nodes_and_connectors(lab, lab_name, username, usb_device_ids=usb_device_ids)
 
         execute_pnet_operation_if_needed(lab, _create_operation)
-    
+
     @classmethod
     def tasks_changed(cls, sender, instance, action, pk_set, **kwargs):
         """Обработчик сигнала m2m_changed для отслеживания назначения задач"""
         if action != 'post_add' or not pk_set:
             return
-        
+
         tasks = instance.tasks.all()
         if not tasks.exists():
             return
-        
+
         user = instance.user
         if not user.pnet_login or not user.pnet_password:
             return
-        
+
         generate_and_save_flags(instance, tasks)
-        
+
         task = create_flag_deployment_task(
             instance=instance,
             user=user,
@@ -535,7 +547,7 @@ class Competition2User(models.Model):
             competition_slug=instance.competition.slug,
             instance_type='Competition2User'
         )
-        
+
         if task:
             get_flag_deployment_queue().submit_task(task)
 
@@ -603,10 +615,10 @@ class TeamCompetition2Team(models.Model):
         def _create_operation(session_manager):
             lab_name = get_pnet_lab_name(instance.competition)
             team_slug = instance.team.slug
-            
+
             # Получаем USB device IDs из deploy_meta
             usb_device_ids = instance.deploy_meta.get('usb_device_ids', []) if instance.deploy_meta else []
-            
+
             session_manager.create_lab_for_user(lab_name, team_slug)
             session_manager.create_lab_nodes_and_connectors(lab, lab_name, team_slug, usb_device_ids=usb_device_ids)
 
@@ -619,23 +631,23 @@ class TeamCompetition2Team(models.Model):
                 )
 
         execute_pnet_operation_if_needed(lab, _create_operation)
-    
+
     @classmethod
     def tasks_changed(cls, sender, instance, action, pk_set, **kwargs):
         """Обработчик сигнала m2m_changed для отслеживания назначения задач"""
         if action != 'post_add' or not pk_set:
             return
-        
+
         tasks = instance.tasks.all()
         if not tasks.exists():
             return
-        
+
         user = instance.team.users.first()
         if not user or not user.pnet_login or not user.pnet_password:
             return
-        
+
         generate_and_save_flags(instance, tasks)
-        
+
         task = create_flag_deployment_task(
             instance=instance,
             user=user,
@@ -643,7 +655,7 @@ class TeamCompetition2Team(models.Model):
             competition_slug=instance.competition.slug,
             instance_type='TeamCompetition2Team'
         )
-        
+
         if task:
             get_flag_deployment_queue().submit_task(task)
 
