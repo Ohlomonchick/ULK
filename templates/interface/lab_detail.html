@@ -255,11 +255,20 @@
             {% for group in task_groups %}
                 <div class="box has-background-white task-group-block"
                      style="padding: 1rem; margin-bottom: 1rem; border: 1px solid #dbdbdb;"
-                     data-group-id="{{ group.id }}">
+                     data-group-id="{{ group.id }}"
+                     data-duration="{{ group.duration_seconds }}">
 
                     <div class="level is-mobile mb-2">
-                        <div class="level-left" style="max-width: 65%;">
-                            <strong>{{ group.name }}</strong>
+                        <div class="level-left" style="max-width: 60%;">
+                            <div>
+                                <strong>{{ group.name }}</strong>
+                                {% if group.duration_seconds > 0 %}
+                                    <br>
+                                    <span class="tag is-light is-warning is-small" style="font-size: 0.7rem;">
+                                        <i class="far fa-clock mr-1"></i> {{ group.duration_display }}
+                                    </span>
+                                {% endif %}
+                            </div>
                         </div>
                         <div class="level-right">
                             <div class="field has-addons mb-0">

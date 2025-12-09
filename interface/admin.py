@@ -56,17 +56,27 @@ class LabTaskTypeInline(admin.TabularInline):
     """Inline для создания типов заданий в карточке лабы"""
     model = LabTaskType
     extra = 1
-    fields = ['name']
+    fields = ['name', 'default_duration']
     verbose_name = "Тип задания"
     verbose_name_plural = "Типы заданий"
 
+    formfield_overrides = {
+        DurationField: {
+            'widget': TimeDurationWidget(
+                show_days=False, 
+                show_hours=False, 
+                show_minutes=True, 
+                show_seconds=True,
+                attrs={'style': 'width:5em;'}
+            ),
+        }
+    }
 
 class LabTaskInline(TabularInlineWithDescription):
     model = LabTask
     form = LabTaskInlineForm
     extra = 1
-    exclude = ['task_type']
-    fields = ['task_id', 'task_type', 'description']  # task_type - это поле из формы, не из модели
+    fields = ['task_id', 'task_type', 'description']  
 
     formfield_overrides = {
         JSONField: {

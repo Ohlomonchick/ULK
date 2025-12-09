@@ -87,12 +87,15 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         for tt in task_types:
             tasks = LabTask.objects.filter(lab=self.object, task_type=tt)
             if tasks.exists():
+                duration_seconds = tt.default_duration.total_seconds() if tt.default_duration else 0
                 task_groups.append({
                     'id': tt.id,
                     'name': tt.name,
                     'count': tasks.count(),
                     'tasks': tasks,
-                    'is_type': True
+                    'is_type': True,
+                    'duration_seconds': duration_seconds, 
+                    'duration_display': str(tt.default_duration)[2:]
                 })
                 has_typed_tasks = True
 
@@ -103,7 +106,9 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
                 'name': 'Общие задания (без типа)',
                 'count': no_type.count(),
                 'tasks': no_type,
-                'is_type': False
+                'is_type': False,
+                'duration_seconds': 0, 
+                'duration_display': '-'
             })
 
         context['task_groups'] = task_groups

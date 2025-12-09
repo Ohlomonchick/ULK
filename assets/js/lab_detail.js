@@ -11,7 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
             'Minutes': 'минут',
             'Day': 'день',
             'Hour': 'час',
-            'Minute': 'минута'
+            'Minute': 'минута',
+            'Seconds': 'секунд',
+            'Second': 'секунда'
         };
         
         // Заменяем текст в span.help элементах
@@ -31,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Заменяем summary текст (например "1 Hour 30 Minutes")
         const summaryP = durationWidget.querySelector('p.help');
-        if (summaryP && summaryP.textContent.match(/(Hour|Minute|Day)/)) {
+        if (summaryP && summaryP.textContent.match(/(Hour|Minute|Second|Day)/)) {
             summaryP.classList.add('duration-summary');
             summaryP.innerHTML = '<i class="fas fa-clock"></i> ' + formatDurationSummary();
         }
@@ -50,22 +52,39 @@ document.addEventListener('DOMContentLoaded', function() {
         const days = parseInt(inputs[0]?.value || 0);
         const hours = parseInt(inputs[1]?.value || 0);
         const minutes = parseInt(inputs[2]?.value || 0);
-        
+        const seconds = parseInt(inputs[3]?.value || 0);
         let parts = [];
         
+        function getPluralForm(num, forms) {
+            const mod10 = num % 10;
+            const mod100 = num % 100;
+            if (mod10 === 1 && mod100 !== 11) {
+                return forms[0]; 
+            } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+                return forms[1]; 
+            } else {
+                return forms[2];
+            }
+        }
+        
         if (days > 0) {
-            const dayWord = days === 1 ? 'день' : (days < 5 ? 'дня' : 'дней');
+            const dayWord = getPluralForm(days, ['день', 'дня', 'дней']);
             parts.push(`${days} ${dayWord}`);
         }
         
         if (hours > 0) {
-            const hourWord = hours === 1 ? 'час' : (hours < 5 ? 'часа' : 'часов');
+            const hourWord = getPluralForm(hours, ['час', 'часа', 'часов']);
             parts.push(`${hours} ${hourWord}`);
         }
         
         if (minutes > 0) {
-            const minWord = minutes === 1 ? 'минута' : (minutes < 5 ? 'минуты' : 'минут');
+            const minWord = getPluralForm(minutes, ['минута', 'минуты', 'минут']);
             parts.push(`${minutes} ${minWord}`);
+        }
+        
+        if (seconds > 0) {
+            const secWord = getPluralForm(seconds, ['секунда', 'секунды', 'секунд']);
+            parts.push(`${seconds} ${secWord}`);
         }
         
         return parts.length > 0 ? parts.join(' ') : 'Время не указано';
@@ -97,110 +116,121 @@ function setupTaskSelectionLogic() {
     const totalBadge = document.getElementById('total-tasks-badge');
     const groupBlocks = document.querySelectorAll('.task-group-block');
 
-    console.log('setupTaskSelectionLogic: Found', groupBlocks.length, 'task group blocks');
+    if (!groupBlocks.length) return;
 
-    // Если на странице нет блоков с группами, выходим
-    if (!groupBlocks.length) {
-        console.log('setupTaskSelectionLogic: No task groups found, exiting');
-        return;
-    }
-
-    // Функция обновления глобального состояния (счетчик + скрытое поле)
+    // --- Функция обновления состояния ---
     function updateGlobalState() {
-        let total = 0;
+        let totalCount = 0;
+        let totalSeconds = 0;
         let jsonData = {};
         
-        // Переопределяем groupBlocks каждый раз, на случай если DOM изменился
+        // 1. Считаем
         const currentGroupBlocks = document.querySelectorAll('.task-group-block');
-
         currentGroupBlocks.forEach(block => {
             const groupId = block.getAttribute('data-group-id');
+            const durationPerTask = parseFloat(block.getAttribute('data-duration')) || 0;
+            
             const input = block.querySelector('.task-count-input');
-            if (!input) {
-                console.warn('setupTaskSelectionLogic: Input not found in block');
-                return;
-            }
-            const count = parseInt(input.value) || 0;
+            const count = parseInt(input?.value) || 0;
 
-            total += count;
+            totalCount += count;
+            totalSeconds += (count * durationPerTask);
             
-            // Формируем ключ для JSON (null если id="null", иначе int)
             const key = (groupId === 'null') ? null : parseInt(groupId);
-            
-            // Добавляем в JSON всегда (как в оригинале)
             jsonData[key] = count;
         });
 
-        if (totalBadge) {
-            totalBadge.innerText = `Всего: ${total}`;
-            console.log('setupTaskSelectionLogic: Updated total badge to', total);
-        } else {
-            console.warn('setupTaskSelectionLogic: totalBadge not found');
-        }
-        
-        if (hiddenInput) {
-            hiddenInput.value = JSON.stringify(jsonData);
-            console.log('setupTaskSelectionLogic: Updated hidden input', jsonData);
-        } else {
-            console.warn('setupTaskSelectionLogic: hiddenInput not found');
-        }
+        // 2. Обновляем UI
+        if (totalBadge) totalBadge.innerText = `Всего: ${totalCount}`;
+        if (hiddenInput) hiddenInput.value = JSON.stringify(jsonData);
+
+        // 3. Обновляем виджет времени
+        updateDurationWidget(totalSeconds);
     }
 
-    // Навешиваем обработчики на каждую группу
-    groupBlocks.forEach((block, blockIndex) => {
+    // --- Обновление виджета времени ---
+    function updateDurationWidget(totalSeconds) {
+        const durationWidget = document.querySelector('.durationwidget');
+        if (!durationWidget) return;
+
+        const inputs = durationWidget.querySelectorAll('input[type="number"]');
+        if (inputs.length < 3) return;
+        
+        const daysInput = inputs[0];
+        const hoursInput = inputs[1];
+        const minutesInput = inputs[2];
+        const secondsInput = inputs.length > 3 ? inputs[3] : null;
+
+        if (totalSeconds > 0) {
+            const days = Math.floor(totalSeconds / (3600 * 24));
+            let remainder = totalSeconds % (3600 * 24);
+            
+            const hours = Math.floor(remainder / 3600);
+            remainder = remainder % 3600;
+            
+            const minutes = Math.floor(remainder / 60);
+            const seconds = Math.round(remainder % 60);
+
+            daysInput.value = days;
+            hoursInput.value = hours;
+            minutesInput.value = minutes;
+            
+            if (secondsInput) {
+                secondsInput.value = seconds;
+            } else if (seconds > 0) {
+                minutesInput.value = minutes + 1;
+            }
+        } else {
+            daysInput.value = 0;
+            hoursInput.value = 0;
+            minutesInput.value = 0;
+            if (secondsInput) {
+                secondsInput.value = 0;
+            }
+        }
+        
+        // Триггерим событие, чтобы обновился текстовый summary
+        daysInput.dispatchEvent(new Event('input'));
+    }
+
+    // --- Обработчики событий ---
+    groupBlocks.forEach(block => {
         const numberInput = block.querySelector('.task-count-input');
         const checkboxes = Array.from(block.querySelectorAll('.task-checkbox'));
         
-        if (!numberInput) {
-            console.warn('setupTaskSelectionLogic: numberInput not found in block', blockIndex);
-            return;
-        }
+        if (!numberInput) return;
         
-        console.log('setupTaskSelectionLogic: Block', blockIndex, 'has', checkboxes.length, 'checkboxes');
-        
-        // 1. ЛОГИКА: Чекбокс -> Инпут
-        checkboxes.forEach((cb, cbIndex) => {
+        checkboxes.forEach(cb => {
             cb.addEventListener('change', function() {
-                console.log('setupTaskSelectionLogic: Checkbox', cbIndex, 'changed, checked:', cb.checked);
                 const checkedCount = checkboxes.filter(c => c.checked).length;
                 numberInput.value = checkedCount;
-                console.log('setupTaskSelectionLogic: Updated input to', checkedCount);
                 updateGlobalState();
             });
         });
 
-        // 2. ЛОГИКА: Инпут -> Чекбоксы (Рандомизация)
         numberInput.addEventListener('input', function() {
-            console.log('setupTaskSelectionLogic: Input changed to', numberInput.value);
             let val = parseInt(numberInput.value);
             const max = parseInt(numberInput.getAttribute('max'));
 
-            // Валидация
             if (isNaN(val) || val < 0) val = 0;
             if (val > max) val = max;
-            // Если валидация изменила число, обновляем поле визуально
-            if (val > max || val < 0) numberInput.value = val;
+            if (val > max || val < 0) numberInput.value = val; 
 
-            // Сброс всех галочек
+            // Сброс и случайный выбор
             checkboxes.forEach(cb => cb.checked = false);
-
-            // Случайный выбор N галочек
             if (val > 0) {
-                // Копия массива и перемешивание
                 const shuffled = [...checkboxes].sort(() => 0.5 - Math.random());
-                // Ставим галочки первым N элементам
                 shuffled.slice(0, val).forEach(cb => cb.checked = true);
-                console.log('setupTaskSelectionLogic: Selected', val, 'random checkboxes');
             }
 
             updateGlobalState();
         });
     });
 
-    // Инициализация при загрузке (если браузер запомнил значения)
+    // Инициализация
     updateGlobalState();
-    console.log('setupTaskSelectionLogic: Initialization complete');
 }
+
 
 function setupVideoForm() {
     const submitButton = document.getElementById('create-lab-button');

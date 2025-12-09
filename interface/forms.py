@@ -198,6 +198,13 @@ class LabTaskInlineForm(forms.ModelForm):
             return None
         return data
 
+    def _post_clean(self):
+        task_type_value = self.cleaned_data.pop('task_type', None)
+        super()._post_clean()
+        
+        if task_type_value is not None:
+            self.cleaned_data['task_type'] = task_type_value
+
 class CompetitionForm(forms.ModelForm):
     class Meta:
         # Exclude fields that should be auto-handled or managed elsewhere
@@ -790,8 +797,8 @@ class SimpleCompetitionForm(forms.Form):
             show_days=True,
             show_hours=True,
             show_minutes=True,
-            show_seconds=False,
-            attrs={'class': 'input', 'style': 'width: 6rem;'}
+            show_seconds=True,
+            attrs={'class': 'input', 'style': 'width: 4rem;'}
         )
     )
     tasks = forms.ModelMultipleChoiceField(
