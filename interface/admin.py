@@ -40,7 +40,7 @@ class TabularInlineWithDescription(admin.TabularInline):
     """
     description = None
     template = 'admin/edit_inline/tabular_with_description.html'
-    
+
     def get_description(self):
         """Возвращает описание для отображения"""
         return self.description
@@ -117,11 +117,11 @@ class LabTaskInline(TabularInlineWithDescription):
         parent_lab = None
         if hasattr(self, 'parent_instance'):
             parent_lab = self.parent_instance
-        
+
         if parent_lab:
             tasks_type = parent_lab.tasks_type
             return get_lab_task_description(tasks_type)
-        
+
         # По умолчанию возвращаем описание для CLASSIC
         return get_lab_task_description('CLASSIC')
 
@@ -165,7 +165,24 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     get_learning_years.short_description = 'Годы обучения'
 
     def get_fieldsets(self, request, obj=None):
-        base_fields = ('name', 'slug', 'pnet_slug', 'description', 'platform', 'program', 'lab_type', 'learning_years', 'default_duration', 'tasks_type', 'cover', 'answer_flag', 'need_kibana', 'task_checking')
+        base_fields = (
+            'name',
+            'slug',
+            'pnet_slug',
+            'description',
+            'platform',
+            'program',
+            'lab_type',
+            'learning_years',
+            'default_duration',
+            'tasks_type',
+            'cover',
+            'background_image',
+            'lab_elements_color',
+            'answer_flag',
+            'need_kibana',
+            'task_checking',
+        )
         pnet_fields = ('NodesData', 'ConnectorsData', 'Connectors2CloudData', 'NetworksData')
         ssh_fields = ('PnetSSHNodeName',)
 
@@ -371,29 +388,29 @@ class KkzAdmin(admin.ModelAdmin):
         Использует общую логику из _create_kkz_competitions.
         """
         super().save_related(request, form, formsets, change)
-        
+
         from .forms import _create_kkz_competitions
-        
+
         obj = form.instance
-        
+
         kkz_lab_formset = next((fs for fs in formsets if fs.model == KkzLab), None)
         if not kkz_lab_formset:
             return
-        
+
         labs_info = []
         preview_assignments = {}
-        
+
         for kkz_lab_index, kkz_lab_form in enumerate(kkz_lab_formset.forms):
             if kkz_lab_form.cleaned_data.get('DELETE', False):
                 continue
-            
+
             if not kkz_lab_form.cleaned_data.get('lab'):
                 continue
-            
+
             lab = kkz_lab_form.cleaned_data['lab']
             tasks = list(kkz_lab_form.cleaned_data.get('tasks', [])) or list(LabTask.objects.filter(lab=lab))
             num_tasks = kkz_lab_form.cleaned_data.get('num_tasks') or len(tasks)
-            
+
             labs_info.append({
                 'lab': lab,
                 'lab_id': lab.id,
@@ -401,7 +418,7 @@ class KkzAdmin(admin.ModelAdmin):
                 'task_ids': [t.id for t in tasks],
                 'num_to_assign': num_tasks
             })
-            
+
             # Получаем assignments из inline-формы
             assignments_str = kkz_lab_form.cleaned_data.get('assignments', '{}')
             try:
@@ -410,7 +427,7 @@ class KkzAdmin(admin.ModelAdmin):
                     preview_assignments[lab.id] = assignments_from_form
             except json.JSONDecodeError:
                 pass
-        
+
         if labs_info:
             _create_kkz_competitions(obj, labs_info, preview_assignments if preview_assignments else None)
 

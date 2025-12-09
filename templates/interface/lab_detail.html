@@ -2,6 +2,9 @@
 {% load static %}
 {% load utm_filters %}
 
+{% block hero_class %}lab-hero{% endblock %}
+{% block container_class %}is-fluid px-5{% endblock %}
+
 {% block extra_css %}
     {% if object.lab_type == "COMPETITION" %}
         {{ simple_form.media.css }}
@@ -10,40 +13,150 @@
                 width: 100% !important;
             }
             .select2-selection--multiple {
-                min-height: 38px;
+                min-height: 48px;
                 border: 1px solid #dbdbdb;
                 border-radius: 4px;
+                font-size: 1.1rem;
             }
             .select2-container--default .select2-selection--multiple .select2-selection__choice {
                 background-color: #3273dc;
                 border: 1px solid #3273dc;
                 color: white;
-                padding: 0 8px;
-                border-radius: 3px;
+                padding: 0.4rem 0.75rem;
+                border-radius: 4px;
+                font-size: 1rem;
+                font-weight: 500;
+                margin: 0.25rem;
             }
-            details > summary { list-style: none; outline: none; }
-            details > summary::-webkit-details-marker { display: none; }
+            .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+                color: white;
+                font-size: 1.1rem;
+                margin-right: 0.5rem;
+            }
+            .select2-container--default .select2-search--inline .select2-search__field {
+                font-size: 1.1rem;
+                padding: 0.5rem;
+            }
         </style>
     {% endif %}
+    <style>
+        :root {
+            --lab-elements-color: {{ object.lab_elements_color|default:"#ffffff" }};
+            --lab-elements-text: #0a0a0a;
+        }
+
+        .hero-body.lab-hero {
+            position: relative;
+            background-color: {% if object.background_image %}#0f1a2a{% else %}#ffffff{% endif %};
+            {% if object.background_image %}
+            background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.28)), url('{{ object.background_image.url }}');
+            {% else %}
+            background-image: none;
+            {% endif %}
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100%;
+        }
+
+        .hero-body.lab-hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            {% if object.background_image %}
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0,0,0,0.24));
+            {% else %}
+            background: none;
+            {% endif %}
+        }
+
+        .hero-body.lab-hero {
+            z-index: 0;
+        }
+
+        .lab-detail-hero__overlay {
+            backdrop-filter: blur(1.5px);
+            position: relative;
+            z-index: 1;
+        }
+
+        .lab-detail-heading {
+            color: {% if object.background_image %}#f5f7fb{% else %}#0a0a0a{% endif %};
+            {% if object.background_image %}
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+            {% else %}
+            text-shadow: none;
+            {% endif %}
+        }
+
+        .lab-theme-surface {
+            background-color: var(--lab-elements-color);
+            color: var(--lab-elements-text);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        .lab-theme-surface .label,
+        .lab-theme-surface .title,
+        .lab-theme-surface .help,
+        .lab-theme-surface p,
+        .lab-theme-surface strong {
+            color: var(--lab-elements-text);
+        }
+
+        .lab-theme-surface .input,
+        .lab-theme-surface .select select,
+        .lab-theme-surface .textarea {
+            background-color: #ffffff;
+            color: #0a0a0a;
+            border-color: rgba(0, 0, 0, 0.15);
+        }
+
+        .lab-theme-text {
+            color: var(--lab-elements-text);
+        }
+
+        /* Улучшенные стили для элементов формы */
+        .task-item:hover,
+        .level-item:hover {
+            background-color: #f5f5f5;
+        }
+
+
+        /* Улучшенные стили для виджета времени */
+        .durationwidget input[type="number"],
+        .durationwidget input[type="text"] {
+            font-size: 1.1rem !important;
+            height: 2.5rem !important;
+            padding: 0.5rem !important;
+        }
+
+        .durationwidget .duration-label {
+            font-size: 1rem !important;
+            font-weight: 600 !important;
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
+<div class="lab-detail-hero__overlay">
     <div class="columns is-centered">
         <div class="column">
-            <h1 class="title is-2">{{ object.name }} <span class="tag {{ object.lab_type|lab_type_class }}" style="font-size: 1.35rem;">{{ object.get_lab_type_display }}</span></h1>
+            <h1 class="title is-2 lab-detail-heading">{{ object.name }} <span class="tag {{ object.lab_type|lab_type_class }}" style="font-size: 1.35rem;">{{ object.get_lab_type_display }}</span></h1>
         </div>
         {% if object.lab_type == 'EXAM' %}
             <div class="field mt-3" style="margin-left: 0.25rem;">
                 <div class="control">
                     <a href="{% url 'interface:kkz-create-from-lab' lab_type=object.lab_type slug=object.slug %}"
-                       class="button is-success">
-                        <span class="icon">
+                       class="button is-success is-medium is-size-5 has-text-weight-semibold">
+                        <span class="icon is-medium">
                             <i class="fas fa-clipboard-list"></i>
                         </span>
                         <span>Выдать в составе ККЗ</span>
                     </a>
                 </div>
-                <p class="help">Создать контрольно-квалификационное задание, включающее эту лабораторную работу</p>
+                <p class="help is-size-6 has-text-weight-medium mt-2">Создать контрольно-квалификационное задание, включающее эту лабораторную работу</p>
             </div>
         {% endif %}
     </div>
@@ -53,212 +166,245 @@
 
     <div class="columns is-centered">
         <div class="column is-two-thirds">
-            <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
-                <h3 class="title is-4">Выдать работу как {{ object.get_lab_type_display }}</h3>
-                <div class="field">
-                    <label class="label" for="{{ simple_form.duration.id_for_label }}">{{ simple_form.duration.label }}</label>
-                    <div class="durationwidget">
-                        {{ simple_form.duration }}
-                    </div>
-                    {% if simple_form.duration.errors %}
-                        <p class="help is-danger">{{ simple_form.duration.errors.0 }}</p>
-                    {% endif %}
-                    <p class="help mb-2">Внимание! Отчёт времени начнётся с момента создания работы.</p>
+        <div class="box lab-theme-surface lab-form-box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+            <h3 class="title is-3 has-text-weight-bold mb-5">Выдать работу как {{ object.get_lab_type_display }}</h3>
+            <div class="field">
+                <label class="label is-size-5 has-text-weight-semibold mb-3" for="{{ simple_form.duration.id_for_label }}">{{ simple_form.duration.label }}</label>
+                <div class="durationwidget">
+                    {{ simple_form.duration }}
                 </div>
-                <div class="field">
-                    {% if platoons %}
-                        {% if platoons.count > 1 %}
-                            <p class="content">Работа будет выдана взводам: <b>{{ platoons.all|join:", " }}</b></p>
-                        {% else %}
-                            <p class="content">Работа будет выдана взводу: {{ platoons.all|join:", " }}</p>
-                        {% endif %}
-                    {% endif %}
-                </div>
-                
-                {# Competition-specific fields #}
-                {% if object.lab_type == "COMPETITION" %}
-                    {% if simple_form.teams %}
-                        <div class="field">
-                            <label class="label" for="{{ simple_form.teams.id_for_label }}">{{ simple_form.teams.label }}</label>
-                            <div class="control">
-                                {{ simple_form.teams }}
-                            </div>
-                            {% if simple_form.teams.help_text %}
-                                <p class="help">{{ simple_form.teams.help_text }}</p>
-                            {% endif %}
-                            {% if simple_form.teams.errors %}
-                                <p class="help is-danger">{{ simple_form.teams.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-
-                    {% if simple_form.users %}
-                        <div class="field">
-                            <label class="label" for="{{ simple_form.users.id_for_label }}">{{ simple_form.users.label }}</label>
-                            <div class="control">
-                                {{ simple_form.users }}
-                            </div>
-                            {% if simple_form.users.help_text %}
-                                <p class="help">{{ simple_form.users.help_text }}</p>
-                            {% endif %}
-                            {% if simple_form.users.errors %}
-                                <p class="help is-danger">{{ simple_form.users.errors.0 }}</p>
-                            {% endif %}
-                        </div>
+                {% if simple_form.duration.errors %}
+                    <p class="help is-danger is-size-6 mt-2">{{ simple_form.duration.errors.0 }}</p>
+                {% endif %}
+                <p class="help is-size-6 has-text-weight-medium mb-2 mt-2">⚠️ Внимание! Отчёт времени начнётся с момента создания работы.</p>
+            </div>
+            <div class="field">
+                {% if platoons %}
+                    {% if platoons.count > 1 %}
+                        <p class="content is-size-5">Работа будет выдана взводам: <strong class="has-text-weight-bold">{{ platoons.all|join:", " }}</strong></p>
+                    {% else %}
+                        <p class="content is-size-5">Работа будет выдана взводу: <strong class="has-text-weight-bold">{{ platoons.all|join:", " }}</strong></p>
                     {% endif %}
                 {% endif %}
-                <div class="field">
-                    <div class="control" style="display: flex; align-items: center;">
-                        <button id="create-lab-button" class="button is-info" type="submit">Создать</button>
-                        <div id="loading-container" class="hidden" style="margin-left: 1rem;">
-                            <div id="loading-text" class="has-text-info" style="font-size: 1.1rem; font-weight: 500;"></div>
+            </div>
+
+            {# Competition-specific fields #}
+            {% if object.lab_type == "COMPETITION" %}
+                {% if simple_form.teams %}
+                    <div class="field">
+                        <label class="label is-size-5 has-text-weight-semibold mb-3" for="{{ simple_form.teams.id_for_label }}">{{ simple_form.teams.label }}</label>
+                        <div class="control">
+                            {{ simple_form.teams }}
                         </div>
-                        <div id="lab-video-container" class="hidden" style="margin-left: 1rem;">
-                            <video id="lab-video" style="width: auto; height: 62px; border-radius: 4px;" muted preload="auto">
-                                <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
-                            </video>
+                        {% if simple_form.teams.help_text %}
+                            <p class="help is-size-6 mt-2">{{ simple_form.teams.help_text }}</p>
+                        {% endif %}
+                        {% if simple_form.teams.errors %}
+                            <p class="help is-danger is-size-6 mt-2">{{ simple_form.teams.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                {% if simple_form.users %}
+                    <div class="field">
+                        <label class="label is-size-5 has-text-weight-semibold mb-3" for="{{ simple_form.users.id_for_label }}">{{ simple_form.users.label }}</label>
+                        <div class="control">
+                            {{ simple_form.users }}
                         </div>
+                        {% if simple_form.users.help_text %}
+                            <p class="help is-size-6 mt-2">{{ simple_form.users.help_text }}</p>
+                        {% endif %}
+                        {% if simple_form.users.errors %}
+                            <p class="help is-danger is-size-6 mt-2">{{ simple_form.users.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
+            <div class="field mt-5">
+                <div class="control" style="display: flex; align-items: center;">
+                    <button id="create-lab-button" class="button is-info is-medium is-size-5 has-text-weight-semibold px-5" type="submit">
+                        <span>Создать</span>
+                    </button>
+                    <div id="loading-container" class="hidden" style="margin-left: 1rem;">
+                        <div id="loading-text" class="has-text-info is-size-5 has-text-weight-semibold"></div>
+                    </div>
+                    <div id="lab-video-container" class="hidden" style="margin-left: 1rem;">
+                        <video id="lab-video" style="width: auto; height: 62px; border-radius: 4px;" muted preload="auto">
+                            <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
+                        </video>
                     </div>
                 </div>
             </div>
-            <p><div class="content mt-2">{{ object.description | safe  }}</div></p>
         </div>
+        {% if not object.background_image %}
+        <div class="content mt-4 is-size-6 lab-theme-text" style="line-height: 1.7;">{{ object.description | safe }}</div>
+        {% endif %}
+    </div>
 
-        <div class="column is-one-third">
-            {% if has_typed_tasks %}
-            <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)" id="tasks-box" data-lab-id="{{ object.id }}">
-                <div class="level is-mobile mb-2">
-                    <div class="level-left"><h3 class="title is-4 mb-0">Задания</h3></div>
-                    <div class="level-right">
-                        <span class="tag is-info is-light is-medium" id="total-tasks-badge">Всего: 0</span>
-                    </div>
+    <div class="column is-one-third">
+        {% if has_typed_tasks %}
+        <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)" id="tasks-box" data-lab-id="{{ object.id }}">
+            <div class="level is-mobile mb-2">
+                <div class="level-left"><h3 class="title is-4 mb-0">Задания</h3></div>
+                <div class="level-right">
+                    <span class="tag is-info is-light is-medium" id="total-tasks-badge">Всего: 0</span>
                 </div>
-                <p class="help mb-4">Выберите количество или отметьте конкретные задания.</p>
+            </div>
+            <p class="help mb-4">Выберите количество или отметьте конкретные задания.</p>
 
-                {% for group in task_groups %}
-                    <div class="box has-background-white task-group-block" 
-                         style="padding: 1rem; margin-bottom: 1rem; border: 1px solid #dbdbdb;"
-                         data-group-id="{{ group.id }}">
-                        
-                        <div class="level is-mobile mb-2">
-                            <div class="level-left" style="max-width: 65%;">
-                                <strong>{{ group.name }}</strong>
-                            </div>
-                            <div class="level-right">
-                                <div class="field has-addons mb-0">
-                                    <div class="control">
-                                        <input class="input is-small task-count-input has-text-centered" 
-                                               type="number" 
-                                               min="0" 
-                                               max="{{ group.count }}" 
-                                               value="0"
-                                               style="width: 3.5rem; font-weight: bold;">
-                                    </div>
-                                    <div class="control">
-                                        <a class="button is-static is-small">
-                                            / {{ group.count }}
-                                        </a>
-                                    </div>
+            {% for group in task_groups %}
+                <div class="box has-background-white task-group-block"
+                     style="padding: 1rem; margin-bottom: 1rem; border: 1px solid #dbdbdb;"
+                     data-group-id="{{ group.id }}">
+
+                    <div class="level is-mobile mb-2">
+                        <div class="level-left" style="max-width: 65%;">
+                            <strong>{{ group.name }}</strong>
+                        </div>
+                        <div class="level-right">
+                            <div class="field has-addons mb-0">
+                                <div class="control">
+                                    <input class="input is-small task-count-input has-text-centered"
+                                           type="number"
+                                           min="0"
+                                           max="{{ group.count }}"
+                                           value="0"
+                                           style="width: 3.5rem; font-weight: bold;">
+                                </div>
+                                <div class="control">
+                                    <a class="button is-static is-small">
+                                        / {{ group.count }}
+                                    </a>
                                 </div>
                             </div>
                         </div>
-
-                        <details>
-                            <summary class="is-size-7 has-text-info" style="cursor: pointer; outline: none;">
-                                Показать список ({{ group.count }})
-                            </summary>
-                            <div class="pt-3 pl-1">
-                                {% for task in group.tasks %}
-                                    <article class="media" style="margin-bottom: 0.75rem; align-items: flex-start;">
-                                        <div class="media-left" style="margin-right: 0.75rem;">
-                                            <label class="checkbox">
-                                                <!-- РЕАЛЬНЫЙ КЛИКАБЕЛЬНЫЙ ЧЕКБОКС -->
-                                                <input type="checkbox" 
-                                                       class="task-checkbox" 
-                                                       name="tasks" 
-                                                       value="{{ task.pk }}">
-                                            </label>
-                                        </div>
-                                        <div class="media-content">
-                                            <div class="content is-small" style="margin-top: 2px;">
-                                                {% if task.description %}
-                                                    {{ task.description|linebreaksbr }}
-                                                {% elif task.question %}
-                                                    {{ task.question|linebreaksbr }}
-                                                {% else %}
-                                                    Задание {{ task.task_id }}
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </article>
-                                {% endfor %}
-                            </div>
-                        </details>
                     </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-            {% if simple_form.fields.tasks.queryset %}
-                <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
-                    <h3 class="title is-4 mb-1">{{ simple_form.tasks.label }}</h3>
-                    <p class="help mb-2">Выбранные задания будут включены в работу.</p>
-                    {% for task in simple_form.fields.tasks.queryset %}
-                        <article class="media" style="margin-bottom: 1rem;">
-                            <div class="media-left" style="margin-right: 0.75rem; display: flex; align-items: start;">
-                                <label class="checkbox">
-                                    <input type="checkbox" name="tasks" value="{{ task.pk }}" checked>
-                                </label>
-                            </div>
-                            <div class="media-content">
-                                <div class="content">
-                                    <p>
-                                        <strong class="title is-6">Задание {{ forloop.counter }}</strong>
-                                        <div class="mt-1">
+
+                    <details>
+                        <summary class="is-size-7 has-text-info" style="cursor: pointer; outline: none;">
+                            Показать список ({{ group.count }})
+                        </summary>
+                        <div class="pt-3 pl-1">
+                            {% for task in group.tasks %}
+                                <article class="media" style="margin-bottom: 0.75rem; align-items: flex-start;">
+                                    <div class="media-left" style="margin-right: 0.75rem;">
+                                        <label class="checkbox">
+                                            <input type="checkbox"
+                                                   class="task-checkbox"
+                                                   name="tasks"
+                                                   value="{{ task.pk }}">
+                                        </label>
+                                    </div>
+                                    <div class="media-content">
+                                        <div class="content is-small" style="margin-top: 2px;">
                                             {% if task.description %}
-                                                {{ task.description | linebreaksbr }}
+                                                {{ task.description|linebreaksbr }}
+                                            {% elif task.question %}
+                                                {{ task.question|linebreaksbr }}
+                                            {% else %}
+                                                Задание {{ task.task_id }}
                                             {% endif %}
                                         </div>
-                                    </p>
-                                </div>
-                            </div>
-                        </article>
-                    {% endfor %}
-                    {% if simple_form.tasks.errors %}
-                        <p class="help is-danger">{{ simple_form.tasks.errors.0 }}</p>
-                    {% endif %}
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </details>
                 </div>
-            {% else %}
-
-                <div class="box" style="border: 1px solid rgba(0, 0, 0, 0.1);">
-                    <h3 class="title is-4 mb-1">{{ simple_form.level.label }}</h3>
-                    <p class="help mb-2">Выберите вариант для работы.</p>
-                    {% for level in simple_form.fields.level.queryset %}
-                        <article class="media" style="margin-bottom: 1rem;">
-                            <div class="media-left" style="margin-right: 0.75rem; display: flex; align-items: start;">
-                                <label class="radio">
-                                    <input type="radio" name="level" value="{{ level.pk }}"
-                                           {% if forloop.first %}checked{% endif %}>
-                                </label>
-                            </div>
-                            <div class="media-content">
-                                <div class="content">
-                                    <p>
-                                        <strong class="title is-6">Вариант {{ level.level_number }}</strong>
-                                        <div class="mt-1">{{ level.description | linebreaksbr }}</div>
-                                    </p>
-                                </div>
-                            </div>
-                        </article>
-                    {% endfor %}
-                    {% if simple_form.level.errors %}
-                        <p class="help is-danger">{{ simple_form.level.errors.0 }}</p>
-                    {% endif %}
-                </div>
-            {% endif %}
-
+            {% endfor %}
         </div>
+        {% else %}
+        <div class="box lab-theme-surface lab-side-box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
+            <h3 class="title is-4 has-text-weight-bold mb-3">{{ simple_form.tasks.label }}</h3>
+            <p class="help is-size-6 has-text-weight-medium mb-4">Выбранные задания будут включены в работу.</p>
+            {% for task in simple_form.fields.tasks.queryset %}
+                <article class="media task-item" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: 8px; transition: background-color 0.2s ease;">
+                    <div class="media-left" style="margin-right: 1rem; display: flex; align-items: start; padding-top: 0.25rem;">
+                        <label class="checkbox">
+                            <input type="checkbox" name="tasks" value="{{ task.pk }}" checked>
+                        </label>
+                    </div>
+                    <div class="media-content">
+                        <div class="content">
+                            <p>
+                                <strong class="title is-5 has-text-weight-semibold">Задание {{ forloop.counter }}</strong>
+                                <div class="mt-2 is-size-6">
+                                    {% if task.description %}
+                                        {{ task.description | linebreaksbr }}
+                                    {% elif task.question %}
+                                        {{ task.question | linebreaksbr }}
+                                    {% endif %}
+                                </div>
+                            </p>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+            {% if simple_form.tasks.errors %}
+                <p class="help is-danger is-size-6">{{ simple_form.tasks.errors.0 }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if simple_form.fields.level.queryset %}
+            <div class="box lab-theme-surface lab-side-box" style="border: 1px solid rgba(0, 0, 0, 0.1);">
+                <h3 class="title is-4 has-text-weight-bold mb-3">{{ simple_form.level.label }}</h3>
+                <p class="help is-size-6 has-text-weight-medium mb-4">Выберите вариант для работы.</p>
+                {% for level in simple_form.fields.level.queryset %}
+                    <article class="media level-item" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: 8px; transition: background-color 0.2s ease;">
+                        <div class="media-left" style="margin-right: 1rem; display: flex; align-items: start; padding-top: 0.25rem;">
+                            <label class="radio">
+                                <input type="radio" name="level" value="{{ level.pk }}"
+                                       {% if forloop.first %}checked{% endif %}>
+                            </label>
+                        </div>
+                        <div class="media-content">
+                            <div class="content">
+                                <p>
+                                    <strong class="title is-5 has-text-weight-semibold">Вариант {{ level.level_number }}</strong>
+                                    <div class="mt-2 is-size-6">{{ level.description | linebreaksbr }}</div>
+                                </p>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+                {% if simple_form.level.errors %}
+                    <p class="help is-danger is-size-6">{{ simple_form.level.errors.0 }}</p>
+                {% endif %}
+            </div>
+        {% endif %}
     </div>
+</div>
 </form>
+</div>
+
+<script>
+    (function() {
+        const root = document.documentElement;
+        const raw = getComputedStyle(root).getPropertyValue('--lab-elements-color').trim() || '#ffffff';
+        const normalizeHex = (hex) => {
+            if (!hex) return null;
+            if (hex.startsWith('#')) hex = hex.slice(1);
+            if (hex.length === 3) {
+                hex = hex.split('').map(ch => ch + ch).join('');
+            }
+            if (hex.length !== 6) return null;
+            return hex;
+        };
+
+        const hex = normalizeHex(raw);
+        if (!hex) return;
+
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        // Perceived brightness formula
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        const textColor = brightness > 140 ? '#0b0b0b' : '#f8f8f8';
+        root.style.setProperty('--lab-elements-text', textColor);
+    })();
+</script>
 
 <script src="{% static 'js/lab_detail.js' %}"></script>
 {% if object.lab_type == "COMPETITION" %}
