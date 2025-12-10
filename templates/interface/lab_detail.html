@@ -4,6 +4,7 @@
 
 {% block hero_class %}lab-hero{% endblock %}
 {% block container_class %}is-fluid px-5{% endblock %}
+{% block footer_class %}{% if object.background_image %}lab-footer-glass{% endif %}{% endblock %}
 
 {% block extra_css %}
     {% if object.lab_type == "COMPETITION" %}
@@ -153,6 +154,28 @@
             background: linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06)), var(--lab-elements-color);
             color: var(--lab-elements-text);
             border-color: rgba(0, 0, 0, 0.18);
+        }
+
+        /* Общий фон для всей страницы, чтобы футер тоже был поверх изображения */
+        .flex-wrapper.lab-global-bg {
+            {% if object.background_image %}
+            background-image: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.32)), url('{{ object.background_image.url }}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            {% else %}
+            background: #ffffff;
+            {% endif %}
+        }
+
+        /* Футер: матовое стекло при наличии фонового изображения */
+        footer.lab-footer-glass {
+            background: rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-top: 1px solid rgba(255, 255, 255, 0.24);
+            box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.12);
         }
 
         /* Инпут количества задач — мягкая внутренняя тень и скругления */
@@ -475,6 +498,15 @@
         const textColor = brightness > 140 ? '#0b0b0b' : '#f8f8f8';
         root.style.setProperty('--lab-elements-text', textColor);
     })();
+
+    {% if object.background_image %}
+    (function() {
+        const wrapper = document.querySelector('.flex-wrapper');
+        if (wrapper) {
+            wrapper.classList.add('lab-global-bg');
+        }
+    })();
+    {% endif %}
 </script>
 
 <script src="{% static 'js/lab_detail.js' %}"></script>
