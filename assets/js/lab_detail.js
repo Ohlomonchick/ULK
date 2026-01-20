@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupTaskSelectionLogic() {
     const hiddenInput = document.getElementById('id_task_type_counts');
     const totalBadge = document.getElementById('total-tasks-badge');
-    const groupBlocks = document.querySelectorAll('.task-group-block');
+    const groupBlocks = document.querySelectorAll('.task-group-block:not(.task-subtype-block)');
 
     if (!groupBlocks.length) return;
 
@@ -124,9 +124,27 @@ function setupTaskSelectionLogic() {
         let totalSeconds = 0;
         let jsonData = {};
         
-        // 1. Считаем
-        const currentGroupBlocks = document.querySelectorAll('.task-group-block');
-        currentGroupBlocks.forEach(block => {
+        // 1. Считаем обычные группы и подтипы 
+        const subtypeBlocks = document.querySelectorAll('.task-subtype-block');
+        const regularBlocks = document.querySelectorAll('.task-group-block:not(.task-parent-block):not(.task-subtype-block)');
+        
+        // Обрабатываем подтипы
+        subtypeBlocks.forEach(block => {
+            const groupId = block.getAttribute('data-group-id');
+            const durationPerTask = parseFloat(block.getAttribute('data-duration')) || 0;
+            
+            const input = block.querySelector('.subtype-count-input');
+            const count = parseInt(input?.value) || 0;
+
+            totalCount += count;
+            totalSeconds += (count * durationPerTask);
+            
+            const key = (groupId === 'null') ? null : parseInt(groupId);
+            jsonData[key] = count;
+        });
+        
+        // Обрабатываем обычные группы (не вложенные)
+        regularBlocks.forEach(block => {
             const groupId = block.getAttribute('data-group-id');
             const durationPerTask = parseFloat(block.getAttribute('data-duration')) || 0;
             
@@ -146,6 +164,60 @@ function setupTaskSelectionLogic() {
 
         // 3. Обновляем виджет времени
         updateDurationWidget(totalSeconds);
+    }
+    
+    // --- Обновление счетчика родителя на основе подтипов ---
+    function updateParentCounter(parentBlock) {
+        const parentId = parentBlock.getAttribute('data-parent-id');
+        const subtypeBlocks = parentBlock.querySelectorAll('.task-subtype-block');
+        
+        let totalCount = 0;
+        subtypeBlocks.forEach(subtypeBlock => {
+            const input = subtypeBlock.querySelector('.subtype-count-input');
+            totalCount += parseInt(input?.value) || 0;
+        });
+        
+        const parentInput = parentBlock.querySelector('.parent-count-input');
+        if (parentInput) {
+            parentInput.value = totalCount;
+        }
+    }
+    
+    // --- Обновление счетчиков подтипов на основе родителя ---
+    function updateSubtypesFromParent(parentBlock, count) {
+        const subtypeBlocks = parentBlock.querySelectorAll('.task-subtype-block');
+        const totalSubtypes = subtypeBlocks.length;
+        
+        if (totalSubtypes === 0) return;
+        
+        // Собираем максимальные значения для каждого подтипа
+        const maxValues = Array.from(subtypeBlocks).map(block => {
+            const input = block.querySelector('.subtype-count-input');
+            return parseInt(input?.getAttribute('max')) || 0;
+        });
+        
+        const totalMax = maxValues.reduce((sum, max) => sum + max, 0);
+        const targetCount = Math.min(count, totalMax);
+        
+        // Распределяем количество пропорционально максимальным значениям
+        let remaining = targetCount;
+        subtypeBlocks.forEach((subtypeBlock, index) => {
+            const input = subtypeBlock.querySelector('.subtype-count-input');
+            const max = maxValues[index];
+            
+            let assigned = 0;
+            if (totalMax > 0 && remaining > 0) {
+                // Пропорциональное распределение
+                const proportion = max / totalMax;
+                assigned = Math.min(Math.round(targetCount * proportion), max, remaining);
+                remaining -= assigned;
+            }
+            
+            input.value = assigned;
+            
+            // Обновляем чекбоксы
+            updateCheckboxesFromCount(subtypeBlock, assigned);
+        });
     }
 
     // --- Обновление виджета времени ---
@@ -193,8 +265,154 @@ function setupTaskSelectionLogic() {
         daysInput.dispatchEvent(new Event('input'));
     }
 
-    // --- Обработчики событий ---
-    groupBlocks.forEach(block => {
+    // --- Обновление чекбоксов на основе количества ---
+    function updateCheckboxesFromCount(block, count) {
+        const checkboxes = Array.from(block.querySelectorAll('.task-checkbox'));
+        checkboxes.forEach(cb => cb.checked = false);
+        if (count > 0) {
+            const shuffled = [...checkboxes].sort(() => 0.5 - Math.random());
+            shuffled.slice(0, count).forEach(cb => cb.checked = true);
+        }
+    }
+
+    // --- Обработчики для типов ---
+    const parentBlocks = document.querySelectorAll('.task-parent-block');
+    parentBlocks.forEach(parentBlock => {
+        const parentInput = parentBlock.querySelector('.parent-count-input');
+        const parentSelectAll = parentBlock.querySelector('.parent-select-all-checkbox');
+        const subtypeBlocks = parentBlock.querySelectorAll('.task-subtype-block');
+        
+        // Обработчик для чекбокса типа
+        if (parentSelectAll) {
+            parentSelectAll.addEventListener('change', function() {
+                if (this.checked) {
+                    // Выбираем все задания всех подтипов
+                    subtypeBlocks.forEach(subtypeBlock => {
+                        const input = subtypeBlock.querySelector('.subtype-count-input');
+                        const max = parseInt(input?.getAttribute('max')) || 0;
+                        input.value = max;
+                        updateCheckboxesFromCount(subtypeBlock, max);
+                    });
+                    updateParentCounter(parentBlock);
+                } else {
+                    // Снимаем выбор со всех подтипов
+                    subtypeBlocks.forEach(subtypeBlock => {
+                        const input = subtypeBlock.querySelector('.subtype-count-input');
+                        input.value = 0;
+                        updateCheckboxesFromCount(subtypeBlock, 0);
+                    });
+                    updateParentCounter(parentBlock);
+                }
+                updateGlobalState();
+            });
+        }
+        
+        // Синхронизация чекбокса типа с состоянием подтипов
+        function syncParentCheckbox() {
+            const allSubtypesSelected = Array.from(subtypeBlocks).every(subtypeBlock => {
+                const input = subtypeBlock.querySelector('.subtype-count-input');
+                const max = parseInt(input?.getAttribute('max')) || 0;
+                return parseInt(input?.value) === max && max > 0;
+            });
+            const anySubtypeSelected = Array.from(subtypeBlocks).some(subtypeBlock => {
+                const input = subtypeBlock.querySelector('.subtype-count-input');
+                return parseInt(input?.value) > 0;
+            });
+            
+            if (parentSelectAll) {
+                parentSelectAll.checked = allSubtypesSelected;
+                parentSelectAll.indeterminate = anySubtypeSelected && !allSubtypesSelected;
+            }
+        }
+        
+        // Обработчик для счетчика типа
+        if (parentInput) {
+            parentInput.addEventListener('input', function() {
+                let val = parseInt(this.value);
+                const max = parseInt(this.getAttribute('max')) || 0;
+                
+                if (isNaN(val) || val < 0) val = 0;
+                if (val > max) val = max;
+                this.value = val;
+                
+                updateSubtypesFromParent(parentBlock, val);
+                updateGlobalState();
+            });
+        }
+        
+        // Обработчики для каждого подтипа
+        subtypeBlocks.forEach(subtypeBlock => {
+            const subtypeInput = subtypeBlock.querySelector('.subtype-count-input');
+            const checkboxes = Array.from(subtypeBlock.querySelectorAll('.task-checkbox'));
+            const subtypeSelectAll = subtypeBlock.querySelector('.subtype-select-all-checkbox');
+            
+            if (!subtypeInput) return;
+            
+            // Обработчик для чекбокса подтипа (выбрать все задания подтипа)
+            if (subtypeSelectAll) {
+                subtypeSelectAll.addEventListener('change', function() {
+                    const max = parseInt(subtypeInput?.getAttribute('max')) || 0;
+                    if (this.checked) {
+                        // Выбираем все задания подтипа
+                        subtypeInput.value = max;
+                        updateCheckboxesFromCount(subtypeBlock, max);
+                    } else {
+                        // Снимаем выбор со всех заданий подтипа
+                        subtypeInput.value = 0;
+                        updateCheckboxesFromCount(subtypeBlock, 0);
+                    }
+                    updateParentCounter(parentBlock);
+                    syncParentCheckbox();
+                    updateGlobalState();
+                });
+            }
+            
+            // Функция синхронизации чекбокса подтипа
+            function syncSubtypeCheckbox() {
+                if (subtypeSelectAll) {
+                    const checkedCount = checkboxes.filter(c => c.checked).length;
+                    const max = parseInt(subtypeInput?.getAttribute('max')) || 0;
+                    subtypeSelectAll.checked = checkedCount === max && max > 0;
+                    subtypeSelectAll.indeterminate = checkedCount > 0 && checkedCount < max;
+                }
+            }
+            
+            // Обработчик для чекбоксов заданий подтипа
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const checkedCount = checkboxes.filter(c => c.checked).length;
+                    subtypeInput.value = checkedCount;
+                    syncSubtypeCheckbox();
+                    updateParentCounter(parentBlock);
+                    syncParentCheckbox();
+                    updateGlobalState();
+                });
+            });
+            
+            // Обработчик для счетчика подтипа
+            subtypeInput.addEventListener('input', function() {
+                let val = parseInt(this.value);
+                const max = parseInt(this.getAttribute('max')) || 0;
+                
+                if (isNaN(val) || val < 0) val = 0;
+                if (val > max) val = max;
+                this.value = val;
+                
+                updateCheckboxesFromCount(subtypeBlock, val);
+                syncSubtypeCheckbox();
+                updateParentCounter(parentBlock);
+                syncParentCheckbox();
+                updateGlobalState();
+            });
+            
+            // Инициализация синхронизации чекбокса подтипа
+            syncSubtypeCheckbox();
+        });
+    });
+
+    // --- Обработчики для обычных групп (не вложенных) ---
+    const regularBlocks = document.querySelectorAll('.task-group-block:not(.task-parent-block):not(.task-subtype-block)');
+    regularBlocks.forEach(block => {
         const numberInput = block.querySelector('.task-count-input');
         const checkboxes = Array.from(block.querySelectorAll('.task-checkbox'));
         
@@ -209,22 +427,19 @@ function setupTaskSelectionLogic() {
         });
 
         numberInput.addEventListener('input', function() {
-            let val = parseInt(numberInput.value);
-            const max = parseInt(numberInput.getAttribute('max'));
+            let val = parseInt(this.value);
+            const max = parseInt(this.getAttribute('max')) || 0;
 
             if (isNaN(val) || val < 0) val = 0;
             if (val > max) val = max;
-            if (val > max || val < 0) numberInput.value = val; 
+            this.value = val;
 
-            // Сброс и случайный выбор
-            checkboxes.forEach(cb => cb.checked = false);
-            if (val > 0) {
-                const shuffled = [...checkboxes].sort(() => 0.5 - Math.random());
-                shuffled.slice(0, val).forEach(cb => cb.checked = true);
-            }
-
+            updateCheckboxesFromCount(block, val);
             updateGlobalState();
         });
+        
+        // Инициализация синхронизации чекбокса типа
+        syncParentCheckbox();
     });
 
     // Инициализация

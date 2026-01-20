@@ -156,6 +156,20 @@
             border-color: rgba(0, 0, 0, 0.18);
         }
 
+        /* Стили для типов */
+        .task-parent-block {
+            border-left: 3px solid rgba(50, 115, 220, 0.5) !important;
+        }
+
+        /* Стили для подтипов */
+        .task-subtype-block {
+            background: linear-gradient(0deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)), var(--lab-elements-color) !important;
+        }
+
+        .task-subtypes-container {
+            padding-left: 0.75rem;
+        }
+
         /* Общий фон для всей страницы, чтобы футер тоже был поверх изображения */
         .flex-wrapper.lab-global-bg {
             {% if object.background_image %}
@@ -338,73 +352,188 @@
             <p class="help mb-4">Выберите количество или отметьте конкретные задания.</p>
 
             {% for group in task_groups %}
-                 <div class="box task-group-block"
-                      style="padding: 1rem; margin-bottom: 1rem;"
-                     data-group-id="{{ group.id }}"
-                     data-duration="{{ group.duration_seconds }}">
-
-                    <div class="level is-mobile mb-2">
-                        <div class="level-left" style="max-width: 60%;">
-                            <div>
-                                <strong>{{ group.name }}</strong>
-                                {% if group.duration_seconds > 0 %}
-                                    <br>
-                                    <span class="tag is-light is-warning is-small mt-1" style="font-size: 0.7rem;">
-                                        <i class="far fa-clock mr-1"></i> {{ group.duration_display }}
-                                    </span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="level-right">
-                            <div class="field has-addons mb-0">
-                                <div class="control">
-                                    <input class="input is-small task-count-input has-text-centered"
-                                           type="number"
-                                           min="0"
-                                           max="{{ group.count }}"
-                                           value="0"
-                                           style="width: 4rem; font-weight: bold; font-size: 1rem; height: 2.4rem;">
-                                </div>
-                                <div class="control">
-                                    <a class="button is-static is-small">
-                                        / {{ group.count }}
-                                    </a>
+                {% if group.is_parent %}
+                    <div class="box task-group-block task-parent-block"
+                         style="padding: 1rem; margin-bottom: 1rem;"
+                         data-parent-id="{{ group.id }}"
+                         data-duration="{{ group.duration_seconds }}">
+                        
+                        <div class="level is-mobile mb-3">
+                            <div class="level-left" style="max-width: 60%; display: flex; align-items: center;">
+                                <label class="checkbox" style="margin-right: 0.75rem;">
+                                    <input type="checkbox" class="parent-select-all-checkbox">
+                                </label>
+                                <div>
+                                    <strong style="font-size: 1.1rem;">{{ group.name }}</strong>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <details>
-                        <summary class="is-size-7 has-text-info has-text-weight-bold" style="cursor: pointer; outline: none;">
-                            Показать список ({{ group.count }})
-                        </summary>
-                        <div class="pt-3 pl-1">
-                            {% for task in group.tasks %}
-                                <article class="media" style="margin-bottom: 0.75rem; align-items: flex-start;">
-                                    <div class="media-left" style="margin-right: 0.75rem;">
-                                        <label class="checkbox">
-                                            <input type="checkbox"
-                                                   class="task-checkbox"
-                                                   name="tasks"
-                                                   value="{{ task.pk }}">
-                                        </label>
+                            <div class="level-right">
+                                <div class="field has-addons mb-0">
+                                    <div class="control">
+                                        <input class="input is-small task-count-input has-text-centered parent-count-input"
+                                               type="number"
+                                               min="0"
+                                               max="{{ group.count }}"
+                                               value="0"
+                                               style="width: 4rem; font-weight: bold; font-size: 1rem; height: 2.4rem;">
                                     </div>
-                                    <div class="media-content">
-                                        <div class="content is-small" style="margin-top: 2px;">
-                                            {% if task.description %}
-                                                {{ task.description|linebreaksbr }}
-                                            {% elif task.question %}
-                                                {{ task.question|linebreaksbr }}
-                                            {% else %}
-                                                Задание {{ task.task_id }}
-                                            {% endif %}
+                                    <div class="control">
+                                        <a class="button is-static is-small">
+                                            / {{ group.count }}
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {# Подтипы #}
+                        <div class="task-subtypes-container" style="margin-left: 1rem;">
+                            {% for subtype in group.subtypes %}
+                                <div class="box task-group-block task-subtype-block"
+                                     style="padding: 0.75rem; margin-bottom: 0.75rem;"
+                                     data-group-id="{{ subtype.id }}"
+                                     data-duration="{{ subtype.duration_seconds }}"
+                                     data-parent-id="{{ group.id }}">
+                                    
+                                    <div class="level is-mobile mb-2">
+                                        <div class="level-left" style="max-width: 60%; display: flex; align-items: center;">
+                                            <label class="checkbox" style="margin-right: 0.5rem;">
+                                                <input type="checkbox" class="subtype-select-all-checkbox" data-subtype-id="{{ subtype.id }}">
+                                            </label>
+                                            <div>
+                                                <strong>{{ subtype.name }}</strong>
+                                                {% if subtype.duration_seconds > 0 %}
+                                                    <br>
+                                                    <span class="tag is-light is-warning is-small mt-1" style="font-size: 0.65rem;">
+                                                        <i class="far fa-clock mr-1"></i> {{ subtype.duration_display }}
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="level-right">
+                                            <div class="field has-addons mb-0">
+                                                <div class="control">
+                                                    <input class="input is-small task-count-input has-text-centered subtype-count-input"
+                                                           type="number"
+                                                           min="0"
+                                                           max="{{ subtype.count }}"
+                                                           value="0"
+                                                           style="width: 3.5rem; font-weight: bold; font-size: 0.9rem; height: 2.2rem;">
+                                                </div>
+                                                <div class="control">
+                                                    <a class="button is-static is-small" style="font-size: 0.9rem; height: 2.2rem;">
+                                                        / {{ subtype.count }}
+                                                    </a>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </article>
+                                    
+                                    <details>
+                                        <summary class="is-size-7 has-text-info has-text-weight-bold" style="cursor: pointer; outline: none;">
+                                            Показать список ({{ subtype.count }})
+                                        </summary>
+                                        <div class="pt-3 pl-1">
+                                            {% for task in subtype.tasks %}
+                                                <article class="media" style="margin-bottom: 0.75rem; align-items: flex-start;">
+                                                    <div class="media-left" style="margin-right: 0.75rem;">
+                                                        <label class="checkbox">
+                                                            <input type="checkbox"
+                                                                   class="task-checkbox"
+                                                                   name="tasks"
+                                                                   value="{{ task.pk }}"
+                                                                   data-subtype-id="{{ subtype.id }}">
+                                                        </label>
+                                                    </div>
+                                                    <div class="media-content">
+                                                        <div class="content is-small" style="margin-top: 2px;">
+                                                            {% if task.description %}
+                                                                {{ task.description|linebreaksbr }}
+                                                            {% elif task.question %}
+                                                                {{ task.question|linebreaksbr }}
+                                                            {% else %}
+                                                                Задание {{ task.task_id }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </article>
+                                            {% endfor %}
+                                        </div>
+                                    </details>
+                                </div>
                             {% endfor %}
                         </div>
-                    </details>
-                </div>
+                    </div>
+                {% else %}
+                    {# Обычный тип без вложенности #}
+                    <div class="box task-group-block"
+                         style="padding: 1rem; margin-bottom: 1rem;"
+                         data-group-id="{{ group.id }}"
+                         data-duration="{{ group.duration_seconds }}">
+
+                        <div class="level is-mobile mb-2">
+                            <div class="level-left" style="max-width: 60%;">
+                                <div>
+                                    <strong>{{ group.name }}</strong>
+                                    {% if group.duration_seconds > 0 %}
+                                        <br>
+                                        <span class="tag is-light is-warning is-small mt-1" style="font-size: 0.7rem;">
+                                            <i class="far fa-clock mr-1"></i> {{ group.duration_display }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="level-right">
+                                <div class="field has-addons mb-0">
+                                    <div class="control">
+                                        <input class="input is-small task-count-input has-text-centered"
+                                               type="number"
+                                               min="0"
+                                               max="{{ group.count }}"
+                                               value="0"
+                                               style="width: 4rem; font-weight: bold; font-size: 1rem; height: 2.4rem;">
+                                    </div>
+                                    <div class="control">
+                                        <a class="button is-static is-small">
+                                            / {{ group.count }}
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <details>
+                            <summary class="is-size-7 has-text-info has-text-weight-bold" style="cursor: pointer; outline: none;">
+                                Показать список ({{ group.count }})
+                            </summary>
+                            <div class="pt-3 pl-1">
+                                {% for task in group.tasks %}
+                                    <article class="media" style="margin-bottom: 0.75rem; align-items: flex-start;">
+                                        <div class="media-left" style="margin-right: 0.75rem;">
+                                            <label class="checkbox">
+                                                <input type="checkbox"
+                                                       class="task-checkbox"
+                                                       name="tasks"
+                                                       value="{{ task.pk }}">
+                                            </label>
+                                        </div>
+                                        <div class="media-content">
+                                            <div class="content is-small" style="margin-top: 2px;">
+                                                {% if task.description %}
+                                                    {{ task.description|linebreaksbr }}
+                                                {% elif task.question %}
+                                                    {{ task.question|linebreaksbr }}
+                                                {% else %}
+                                                    Задание {{ task.task_id }}
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </article>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    </div>
+                {% endif %}
             {% endfor %}
         </div>
         {% elif simple_form.fields.tasks.queryset %}

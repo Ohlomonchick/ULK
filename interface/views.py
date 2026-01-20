@@ -77,27 +77,76 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         context["platoons"] = Platoon.objects.filter(learning_year__in=self.object.learning_years, number__gt=0)
         
         lab = self.object
-        task_groups = []
-        
         task_types = LabTaskType.objects.filter(lab=self.object)
         
-        task_groups = []
+        parent_groups = {}  
+        standalone_groups = []  # Типы без запятой (не вложенные)
         has_typed_tasks = False
 
         for tt in task_types:
             tasks = LabTask.objects.filter(lab=self.object, task_type=tt)
-            if tasks.exists():
-                duration_seconds = tt.default_duration.total_seconds() if tt.default_duration else 0
-                task_groups.append({
+            if not tasks.exists():
+                continue
+                
+            has_typed_tasks = True
+            duration_seconds = tt.default_duration.total_seconds() if tt.default_duration else 0
+            
+            if ',' in tt.name:
+                parts = [p.strip() for p in tt.name.split(',', 1)]
+                parent_name = parts[0]
+                subtype_name = parts[1] if len(parts) > 1 else ''
+                
+                if parent_name not in parent_groups:
+                    parent_groups[parent_name] = {
+                        'name': parent_name,
+                        'subtypes': [],
+                        'all_task_ids': set(),
+                        'total_count': 0,
+                        'total_duration_seconds': 0,
+                        'is_parent': True
+                    }
+                
+                parent_groups[parent_name]['subtypes'].append({
+                    'id': tt.id,
+                    'name': subtype_name,
+                    'full_name': tt.name, 
+                    'count': tasks.count(),
+                    'tasks': tasks,
+                    'duration_seconds': duration_seconds,
+                    'duration_display': str(tt.default_duration)[2:] if tt.default_duration else '-',
+                    'is_subtype': True
+                })
+                
+                parent_groups[parent_name]['all_task_ids'].update(tasks.values_list('id', flat=True))
+                parent_groups[parent_name]['total_count'] += tasks.count()
+                parent_groups[parent_name]['total_duration_seconds'] += duration_seconds * tasks.count()
+            else:
+                standalone_groups.append({
                     'id': tt.id,
                     'name': tt.name,
                     'count': tasks.count(),
                     'tasks': tasks,
                     'is_type': True,
-                    'duration_seconds': duration_seconds, 
-                    'duration_display': str(tt.default_duration)[2:]
+                    'duration_seconds': duration_seconds,
+                    'duration_display': str(tt.default_duration)[2:] if tt.default_duration else '-',
+                    'is_parent': False
                 })
-                has_typed_tasks = True
+
+        nested_groups = []
+        for parent_name, parent_data in parent_groups.items():
+            nested_groups.append({
+                'id': f"parent_{parent_name}", 
+                'name': parent_name,
+                'count': parent_data['total_count'],
+                'tasks': None,  
+                'is_parent': True,
+                'subtypes': parent_data['subtypes'],
+                'duration_seconds': 0, 
+                'duration_display': '-',  
+                'all_task_ids': list(parent_data['all_task_ids'])
+            })
+
+        task_groups = nested_groups + standalone_groups
 
         no_type = LabTask.objects.filter(lab=self.object, task_type__isnull=True)
         if no_type.exists():
@@ -107,6 +156,7 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
                 'count': no_type.count(),
                 'tasks': no_type,
                 'is_type': False,
+                'is_parent': False,
                 'duration_seconds': 0, 
                 'duration_display': '-'
             })
