@@ -91,8 +91,8 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             has_typed_tasks = True
             duration_seconds = tt.default_duration.total_seconds() if tt.default_duration else 0
             
-            if ',' in tt.name:
-                parts = [p.strip() for p in tt.name.split(',', 1)]
+            if ';' in tt.name:
+                parts = [p.strip() for p in tt.name.split(';', 1)]
                 parent_name = parts[0]
                 subtype_name = parts[1] if len(parts) > 1 else ''
                 
