@@ -2,7 +2,13 @@ from django.core.management.base import BaseCommand
 import random
 import string
 from interface.models import User
-from interface.elastic_utils import create_elastic_user, get_elastic_client
+from interface.elastic_utils import (
+    create_elastic_user,
+    get_elastic_client,
+    change_elastic_password,
+    update_elastic_user_role,
+    transliterate_username
+)
 from interface.utils import get_pnet_password
 
 
@@ -44,8 +50,10 @@ class Command(BaseCommand):
             client = get_elastic_client()
             if not client:
                 return False
-            response = client.security.get_user(username=username)
-            return username in response
+            # Используем транслитерированное имя, как при создании пользователя
+            safe_username = transliterate_username(username)
+            response = client.security.get_user(username=safe_username)
+            return safe_username in response
         except:
             return False
 
@@ -97,9 +105,47 @@ class Command(BaseCommand):
                 self.stdout.write(f"Сгенерирован новый пароль для пользователя {user.username}")
 
             # Проверяем существование пользователя
-            if not force and self.check_user_exists(user.pnet_login):
-                self.stdout.write(f"Пользователь {user.pnet_login} уже существует - пропускаем")
-                skipped_count += 1
+            user_exists = self.check_user_exists(user.pnet_login)
+            index_pattern = f"*{user.pnet_login}*"
+
+            if not force and user_exists:
+                # Пользователь существует - обновляем пароль и роль
+                if dry_run:
+                    self.stdout.write(
+                        f"DRY RUN: Обновил бы пароль и роль для пользователя {user.pnet_login} "
+                        f"с индексом {index_pattern}"
+                    )
+                    success_count += 1
+                    continue
+
+                self.stdout.write(f"Пользователь {user.pnet_login} уже существует - обновляем пароль и роль...")
+
+                # Обновляем пароль
+                password_result = change_elastic_password(user.pnet_login, password)
+                if password_result == 'password_changed':
+                    self.stdout.write(self.style.SUCCESS(f"✓ Пароль для {user.pnet_login} обновлен"))
+                elif password_result == 'error':
+                    self.stdout.write(self.style.ERROR(f"✗ Ошибка обновления пароля для {user.pnet_login}"))
+                    error_count += 1
+                    continue
+
+                # Обновляем роль
+                role_result = update_elastic_user_role(user.pnet_login, index_pattern)
+                if role_result == 'role_updated':
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"✓ Роль для {user.pnet_login} обновлена с доступом к индексу {index_pattern}"
+                        )
+                    )
+                    success_count += 1
+                elif role_result == 'role_unchanged':
+                    self.stdout.write(
+                        f"Роль для {user.pnet_login} уже имеет доступ к индексу {index_pattern} - без изменений"
+                    )
+                    success_count += 1
+                else:
+                    self.stdout.write(self.style.ERROR(f"✗ Ошибка обновления роли для {user.pnet_login}"))
+                    error_count += 1
                 continue
 
             if dry_run:
@@ -109,7 +155,7 @@ class Command(BaseCommand):
 
             # Создаем пользователя
             self.stdout.write(f"Создание пользователя {user.pnet_login}...")
-            result = create_elastic_user(user.pnet_login, password, index)
+            result = create_elastic_user(user.pnet_login, password, index_pattern)
 
             if result == 'created':
                 self.stdout.write(self.style.SUCCESS(f"✓ Пользователь {user.pnet_login} создан"))
