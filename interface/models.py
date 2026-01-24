@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import timedelta
 from hashlib import md5
+import random
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -627,6 +628,18 @@ class TeamCompetition2Team(models.Model):
         null=True,
         default=dict
     )
+    master_session_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='master_team_sessions',
+        verbose_name='Пользователь мастер-сессии',
+        null=True,
+        blank=True
+    )
+    master_session_created = models.BooleanField(
+        "Мастер-сессия создана",
+        default=False
+    )
     failed_tasks = models.JSONField(
         "Задания с неверным ответом (PK заданий, на которые больше нельзя отвечать)",
         blank=True,
@@ -644,6 +657,13 @@ class TeamCompetition2Team(models.Model):
         if not created:
             return
         lab = instance.competition.lab
+
+        if not instance.master_session_user_id:
+            team_users = list(instance.team.users.all())
+            if team_users:
+                instance.master_session_user = random.choice(team_users)
+                instance.master_session_created = False
+                instance.save(update_fields=['master_session_user', 'master_session_created'])
 
         def _create_operation(session_manager):
             lab_name = get_pnet_lab_name(instance.competition)

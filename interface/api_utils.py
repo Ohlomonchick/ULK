@@ -1,5 +1,5 @@
 from django.db.models import Q, Case, When, IntegerField
-from .models import User, Competition2User, TeamCompetition2Team
+from .models import User, Competition2User, TeamCompetition2Team, TeamCompetition
 from django.http import JsonResponse
 from rest_framework import status
 from slugify import slugify
@@ -68,14 +68,9 @@ def get_issue(data, competition_filters):
             JsonResponse({'message': 'Wrong request format'}, status=status.HTTP_400_BAD_REQUEST)
         )
 
-    if username:
-        user = User.objects.filter(username=username).first()
-        if not user:
-            # Fallback: try to find by pnet_login if username not found
-            user = User.objects.filter(pnet_login=username).first()
-    else:
-        user = User.objects.filter(pnet_login=pnet_login).first()
-
+    # Используем общую функцию для поиска пользователя
+    user = get_user_by_username(username or pnet_login)
+    
     if not user:
         return (
             None,
@@ -105,3 +100,97 @@ def get_issue(data, competition_filters):
             None,
             JsonResponse({'message': 'No such issue'}, status=status.HTTP_404_NOT_FOUND)
         )
+
+
+def get_user_by_username(username):
+    """
+    Получает пользователя по username или pnet_login.
+    
+    Args:
+        username: имя пользователя или pnet_login
+        
+    Returns:
+        User или None если пользователь не найден
+    """
+    return User.objects.filter(Q(username=username) | Q(pnet_login=username)).first()
+
+
+def get_issue_for_user(competition, user):
+    """
+    Получает issue (TeamCompetition2Team или Competition2User) для пользователя в соревновании.
+    
+    ВАЖНО: 
+    - Competition2User может быть как в Competition, так и в TeamCompetition
+    - TeamCompetition2Team только в TeamCompetition
+    
+    Логика для TeamCompetition:
+    1. Сначала пытается найти TeamCompetition2Team (командный участник)
+    2. Затем Competition2User (одиночный участник в командном соревновании)
+    
+    Для обычных соревнований (Competition):
+    - Пытается найти Competition2User
+    
+    Args:
+        competition: объект Competition или TeamCompetition
+        user: объект User
+        
+    Returns:
+        tuple: (issue, error_response)
+            - issue: TeamCompetition2Team или Competition2User
+            - error_response: JsonResponse с ошибкой или None
+    """
+    if isinstance(competition, TeamCompetition):
+        # Для командных соревнований: сначала ищем TeamCompetition2Team
+        issue = TeamCompetition2Team.objects.select_related('team').filter(
+            competition=competition,
+            team__users=user
+        ).first()
+        
+        if issue:
+            return issue, None
+    
+    # Для обычных соревнований или одиночных участников в TeamCompetition
+    try:
+        issue = Competition2User.objects.get(competition=competition, user=user)
+        return issue, None
+    except Competition2User.DoesNotExist:
+        return None, JsonResponse(
+            {'error': 'User is not a participant of this competition'}, 
+            status=404
+        )
+
+
+def create_lab_session_for_issue(competition, user, issue, pnet_url, cookies, xsrf_token):
+    """
+    Создает сессию лабы для пользователя в зависимости от типа issue.
+    
+    Для TeamCompetition2Team создаёт мастер-сессию (командная лаба).
+    Для Competition2User создаёт индивидуальную сессию.
+    
+    Args:
+        competition: объект Competition
+        user: объект User
+        issue: TeamCompetition2Team или Competition2User
+        pnet_url: URL PNET
+        cookies: cookies для запросов
+        xsrf_token: XSRF токен
+        
+    Returns:
+        tuple: (success, message, lab_path)
+    """
+    from .api import _ensure_team_session, get_lab_path
+    from .eveFunctions import create_pnet_lab_session_common
+    
+    if isinstance(issue, TeamCompetition2Team):
+        # Командная сессия с мастером
+        return _ensure_team_session(competition, user, pnet_url, cookies, xsrf_token)
+    
+    # Индивидуальная сессия
+    lab_path = get_lab_path(competition, user)
+    success, message = create_pnet_lab_session_common(
+        pnet_url, 
+        user.pnet_login, 
+        lab_path, 
+        cookies
+    )
+    return success, message, lab_path

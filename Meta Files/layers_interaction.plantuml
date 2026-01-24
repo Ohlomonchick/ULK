@@ -1,0 +1,87 @@
+@startuml layers_interaction
+!theme plain
+skinparam direction top to bottom
+
+package "Application Layer" #LightYellow {
+  folder Views {
+  }
+  
+  folder FrontendComponents {
+  }
+  
+  folder API {
+  }
+}
+
+package "Business Logic Layer" #LightGreen {
+  folder Forms {
+  }
+  
+  folder PnetSessionManager {
+  }
+  
+  folder LabTopology {
+  }
+  
+  folder SSHManager {
+  }
+  
+  folder FlagGenerator {
+  }
+  
+  folder FlagDeployment {
+  }
+  
+  folder EveFunctions {
+  }
+  
+  folder ElasticUtils {
+  }
+  
+  folder Config {
+  }
+}
+
+package "Data Management Layer" #LightBlue {
+  folder Models {
+  }
+  
+  folder MigrationUtils {
+  }
+}
+
+' Dependencies between layers
+Views --> Forms
+Views --> Models
+Views --> PnetSessionManager
+Views --> Config
+
+API --> Models
+API --> PnetSessionManager
+API --> LabTopology
+API --> EveFunctions
+API --> Config
+
+FrontendComponents --> API
+
+Forms --> Models
+Forms --> PnetSessionManager
+Forms --> FlagDeployment
+Forms --> ElasticUtils
+Forms --> Config
+
+PnetSessionManager --> EveFunctions
+PnetSessionManager --> Config
+
+FlagDeployment --> FlagGenerator
+FlagDeployment --> SSHManager
+FlagDeployment --> LabTopology
+FlagDeployment --> EveFunctions
+FlagDeployment --> Models
+FlagDeployment --> Config
+
+EveFunctions --> Config
+
+Config --> Models
+
+@enduml

@@ -1,0 +1,67 @@
+@startuml business_logic_layer
+!theme plain
+skinparam direction top to bottom
+
+title Business Logic Layer - Cyberpolygon Web Service
+
+package "Business Logic Layer" #LightGreen {
+  package Forms {
+    [CompetitionForm]
+    [TeamCompetitionForm]
+    [SimpleCompetitionForm]
+    [KkzForm]
+    [SimpleKkzForm]
+    [KkzLabInlineForm]
+    [LabForm]
+    [CustomUserCreationForm]
+    [SignUpForm]
+    [LabAnswerForm]
+    [ChangePasswordForm]
+  }
+  
+  folder PnetSessionManager {
+  }
+  
+  folder LabTopology {
+  }
+  
+  folder SSHManager {
+  }
+  
+  folder FlagGenerator {
+  }
+  
+  package FlagDeployment {
+    [FlagDeploymentTask]
+    [FlagDeploymentQueue]
+  }
+  
+  folder EveFunctions {
+  }
+  
+  folder ElasticUtils {
+  }
+  
+  folder Config {
+  }
+}
+
+' Internal dependencies within Business Logic Layer
+Forms --> PnetSessionManager
+Forms --> FlagDeployment
+Forms --> ElasticUtils
+Forms --> Config
+
+PnetSessionManager --> EveFunctions
+PnetSessionManager --> LabTopology
+PnetSessionManager --> Config
+
+FlagDeployment --> FlagGenerator
+FlagDeployment --> SSHManager
+FlagDeployment --> LabTopology
+FlagDeployment --> EveFunctions
+FlagDeployment --> Config
+
+EveFunctions --> Config
+
+@enduml

@@ -1,0 +1,36 @@
+@startuml component_diagram
+!theme plain
+skinparam direction top to bottom
+
+package "Web Interface Backend Service" #LightYellow {
+  [Django MVC Backend] as DjangoBackend
+  [Internal API] as InternalAPI
+  [Open API] as OpenAPI
+  [Scheduler] as Scheduler
+}
+
+database "Database" #LightBlue {
+  [[PostgreSQL/SQLite]] as DB
+}
+
+cloud "External Systems" #LightYellow {
+  [PNET Platform] as PNET
+  [ELK] as Elasticsearch
+  [Virtual Machines] as VMs
+}
+
+' Component connections
+DjangoBackend --> DB
+DjangoBackend --> InternalAPI
+
+InternalAPI --> DB
+InternalAPI --> PNET
+InternalAPI --> Elasticsearch
+
+OpenAPI --> DB
+OpenAPI <-- VMs
+
+Scheduler --> DB
+Scheduler --> PNET
+
+@enduml

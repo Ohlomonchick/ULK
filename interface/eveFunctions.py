@@ -374,6 +374,59 @@ def join_session(url, lab_session_id, cookie):
         timeout=4  # 4 секунды таймаут для подключения к сессии
     )
     logger.debug(r)
+    logger.debug(r.json())
+    return r
+
+
+def get_session_id_by_filter(url, cookie, xsrf, lab_path):
+    """
+    Получает session_id по пути к лабе через filter_session.
+    
+    Args:
+        url: URL PNET сервера
+        cookie: Cookie для аутентификации
+        xsrf: XSRF токен
+        lab_path: Путь к лабе (например, /api_test_dir/komanda-a/lab.unl)
+    
+    Returns:
+        tuple: (session_id, error_message) где session_id - ID сессии или None при ошибке
+    """
+    try:
+        response = filter_session(
+            url,
+            cookie,
+            xsrf,
+            page_number=1,
+            page_quantity=50,
+            path_contains=lab_path
+        )
+        
+        if response.status_code == 204:
+            return None, "No sessions found"
+        
+        if response.status_code not in range(200, 400):
+            return None, f"Failed to search sessions: {response.text}"
+        
+        if not response.headers.get("content-type", "").strip().startswith("application/json"):
+            return None, "Invalid response from session search"
+        
+        data = response.json()
+        target_path = lab_path if lab_path.endswith('.unl') else f"{lab_path}.unl"
+        sessions = data.get("data", {}).get("data_table", [])
+        
+        for item in sessions:
+            if item.get("lab_session_path") == target_path:
+                session_id = item.get("lab_session_id")
+                logger.debug(f"Found session ID {session_id} for path {target_path}")
+                return session_id, None
+        
+        return None, f"Session not found for path {target_path}"
+        
+    except ValueError as exc:
+        return None, f"JSON parse error: {str(exc)}"
+    except Exception as exc:
+        return None, f"Error getting session ID: {str(exc)}"
+
 
 
 @retry_pnet_request(max_attempts=3)

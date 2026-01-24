@@ -1,0 +1,57 @@
+@startuml application_layer
+!theme plain
+skinparam direction top to bottom
+
+title Application Layer - Cyberpolygon Web Service
+
+package "Application Layer" #LightYellow {
+  package Views {
+    [LabDetailView]
+    [LabListView]
+    [CompetitionDetailView]
+    [CompetitionListView]
+    [CompetitionHistoryListView]
+    [TeamCompetitionDetailView]
+    [TeamCompetitionListView]
+    [KkzDetailView]
+    [CreateKkzView]
+    [CreateKkzFromLabView]
+    [UserDetailView]
+    [PlatoonDetailView]
+    [PlatoonListView]
+    [AnswerAPIView]
+    [UtilsConsole]
+    [KibanaDashboard]
+    [CustomSummernoteUploadAttachment]
+  }
+  
+  package FrontendComponents {
+    [PnetController]
+    [CmdController]
+    [PnetIframeController]
+    [SolutionsController]
+    [TasksController]
+    [SolutionsTable]
+    [TimerController]
+    [ControlButtons]
+    [NavbarController]
+    [KibanaController]
+    [ExportRating]
+    [ConsoleLoader]
+    [CommonUtils]
+  }
+  
+  package API {
+    [LabAPI]
+    [CompetitionAPI]
+    [TaskAPI]
+    [KkzAPI]
+    [ExportAPI]
+    [KibanaAPI]
+  }
+}
+
+' Note: External dependencies to Business Logic Layer and Data Management Layer
+' will be shown when layers are combined in the main diagram
+
+@enduml

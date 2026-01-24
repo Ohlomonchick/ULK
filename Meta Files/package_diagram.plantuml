@@ -1,0 +1,160 @@
+@startuml
+!theme plain
+skinparam packageStyle rectangle
+skinparam groupInheritance 2
+skinparam linetype ortho
+skinparam direction top to bottom
+
+' Compact spacing settings
+skinparam packagePadding 3
+skinparam packageSpacing 5
+skinparam componentPadding 2
+skinparam componentFontSize 9
+skinparam defaultFontSize 9
+
+title Package Diagram - Cyberpolygon Web Service
+
+package "Data Management Layer" #LightBlue {
+  package Models {
+    [Lab]
+    [LabTask]
+    [LabLevel]
+    [LabNode]
+    [User]
+    [Platoon]
+    [Team]
+    [Competition]
+    [Competition2User]
+    [TeamCompetition]
+    [TeamCompetition2Team]
+    [Answers]
+    [Kkz]
+    [KkzLab]
+    [KkzPreview]
+    [MyAttachment]
+  }
+  
+  folder Migrations {
+  }
+}
+
+package "Business Logic Layer" #LightGreen {
+  package Forms {
+    [CompetitionForm]
+    [TeamCompetitionForm]
+    [SimpleCompetitionForm]
+    [KkzForm]
+    [SimpleKkzForm]
+    [KkzLabInlineForm]
+    [LabForm]
+    [CustomUserCreationForm]
+    [SignUpForm]
+    [LabAnswerForm]
+    [ChangePasswordForm]
+  }
+  
+  folder PnetSessionManager {
+  }
+  
+  folder LabTopology {
+  }
+  
+  folder SSHManager {
+  }
+  
+  folder FlagGenerator {
+  }
+  
+  package FlagDeployment {
+    [FlagDeploymentTask]
+    [FlagDeploymentQueue]
+  }
+  
+  folder EveFunctions {
+  }
+  
+  folder ElasticUtils {
+  }
+}
+
+package "Application Layer" #LightYellow {
+  package Views {
+    [LabDetailView]
+    [LabListView]
+    [CompetitionDetailView]
+    [CompetitionListView]
+    [CompetitionHistoryListView]
+    [TeamCompetitionDetailView]
+    [TeamCompetitionListView]
+    [KkzDetailView]
+    [CreateKkzView]
+    [CreateKkzFromLabView]
+    [UserDetailView]
+    [PlatoonDetailView]
+    [PlatoonListView]
+    [AnswerAPIView]
+    [UtilsConsole]
+    [KibanaDashboard]
+    [CustomSummernoteUploadAttachment]
+  }
+  
+  package Frontend {
+    [PnetController]
+    [CmdController]
+    [PnetIframeController]
+    [SolutionsController]
+    [TasksController]
+    [SolutionsTable]
+    [TimerController]
+    [ControlButtons]
+    [NavbarController]
+    [LabDetail]
+    [KibanaController]
+    [ExportRating]
+    [ConsoleLoader]
+    [CommonUtils]
+    [HTMLTemplates]
+  }
+  
+  package API {
+    [LabAPI]
+    [CompetitionAPI]
+    [TaskAPI]
+    [KkzAPI]
+    [ExportAPI]
+    [KibanaAPI]
+  }
+}
+
+' Hierarchical dependencies between packages
+
+Models --> Forms
+Models --> API
+Models --> Views
+
+Migrations --> Models
+
+Forms --> PnetSessionManager
+Forms --> FlagDeployment
+Forms --> ElasticUtils
+
+PnetSessionManager --> EveFunctions
+PnetSessionManager --> LabTopology
+
+FlagDeployment --> FlagGenerator
+FlagDeployment --> SSHManager
+FlagDeployment --> LabTopology
+FlagDeployment --> EveFunctions
+
+API --> PnetSessionManager
+API --> FlagDeployment
+API --> ElasticUtils
+API --> EveFunctions
+
+Views --> Forms
+Views --> API
+
+Frontend --> API
+Views --> Frontend
+
+@enduml

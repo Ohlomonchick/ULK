@@ -1,0 +1,32 @@
+@startuml data_management_layer
+!theme plain
+skinparam direction top to bottom
+
+title Data Management Layer - Cyberpolygon Web Service
+
+package "Data Management Layer" #LightBlue {
+  package Models {
+    [Lab]
+    [LabTask]
+    [LabLevel]
+    [LabNode]
+    [User]
+    [Platoon]
+    [Team]
+    [Competition]
+    [Competition2User]
+    [TeamCompetition]
+    [TeamCompetition2Team]
+    [Answers]
+    [Kkz]
+    [KkzLab]
+    [KkzPreview]
+    [MyAttachment]
+  }
+  
+  package MigrationUtils {
+    [DataBaseAwareMigration]
+  }
+}
+
+@enduml

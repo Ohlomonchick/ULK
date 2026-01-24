@@ -1,0 +1,111 @@
+%%{init: {'themeCSS': '.cluster-DML rect { fill: #ADD8E6 !important; } .cluster-BLL rect { fill: #90EE90 !important; } .cluster-AL rect { fill: #FFFFE0 !important; } .cluster-DML .cluster-label { fill: #ADD8E6 !important; } .cluster-BLL .cluster-label { fill: #90EE90 !important; } .cluster-AL .cluster-label { fill: #FFFFE0 !important; }'}}%%
+flowchart TB
+    %% Data Management Layer
+    subgraph DML["📁 Data Management Layer"]
+        direction TB
+        subgraph Models["📁 Models"]
+            Models_Labs["Labs<br/>• Lab<br/>• LabTask<br/>• LabLevel<br/>• LabNode"]
+            Models_Users["Users and Teams<br/>• User<br/>• Platoon<br/>• Team"]
+            Models_Competitions["Competitions<br/>• Competition<br/>• Competition2User<br/>• TeamCompetition<br/>• TeamCompetition2Team<br/>• Answers"]
+            Models_KKZ["KKZ<br/>• Kkz<br/>• KkzLab<br/>• KkzPreview"]
+            Models_Files["Files<br/>• MyAttachment"]
+        end
+        
+        Migrations["📁 Migrations<br/>DatabaseAwareMigration"]
+    end
+    
+    %% Business Logic Layer
+    subgraph BLL["📁 Business Logic Layer"]
+        direction TB
+        subgraph Forms["📁 Forms"]
+            Forms_Competition["Competition Forms<br/>• CompetitionForm<br/>• TeamCompetitionForm<br/>• SimpleCompetitionForm"]
+            Forms_KKZ["KKZ Forms<br/>• KkzForm<br/>• SimpleKkzForm<br/>• KkzLabInlineForm"]
+            Forms_Other["Other Forms<br/>• LabForm<br/>• CustomUserCreationForm<br/>• SignUpForm<br/>• LabAnswerForm<br/>• ChangePasswordForm"]
+        end
+        
+        PnetSessionManager["📁 PnetSessionManager<br/>PNetSessionManager"]
+        
+        LabTopology["📁 LabTopology<br/>LabTopology"]
+        
+        SSHManager["📁 SSHManager<br/>SSHConnectionTask"]
+        
+        FlagGenerator["📁 FlagGenerator<br/>FlagGenerator"]
+        
+        subgraph FlagDeployment["📁 FlagDeployment"]
+            FlagDeployment_Class["FlagDeploymentTask<br/>FlagDeploymentQueue"]
+        end
+        
+        EveFunctions["📁 EveFunctions<br/>PnetFunctions"]
+        
+        ElasticUtils["📁 ElasticUtils<br/>ElasticUtils"]
+        
+        subgraph API["📁 API"]
+            API_Labs["Labs API<br/>• LabAPI"]
+            API_Competitions["Competitions API<br/>• CompetitionAPI"]
+            API_Tasks["Tasks API<br/>• TaskAPI"]
+            API_KKZ["KKZ API<br/>• KkzAPI"]
+            API_Export["Export API<br/>• ExportAPI"]
+            API_Kibana["Kibana API<br/>• KibanaAPI"]
+        end
+    end
+    
+    %% Application Layer
+    subgraph AL["📁 Application Layer"]
+        direction TB
+        subgraph Views["📁 Views"]
+            Views_Lab["Lab Views<br/>• LabDetailView<br/>• LabListView"]
+            Views_Competition["Competition Views<br/>• CompetitionDetailView<br/>• CompetitionListView<br/>• CompetitionHistoryListView<br/>• TeamCompetitionDetailView<br/>• TeamCompetitionListView"]
+            Views_KKZ["KKZ Views<br/>• KkzDetailView<br/>• CreateKkzView<br/>• CreateKkzFromLabView"]
+            Views_User["User Views<br/>• UserDetailView<br/>• PlatoonDetailView<br/>• PlatoonListView"]
+            Views_API["API Views<br/>• AnswerAPIView"]
+            Views_Utils["Utils<br/>• UtilsConsole<br/>• KibanaDashboard<br/>• CustomSummernoteUploadAttachment"]
+        end
+        
+        subgraph Frontend["📁 Frontend"]
+            Frontend_Platform["Platform Controllers<br/>• PnetController<br/>• CmdController<br/>• PnetIframeController"]
+            Frontend_Data["Data Controllers<br/>• SolutionsController<br/>• TasksController<br/>• SolutionsTable"]
+            Frontend_UI["UI Controllers<br/>• TimerController<br/>• ControlButtons<br/>• NavbarController<br/>• LabDetail"]
+            Frontend_Integrations["Integrations<br/>• KibanaController<br/>• ExportRating"]
+            Frontend_Utils["Utils<br/>• ConsoleLoader<br/>• CommonUtils"]
+            Frontend_Templates["Templates<br/>• HTMLTemplates"]
+        end
+    end
+    
+    %% Dependencies
+    Models --> Forms
+    Models --> API
+    Models --> Views
+    
+    Migrations --> Models
+    
+    Forms --> PnetSessionManager
+    Forms --> FlagDeployment
+    Forms --> ElasticUtils
+    
+    PnetSessionManager --> EveFunctions
+    PnetSessionManager --> LabTopology
+    
+    FlagDeployment --> FlagGenerator
+    FlagDeployment --> SSHManager
+    FlagDeployment --> LabTopology
+    FlagDeployment --> EveFunctions
+    
+    API --> PnetSessionManager
+    API --> FlagDeployment
+    API --> ElasticUtils
+    API --> EveFunctions
+    
+    Views --> Forms
+    Views --> API
+    
+    Frontend --> API
+    Views --> Frontend_Templates
+    
+    %% Styling - Colors for layers using classDef
+    classDef dmlStyle fill:#ADD8E6,stroke:#000,stroke-width:3px,color:#000
+    classDef bllStyle fill:#90EE90,stroke:#000,stroke-width:3px,color:#000
+    classDef alStyle fill:#FFFFE0,stroke:#000,stroke-width:3px,color:#000
+    
+    class DML dmlStyle
+    class BLL bllStyle
+    class AL alStyle
