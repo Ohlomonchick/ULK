@@ -22,6 +22,7 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django import forms
 
 from interface.pnet_session_manager import ensure_admin_pnet_session
+from interface.elastic_utils import change_elastic_password
 from interface.serializers import *
 from rest_framework import viewsets
 
@@ -75,11 +76,11 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         # Provide empty form by default
         context["simple_form"] = SimpleCompetitionForm(lab=self.object)
         context["platoons"] = Platoon.objects.filter(learning_year__in=self.object.learning_years, number__gt=0)
-        
+
         lab = self.object
         task_types = LabTaskType.objects.filter(lab=self.object)
-        
-        parent_groups = {}  
+
+        parent_groups = {}
         standalone_groups = []  # Типы без запятой (не вложенные)
         has_typed_tasks = False
 
@@ -87,15 +88,15 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             tasks = LabTask.objects.filter(lab=self.object, task_type=tt)
             if not tasks.exists():
                 continue
-                
+
             has_typed_tasks = True
             duration_seconds = tt.default_duration.total_seconds() if tt.default_duration else 0
-            
+
             if ';' in tt.name:
                 parts = [p.strip() for p in tt.name.split(';', 1)]
                 parent_name = parts[0]
                 subtype_name = parts[1] if len(parts) > 1 else ''
-                
+
                 if parent_name not in parent_groups:
                     parent_groups[parent_name] = {
                         'name': parent_name,
@@ -105,18 +106,18 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
                         'total_duration_seconds': 0,
                         'is_parent': True
                     }
-                
+
                 parent_groups[parent_name]['subtypes'].append({
                     'id': tt.id,
                     'name': subtype_name,
-                    'full_name': tt.name, 
+                    'full_name': tt.name,
                     'count': tasks.count(),
                     'tasks': tasks,
                     'duration_seconds': duration_seconds,
                     'duration_display': str(tt.default_duration)[2:] if tt.default_duration else '-',
                     'is_subtype': True
                 })
-                
+
                 parent_groups[parent_name]['all_task_ids'].update(tasks.values_list('id', flat=True))
                 parent_groups[parent_name]['total_count'] += tasks.count()
                 parent_groups[parent_name]['total_duration_seconds'] += duration_seconds * tasks.count()
@@ -135,14 +136,14 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         nested_groups = []
         for parent_name, parent_data in parent_groups.items():
             nested_groups.append({
-                'id': f"parent_{parent_name}", 
+                'id': f"parent_{parent_name}",
                 'name': parent_name,
                 'count': parent_data['total_count'],
-                'tasks': None,  
+                'tasks': None,
                 'is_parent': True,
                 'subtypes': parent_data['subtypes'],
-                'duration_seconds': 0, 
-                'duration_display': '-',  
+                'duration_seconds': 0,
+                'duration_display': '-',
                 'all_task_ids': list(parent_data['all_task_ids'])
             })
 
@@ -151,19 +152,19 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         no_type = LabTask.objects.filter(lab=self.object, task_type__isnull=True)
         if no_type.exists():
             task_groups.append({
-                'id': 'null', 
+                'id': 'null',
                 'name': 'Общие задания (без типа)',
                 'count': no_type.count(),
                 'tasks': no_type,
                 'is_type': False,
                 'is_parent': False,
-                'duration_seconds': 0, 
+                'duration_seconds': 0,
                 'duration_display': '-'
             })
 
         context['task_groups'] = task_groups
         context['has_typed_tasks'] = has_typed_tasks
-        
+
         return context
 
 
@@ -476,7 +477,7 @@ def build_competition_context(request, instance, is_team_competition=False):
     button_start_now = (now - instance.start).total_seconds() < 0 if hasattr(instance, "start") else False
     button_end_now = not button_start_now and (instance.finish - now).total_seconds() > 0 if hasattr(instance, "finish") else False
     button_resume = not button_start_now and not button_end_now
-    
+
     # Показываем кнопку удаления с платформы, если:
     # - соревнование завершено (finish <= now)
     # - платформа PNET или CMD
@@ -657,20 +658,20 @@ class UserDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):  # pr
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = context["object"]
-        
+
         issues = self._get_user_issues(user)
         self._mark_issues_completion(issues, user)
-        
+
         # Count issues (not unique labs) - total should be number of assigned works
         issues_list = list(issues)
         context["issues"] = issues_list
         context["total"] = len(issues_list)
-        
+
         # Count unique labs with submitted answers (old behavior)
         submitted_labs = self._get_submitted_labs(user)
         submitted_lab_ids = set(submitted_labs.values_list('lab', flat=True))
         context["submitted"] = len(submitted_lab_ids)
-        
+
         # Also include submitted labs that are not in any competition issue
         issue_lab_ids = {
             issue.competition.lab.id
@@ -681,9 +682,9 @@ class UserDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):  # pr
         if additional_labs:
             # Add labs with submissions that are not in any competition issue to total
             context["total"] += len(additional_labs)
-        
+
         context["progress"] = self._calculate_progress(context["submitted"], context["total"])
-        
+
         logging.debug(context)
         return context
 
@@ -699,7 +700,7 @@ class UserDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):  # pr
         for issue in issues:
             if not issue.competition or not issue.competition.lab:
                 continue
-            
+
             issue.done = self._is_issue_completed(issue, user)
 
     def _is_issue_completed(self, issue, user):
@@ -709,13 +710,13 @@ class UserDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):  # pr
             user=user,
             lab_task__in=issue.tasks.all()
         ).count()
-        
+
         has_none_task_answer = Answers.objects.filter(
             user=user,
             lab=issue.competition.lab,
             lab_task=None
         ).exists()
-        
+
         return has_none_task_answer or (submitted_tasks == assigned_tasks and submitted_tasks > 0)
 
     def _get_submitted_labs(self, user):
@@ -771,6 +772,13 @@ def change_password(request):  # pragma: no cover
             session_manager = ensure_admin_pnet_session()
             with session_manager:
                 session_manager.change_user_password(user.pnet_login, user.pnet_password)
+
+            try:
+                result = change_elastic_password(user.pnet_login, user.pnet_password)
+                if result != 'password_changed':
+                    logger.warning(f"Failed to update Elasticsearch password for user {user.username}: {result}")
+            except Exception as e:
+                logger.error(f"Exception while updating Elasticsearch password for user {user.username}: {e}")
 
             return redirect('/cyberpolygon/competitions')
         else:
@@ -929,11 +937,11 @@ def get_worker_id(request):
     """
     from interface.utils import get_gunicorn_worker_id, get_gunicorn_worker_index
     import os
-    
+
     worker_id = get_gunicorn_worker_id()
     worker_index = get_gunicorn_worker_index()
     pid = os.getpid()
-    
+
     return JsonResponse({
         'worker_id': worker_id,
         'worker_index': worker_index,

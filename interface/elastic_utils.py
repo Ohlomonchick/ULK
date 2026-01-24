@@ -175,22 +175,14 @@ def change_elastic_password(username, password):
             roles=current_roles if current_roles else None,
         )
 
-        # Логируем полный ответ для отладки
-        logger.info(f"Change password response for {username}: {response}")
-
-        # put_user возвращает словарь с информацией об операции
-        # Для существующего пользователя может вернуть пустой словарь или словарь без 'created'
-        # Если нет ошибки, считаем операцию успешной
+        # Если нет ошибки в ответе, операция успешна
         has_error = response.get('error') is not None if isinstance(response, dict) else False
 
         if not has_error:
             logger.info(f"Successfully changed password for Elasticsearch user: {username}")
             return 'password_changed'
         else:
-            logger.warning(
-                f"Password change for user {username} was not successful. "
-                f"Response: {response}"
-            )
+            logger.warning(f"Password change for user {username} failed. Response: {response}")
             return 'error'
 
     except Exception as e:
@@ -261,24 +253,14 @@ def update_elastic_user_role(username, index):
             transient_metadata={'enabled': True}
         )
 
-        # Логируем полный ответ для отладки
-        logger.info(f"Update role response for {role_name}: {response_role}")
-
-        # put_role возвращает словарь с информацией об операции
-        # Для существующей роли может вернуть {'role': {'created': False}}, но это не означает ошибку
-        # Проверяем наличие ошибки или успешное создание/обновление
-        role_info = response_role.get('role', {})
+        # Если нет поля 'error', операция успешна (роль создана или обновлена)
         has_error = response_role.get('error') is not None if isinstance(response_role, dict) else False
-        role_created = role_info.get('created', False)
-        role_updated = role_info.get('updated', False)
 
-        if role_created or role_updated or (not has_error and isinstance(response_role, dict) and len(response_role) > 0):
+        if not has_error:
             logger.info(f"Successfully updated Elasticsearch role {role_name} with index {index}")
             return 'role_updated'
         else:
-            logger.warning(
-                f"Role {role_name} was not updated. Response: {response_role}"
-            )
+            logger.warning(f"Role {role_name} update failed. Response: {response_role}")
             return 'error'
 
     except Exception as e:
