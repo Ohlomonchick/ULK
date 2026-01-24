@@ -158,7 +158,7 @@ def change_elastic_password(username, password):
 
     try:
         safe_username = transliterate_username(username)
-        
+
         # Получаем текущего пользователя, чтобы сохранить его роли
         try:
             current_user = client.security.get_user(username=safe_username)
@@ -182,7 +182,7 @@ def change_elastic_password(username, password):
         # Для существующего пользователя может вернуть пустой словарь или словарь без 'created'
         # Если нет ошибки, считаем операцию успешной
         has_error = response.get('error') is not None if isinstance(response, dict) else False
-        
+
         if not has_error:
             logger.info(f"Successfully changed password for Elasticsearch user: {username}")
             return 'password_changed'
@@ -261,11 +261,24 @@ def update_elastic_user_role(username, index):
             transient_metadata={'enabled': True}
         )
 
-        if response_role.get('role', {}).get('created', False) or response_role.get('role', {}).get('updated', False):
+        # Логируем полный ответ для отладки
+        logger.info(f"Update role response for {role_name}: {response_role}")
+
+        # put_role возвращает словарь с информацией об операции
+        # Для существующей роли может вернуть {'role': {'created': False}}, но это не означает ошибку
+        # Проверяем наличие ошибки или успешное создание/обновление
+        role_info = response_role.get('role', {})
+        has_error = response_role.get('error') is not None if isinstance(response_role, dict) else False
+        role_created = role_info.get('created', False)
+        role_updated = role_info.get('updated', False)
+
+        if role_created or role_updated or (not has_error and isinstance(response_role, dict) and len(response_role) > 0):
             logger.info(f"Successfully updated Elasticsearch role {role_name} with index {index}")
             return 'role_updated'
         else:
-            logger.warning(f"Role {role_name} was not updated")
+            logger.warning(
+                f"Role {role_name} was not updated. Response: {response_role}"
+            )
             return 'error'
 
     except Exception as e:
