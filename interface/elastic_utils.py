@@ -158,16 +158,39 @@ def change_elastic_password(username, password):
 
     try:
         safe_username = transliterate_username(username)
-        response = client.security.change_password(
+        
+        # Получаем текущего пользователя, чтобы сохранить его роли
+        try:
+            current_user = client.security.get_user(username=safe_username)
+            user_data = current_user.get(safe_username, {})
+            current_roles = user_data.get('roles', [])
+        except Exception as e:
+            logger.warning(f"Could not get current user {safe_username} to preserve roles: {e}")
+            current_roles = []
+
+        # Используем put_user для обновления пароля (более надежный способ)
+        response = client.security.put_user(
             username=safe_username,
-            password=password
+            password=password,
+            roles=current_roles if current_roles else None,
         )
 
-        if response.get('password_changed', False):
+        # Логируем полный ответ для отладки
+        logger.info(f"Change password response for {username}: {response}")
+
+        # put_user возвращает словарь с информацией об операции
+        # Для существующего пользователя может вернуть пустой словарь или словарь без 'created'
+        # Если нет ошибки, считаем операцию успешной
+        has_error = response.get('error') is not None if isinstance(response, dict) else False
+        
+        if not has_error:
             logger.info(f"Successfully changed password for Elasticsearch user: {username}")
             return 'password_changed'
         else:
-            logger.warning(f"Password change for user {username} was not successful")
+            logger.warning(
+                f"Password change for user {username} was not successful. "
+                f"Response: {response}"
+            )
             return 'error'
 
     except Exception as e:
