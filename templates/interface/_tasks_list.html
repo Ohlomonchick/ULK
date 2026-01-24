@@ -17,7 +17,14 @@
 {% if tasks %}
     <div class="box" id="tasks-list-box" style="border: 1px solid rgba(0, 0, 0, 0.1)">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 class="title is-4 mb-0">{% if title %}{{ title }}{% else %}Задания{% endif %}</h3>
+            <h3 class="title is-4 mb-0">
+                {% if title %}{{ title }}{% else %}Задания{% endif %}
+                {% if not is_superuser %}
+                    <span id="tasks-completion-counter" class="tag is-light is-medium ml-2">
+                        <span class="completed-count">0</span>/<span class="total-count">{{ tasks|length }}</span>
+                    </span>
+                {% endif %}
+            </h3>
             {% if not is_superuser %}
                 <button id="check-tasks-btn" class="button is-primary is-small" 
                         data-competition-slug="{{ competition_slug }}"

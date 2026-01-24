@@ -182,6 +182,11 @@ class TasksController {
      * Обновляет UI заданий на основе данных
      */
     updateTasksUI(tasks) {
+        const completedCount = tasks.filter(task => task.done).length;
+        const totalCount = tasks.length;
+        
+        this.updateCompletionCounter(completedCount, totalCount);
+
         tasks.forEach(task => {
             const $taskElement = $(`.task-item[data-task-id="${task.id}"]`);
             if (!$taskElement.length) return;
@@ -224,6 +229,17 @@ class TasksController {
                 $statusTag.empty();
             }
         });
+    }
+
+    /**
+     * Обновляет счётчик выполненных заданий
+     */
+    updateCompletionCounter(completed, total) {
+        const $counter = $('#tasks-completion-counter');
+        if ($counter.length) {
+            $counter.find('.completed-count').text(completed);
+            $counter.find('.total-count').text(total);
+        }
     }
 
     /**
