@@ -105,7 +105,7 @@ def create_elastic_user(username, password, index="suricata-*"):
             indices=[
                 {
                     "names": [index],
-                    "privileges": ["read"],
+                    "privileges": ["read", "index"],
                 }
             ],
             applications=[
@@ -138,6 +138,133 @@ def create_elastic_user(username, password, index="suricata-*"):
 
     except Exception as e:
         logger.error(f"Failed to create Elasticsearch user {username}: {e}")
+        return 'error'
+
+
+def change_elastic_password(username, password):
+    """
+    Изменить пароль пользователя в Elasticsearch
+
+    Args:
+        username (str): Имя пользователя
+        password (str): Новый пароль
+
+    Returns:
+        str: Результат операции ('password_changed', 'connection failed', 'error')
+    """
+    client = get_elastic_client()
+    if not client:
+        return 'connection failed'
+
+    try:
+        safe_username = transliterate_username(username)
+
+        # Получаем текущего пользователя, чтобы сохранить его роли
+        try:
+            current_user = client.security.get_user(username=safe_username)
+            user_data = current_user.get(safe_username, {})
+            current_roles = user_data.get('roles', [])
+        except Exception as e:
+            logger.warning(f"Could not get current user {safe_username} to preserve roles: {e}")
+            current_roles = []
+
+        # Используем put_user для обновления пароля (более надежный способ)
+        response = client.security.put_user(
+            username=safe_username,
+            password=password,
+            roles=current_roles if current_roles else None,
+        )
+
+        # Если нет ошибки в ответе, операция успешна
+        has_error = response.get('error') is not None if isinstance(response, dict) else False
+
+        if not has_error:
+            logger.info(f"Successfully changed password for Elasticsearch user: {username}")
+            return 'password_changed'
+        else:
+            logger.warning(f"Password change for user {username} failed. Response: {response}")
+            return 'error'
+
+    except Exception as e:
+        logger.error(f"Failed to change password for Elasticsearch user {username}: {e}")
+        return 'error'
+
+
+def update_elastic_user_role(username, index):
+    """
+    Обновить роль пользователя, добавив разрешения к указанному индексу, если их нет
+
+    Args:
+        username (str): Имя пользователя
+        index (str): Индекс для доступа
+
+    Returns:
+        str: Результат операции ('role_updated', 'role_unchanged', 'connection failed', 'error')
+    """
+    client = get_elastic_client()
+    if not client:
+        return 'connection failed'
+
+    try:
+        safe_username = transliterate_username(username)
+        role_name = f"user_{safe_username}_role"
+
+        # Получаем текущую роль
+        try:
+            current_role = client.security.get_role(name=role_name)
+            role_data = current_role.get(role_name, {})
+            current_indices = role_data.get('indices', [])
+        except Exception as e:
+            logger.warning(f"Role {role_name} not found, will create it: {e}")
+            role_data = {}
+            current_indices = []
+
+        # Проверяем, есть ли уже доступ к указанному индексу
+        index_exists = False
+        for idx_config in current_indices:
+            if index in idx_config.get('names', []):
+                index_exists = True
+                break
+
+        # Если индекс уже есть, ничего не делаем
+        if index_exists:
+            logger.info(f"Role {role_name} already has access to index {index}")
+            return 'role_unchanged'
+
+        # Добавляем новый индекс к существующим
+        updated_indices = list(current_indices)
+        updated_indices.append({
+            "names": [index],
+            "privileges": ["read", "index"],
+        })
+
+        # Обновляем роль
+        response_role = client.security.put_role(
+            name=role_name,
+            cluster=role_data.get('cluster', []),
+            indices=updated_indices,
+            applications=role_data.get('applications', [
+                {
+                    "application": "kibana-.kibana",
+                    "privileges": ["read"],
+                    "resources": ["*"]
+                }
+            ]),
+            transient_metadata={'enabled': True}
+        )
+
+        # Если нет поля 'error', операция успешна (роль создана или обновлена)
+        has_error = response_role.get('error') is not None if isinstance(response_role, dict) else False
+
+        if not has_error:
+            logger.info(f"Successfully updated Elasticsearch role {role_name} with index {index}")
+            return 'role_updated'
+        else:
+            logger.warning(f"Role {role_name} update failed. Response: {response_role}")
+            return 'error'
+
+    except Exception as e:
+        logger.error(f"Failed to update Elasticsearch role for user {username}: {e}")
         return 'error'
 
 

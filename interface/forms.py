@@ -147,7 +147,7 @@ class CustomUserCreationForm(UserCreationForm):  # pragma: no cover
             elastic_result = create_elastic_user(
                 username=user.pnet_login,  # pnet_login
                 password=user.pnet_password,  # pnet_password
-                index="suricata-*"  # Можно настроить через конфигурацию
+                index=f"*{user.pnet_login}*"  # Можно настроить через конфигурацию
             )
             if elastic_result != 'created':
                 # Логируем ошибку, но не прерываем создание пользователя
@@ -201,7 +201,7 @@ class LabTaskInlineForm(forms.ModelForm):
     def _post_clean(self):
         task_type_value = self.cleaned_data.pop('task_type', None)
         super()._post_clean()
-        
+
         if task_type_value is not None:
             self.cleaned_data['task_type'] = task_type_value
 
@@ -366,7 +366,7 @@ class CompetitionForm(forms.ModelForm):
                     Competition2User.objects.get(competition=instance, user_id=user_id).delete()
 
         with_pnet_session_if_needed(instance.lab, _delete_operation)
-        
+
 
 class KkzForm(forms.ModelForm):  # pragma: no cover
     class Meta:
@@ -838,9 +838,9 @@ class SimpleCompetitionForm(forms.Form):
         """Configure tasks field for the current lab"""
         tasks = LabTask.objects.filter(lab=self.lab).select_related('task_type').order_by('task_type__name', 'task_id')
         self.fields["tasks"].queryset = tasks
-        
+
         grouped_choices = []
-       
+
         def get_type_name(t):
             return t.task_type.name if t.task_type else "Без типа"
 
@@ -893,27 +893,27 @@ class SimpleCompetitionForm(forms.Form):
 
     def select_tasks_by_type_counts(self, lab, task_type_counts):
         """
-        Выбирает случайные задания согласно указанному количеству для каждого типа. 
-        """        
+        Выбирает случайные задания согласно указанному количеству для каждого типа.
+        """
         selected_tasks = []
-        
+
         if isinstance(task_type_counts, list):
             counts_dict = {item['type_id']: item['count'] for item in task_type_counts}
         else:
             counts_dict = task_type_counts
-        
+
         for type_id, count in counts_dict.items():
             if count <= 0:
                 continue
-                
+
             if type_id is None:
                 available_tasks = list(LabTask.objects.filter(lab=lab, task_type__isnull=True))
             else:
                 available_tasks = list(LabTask.objects.filter(lab=lab, task_type_id=type_id))
-            
+
             selected = random.sample(available_tasks, min(count, len(available_tasks)))
             selected_tasks.extend(selected)
-        
+
         return selected_tasks
 
     def create_competition(self):
@@ -921,12 +921,12 @@ class SimpleCompetitionForm(forms.Form):
             raise ValidationError("Лабораторная работа не указана")
 
         task_type_counts = self.cleaned_data.get("task_type_counts", {})
-        
+
         if task_type_counts:
             selected_tasks = self.select_tasks_by_type_counts(self.lab, task_type_counts)
         else:
             selected_tasks = list(self.cleaned_data.get("tasks") or [])
-        
+
         base_data = self._build_base_competition_data(selected_tasks)
 
         if self.lab.lab_type == LabType.COMPETITION:
