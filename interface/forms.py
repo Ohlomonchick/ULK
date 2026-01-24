@@ -72,7 +72,7 @@ class LabAnswerForm(forms.Form):
 
 
 class SignUpForm(forms.ModelForm):  # pragma: no cover
-    password = forms.CharField(widget=forms.PasswordInput(), label = "Пароль")
+    password = forms.CharField(widget=forms.PasswordInput(), label = "Пароль", help_text="Пароль по умолчанию test.test")
     class Meta:
         fields = ["first_name", "last_name", "platoon"]
         model = User

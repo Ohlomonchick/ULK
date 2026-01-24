@@ -52,6 +52,9 @@
                             <div class="control is-expanded">
                                 {{ field|add_class:"input" }}
                             </div>
+                            {% if field.help_text %}
+                                <p class="help">{{ field.help_text }}</p>
+                            {% endif %}
                         </div>
                         {% if field.errors %}
                                 <p class=" help is-danger">{{ field.errors.as_text }}</p>
