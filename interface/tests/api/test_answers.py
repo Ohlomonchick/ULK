@@ -1,4 +1,5 @@
-from django.test import TestCase
+from django.test import TestCase, Client
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -390,4 +391,254 @@ class AnswerSerializerTests(TestCase):
         )
         self.assertEqual(answers_without_task.count(), 1)
 
+
+class AnswerAPIGetTests(TestCase):
+    """
+    Тесты для GET /api/answers endpoint
     
+    Проверяет получение выполненных заданий студента по:
+    - username
+    - pnet_login
+    - lab_slug
+    """
+    
+    def setUp(self):
+        self.client = Client()
+        
+        self.lab = Lab.objects.create(
+            name="Test Lab GET",
+            description="Test lab for GET endpoint",
+            slug="test-lab-get",
+            platform="NO"
+        )
+        
+        self.lab2 = Lab.objects.create(
+            name="Test Lab 2",
+            description="Another test lab",
+            slug="test-lab-2",
+            platform="NO"
+        )
+        
+        self.user1 = User.objects.create(
+            username="Иванов_Иван",
+            pnet_login="ivanov-ivan",
+            first_name="Иван",
+            last_name="Иванов"
+        )
+        self.user2 = User.objects.create(
+            username="Петров_Петр",
+            pnet_login="petrov-petr",
+            first_name="Петр",
+            last_name="Петров"
+        )
+        
+        self.task1 = LabTask.objects.create(
+            lab=self.lab,
+            task_id="task_1",
+            description="Первое задание"
+        )
+        self.task2 = LabTask.objects.create(
+            lab=self.lab,
+            task_id="task_2",
+            description="Второе задание"
+        )
+        self.task3 = LabTask.objects.create(
+            lab=self.lab,
+            task_id="task_3",
+            description="Третье задание"
+        )
+        
+        self.task_lab2 = LabTask.objects.create(
+            lab=self.lab2,
+            task_id="task_1",
+            description="Задание из другой лабы"
+        )
+        
+        self.answer1 = Answers.objects.create(
+            user=self.user1,
+            lab=self.lab,
+            lab_task=self.task1,
+            datetime=timezone.now()
+        )
+        self.answer2 = Answers.objects.create(
+            user=self.user1,
+            lab=self.lab,
+            lab_task=self.task2,
+            datetime=timezone.now()
+        )
+        
+        self.answer_lab2 = Answers.objects.create(
+            user=self.user1,
+            lab=self.lab2,
+            lab_task=self.task_lab2,
+            datetime=timezone.now()
+        )
+        
+        self.answer_user2 = Answers.objects.create(
+            user=self.user2,
+            lab=self.lab,
+            lab_task=self.task3,
+            datetime=timezone.now()
+        )
+
+    def test_get_answers_by_username(self):
+        """
+        Тест получения выполненных заданий по username
+        GET /api/answers?username=Иванов_Иван&lab_slug=test-lab-get
+        """
+        response = self.client.get(
+            '/api/answers',
+            {'username': 'Иванов_Иван', 'lab_slug': 'test-lab-get'}
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        self.assertIn('task_1', data['completed_task_ids'])
+        self.assertIn('task_2', data['completed_task_ids'])
+        self.assertNotIn('task_3', data['completed_task_ids'])
+
+    def test_get_answers_by_pnet_login(self):
+        """
+        Тест получения выполненных заданий по pnet_login
+        GET /api/answers?pnet_login=ivanov-ivan&lab_slug=test-lab-get
+        """
+        response = self.client.get(
+            '/api/answers',
+            {'pnet_login': 'ivanov-ivan', 'lab_slug': 'test-lab-get'}
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        self.assertEqual(len(data['completed_task_ids']), 2)
+
+    def test_get_answers_missing_lab_slug(self):
+        """
+        Тест ошибки при отсутствии lab_slug
+        """
+        response = self.client.get(
+            '/api/answers',
+            {'username': 'Иванов_Иван'}
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('error', data)
+        self.assertIn('lab_slug', data['error'])
+
+    def test_get_answers_missing_user_identifier(self):
+        """
+        Тест ошибки при отсутствии username и pnet_login
+        """
+        response = self.client.get(
+            '/api/answers',
+            {'lab_slug': 'test-lab-get'}
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('error', data)
+        self.assertIn('username', data['error'].lower())
+
+    def test_get_answers_user_not_found(self):
+        """
+        Тест ошибки при несуществующем пользователе
+        """
+        response = self.client.get(
+            '/api/answers',
+            {'username': 'Несуществующий_Пользователь', 'lab_slug': 'test-lab-get'}
+        )
+        
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertIn('error', data)
+        self.assertIn('User not found', data['error'])
+
+    def test_get_answers_lab_not_found(self):
+        """
+        Тест ошибки при несуществующей лабе
+        """
+        response = self.client.get(
+            '/api/answers',
+            {'username': 'Иванов_Иван', 'lab_slug': 'nonexistent-lab'}
+        )
+        
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertIn('error', data)
+        self.assertIn('Lab', data['error'])
+
+    def test_get_answers_empty_result(self):
+        """
+        Тест пустого результата когда у пользователя нет выполненных заданий
+        """
+        new_user = User.objects.create(
+            username="Новый_Пользователь",
+            pnet_login="new-user"
+        )
+        
+        response = self.client.get(
+            '/api/answers',
+            {'username': 'Новый_Пользователь', 'lab_slug': 'test-lab-get'}
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        self.assertEqual(data['completed_task_ids'], [])
+
+    def test_get_answers_response_structure(self):
+        """
+        Тест структуры ответа - проверяем обязательное поле completed_task_ids
+        """
+        response = self.client.get(
+            '/api/answers',
+            {'username': 'Иванов_Иван', 'lab_slug': 'test-lab-get'}
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        self.assertIn('completed_task_ids', data)
+        self.assertIsInstance(data['completed_task_ids'], list)
+
+    def test_post_still_works(self):
+        """
+        Тест что POST запрос всё ещё работает корректно
+        """
+        competition = Competition.objects.create(
+            lab=self.lab,
+            start=timezone.now() - timezone.timedelta(hours=1),
+            finish=timezone.now() + timezone.timedelta(hours=1)
+        )
+        Competition2User.objects.create(
+            competition=competition,
+            user=self.user1
+        )
+        
+        new_task = LabTask.objects.create(
+            lab=self.lab,
+            task_id="new_task",
+            description="Новое задание"
+        )
+        
+        response = self.client.post(
+            '/api/answers',
+            {
+                'pnet_login': 'ivanov-ivan',
+                'lab_slug': 'test-lab-get',
+                'task': 'new_task'
+            },
+            content_type='application/json'
+        )
+        
+        self.assertIn(response.status_code, [200, 201])
+        
+        self.assertTrue(
+            Answers.objects.filter(
+                user=self.user1,
+                lab=self.lab,
+                lab_task=new_task
+            ).exists()
+        )

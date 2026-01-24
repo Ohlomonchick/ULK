@@ -792,6 +792,59 @@ class AnswerAPIView(viewsets.ModelViewSet):
     queryset = Answers.objects.all()
     serializer_class = AnswerSerializer
 
+    def list(self, request, *args, **kwargs):
+        """
+        GET /api/answers - получение выполненных заданий студента
+        Необходимо передать lab_slug и один из идентификаторов пользователя (username или pnet_login)
+        """
+        username = request.query_params.get('username')
+        pnet_login = request.query_params.get('pnet_login')
+        lab_slug = request.query_params.get('lab_slug')
+
+        if not lab_slug:
+            return JsonResponse(
+                {'error': 'lab_slug parameter is required'},
+                status=400
+            )
+
+        if not username and not pnet_login:
+            return JsonResponse(
+                {'error': 'Either username or pnet_login parameter is required'},
+                status=400
+            )
+
+        try:
+            lab = Lab.objects.get(slug=lab_slug)
+        except Lab.DoesNotExist:
+            return JsonResponse(
+                {'error': f'Lab with slug "{lab_slug}" not found'},
+                status=404
+            )
+
+        user = None
+        if username:
+            user = User.objects.filter(username=username).first()
+        if not user and pnet_login:
+            user = User.objects.filter(pnet_login=pnet_login).first()
+
+        if not user:
+            return JsonResponse(
+                {'error': 'User not found with provided credentials'},
+                status=404
+            )
+
+        answers = Answers.objects.filter(
+            user=user,
+            lab=lab,
+            lab_task__isnull=False
+        ).select_related('lab_task')
+
+        completed_task_ids = [answer.lab_task.task_id for answer in answers]
+
+        return JsonResponse({
+            'completed_task_ids': completed_task_ids
+        })
+
 def utils_console(request, slug, node_name):
     # Получаем username из параметра запроса, если не передан - используем текущего пользователя
     username = request.GET.get('username', request.user.username)
