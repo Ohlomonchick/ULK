@@ -53,6 +53,13 @@
             </div>
 
             <div class="navbar-end">
+              {% if request.user.is_authenticated and not request.user.is_superuser %}
+              <div class="navbar-item no-hover">
+                <span class="has-text-light">
+                  {{ request.user.last_name }} {{ request.user.first_name|slice:":1" }}.
+                </span>
+              </div>
+              {% endif %}
               <div class="navbar-item no-hover">
                 <div class="buttons">
                     {% if request.user.is_authenticated %}
