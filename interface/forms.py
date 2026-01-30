@@ -354,6 +354,16 @@ class CompetitionForm(forms.ModelForm):
                 competition2user.deploy_meta['usb_device_ids'] = usb_ids
                 competition2user.save(update_fields=['deploy_meta'])
 
+    def _create_admin_competition_users(self, instance):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating admin competition users for {instance.slug}")
+        for user in User.objects.filter(is_superuser=True):
+            Competition2User.objects.update_or_create(
+                competition=instance,
+                user=user,
+            )
+
     def _delete_removed_users(self, instance):
         """Удаляет пользователей, которых больше нет в списке."""
         all_users = self.get_all_users(instance)
