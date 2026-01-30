@@ -311,6 +311,7 @@ class CompetitionForm(forms.ModelForm):
             logger.info(f"USB IDs distribution: {usb_ids_distribution}")
 
             def _create_users():
+                self._create_admin_competition_users(instance)
                 return self._create_competition_users(instance, new_users, usb_ids_distribution)
 
             with_pnet_session_if_needed(instance.lab, _create_users)
@@ -366,7 +367,7 @@ class CompetitionForm(forms.ModelForm):
 
     def _delete_removed_users(self, instance):
         """Удаляет пользователей, которых больше нет в списке."""
-        all_users = self.get_all_users(instance)
+        all_users = self.get_all_users(instance) | User.objects.filter(is_superuser=True).all().distinct()
         all_users_ids = set(all_users.values_list('pk', flat=True))
         existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
 

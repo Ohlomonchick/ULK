@@ -68,7 +68,7 @@ class Command(BaseCommand):
                 )
 
                 # Создаем директорию для пользователя
-                session.create_directory(get_pnet_base_dir(), user.username)
+                session.create_directory(get_pnet_base_dir(), user.pnet_login)
 
                 # Создаем пользователя
                 session.create_user(user.pnet_login, pnet_password)

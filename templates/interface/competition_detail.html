@@ -26,40 +26,43 @@
                         {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' lab_name=object.lab.name finish_date=object.finish platoon_number=platoon_number %}
                     </div>
                 {% endif %}
-            {% elif object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-                <div class="iframe-container" style="position: relative;">
-                    <button class="iframe-toggle-slider" id="expandIframeBtn">
-                        <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
-                    </button>
-                    {% if object.lab.platform == "CMD" %}
-                        <button class="console-refresh-slider" id="refreshConsoleBtn" onclick="refreshConsoleSession()">
-                            <i class="fas fa-sync-alt"></i><span class="slider-text"> Обновить консоль</span>
+            {% endif %}
+            {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
+                {% if show_console_iframe %}
+                    <div class="iframe-container" style="position: relative;">
+                        <button class="iframe-toggle-slider" id="expandIframeBtn">
+                            <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
                         </button>
-                        <!-- Загрузчик для CMD консоли -->
-                        <div class="cmd-console-loader" id="cmdConsoleLoader">
-                            <div class="cmd-console-loader-spinner"></div>
-                            <p class="cmd-console-loader-text">Инициализация консоли...</p>
-                            <p class="cmd-console-loader-subtext">Включение виртуальных машин</p>
-                        </div>
-                    {% elif object.lab.platform == "PN" %}
-                        <!-- Загрузчик для PNET консоли -->
-                        <div class="cmd-console-loader" id="pnetConsoleLoader">
-                            <div class="cmd-console-loader-spinner"></div>
-                            <p class="cmd-console-loader-text">Инициализация PNET...</p>
-                            <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
-                        </div>
-                    {% endif %}
-                    <iframe
-                        id="pnetFrame"
-                        style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
-                        {% if object.lab.platform == "PN" %}data-src="/pnetlab/"{% endif %}
-                        width="100%"
-                        class="mb-5"
-                        height="680px"
-                        frameborder="0"
-                        tabindex="0">
-                    </iframe>
-                </div>
+                        {% if object.lab.platform == "CMD" %}
+                            <button class="console-refresh-slider" id="refreshConsoleBtn" onclick="refreshConsoleSession()">
+                                <i class="fas fa-sync-alt"></i><span class="slider-text"> Обновить консоль</span>
+                            </button>
+                            <!-- Загрузчик для CMD консоли -->
+                            <div class="cmd-console-loader" id="cmdConsoleLoader">
+                                <div class="cmd-console-loader-spinner"></div>
+                                <p class="cmd-console-loader-text">Инициализация консоли...</p>
+                                <p class="cmd-console-loader-subtext">Включение виртуальных машин</p>
+                            </div>
+                        {% elif object.lab.platform == "PN" %}
+                            <!-- Загрузчик для PNET консоли -->
+                            <div class="cmd-console-loader" id="pnetConsoleLoader">
+                                <div class="cmd-console-loader-spinner"></div>
+                                <p class="cmd-console-loader-text">Инициализация PNET...</p>
+                                <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
+                            </div>
+                        {% endif %}
+                        <iframe
+                            id="pnetFrame"
+                            style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
+                            {% if object.lab.platform == "PN" %}data-src="/pnetlab/"{% endif %}
+                            width="100%"
+                            class="mb-5"
+                            height="680px"
+                            frameborder="0"
+                            tabindex="0">
+                        </iframe>
+                    </div>
+                {% endif %}
             {% endif %}
             
             {% with object=object.lab %}
@@ -143,7 +146,7 @@
     {% endif %}
 
     {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-        {% if not user.is_superuser %}
+        {% if show_console_iframe %}
             <script src="{% static 'js/common_utils.js' %}"></script>
             <script src="{% static 'js/console_loader.js' %}"></script>
             <script src="{% static 'js/pnet_iframe_controller.js' %}"></script>
@@ -152,7 +155,11 @@
             {% elif object.lab.platform == "CMD" %}
                 <script src="{% static 'js/cmd_controller.js' %}"></script>
             {% endif %}
+        {% endif %}
+    {% endif %}
 
+    {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
+        {% if show_console_iframe %}
             <div class="iframe-fullscreen-overlay" id="iframeOverlay"></div>
             <button class="iframe-collapse-btn" id="collapseIframeBtn">
                 <i class="fas fa-compress"></i>
@@ -179,11 +186,14 @@
             </div>
             
             <!-- Левая панель с описанием (split-screen) -->
-            <div class="description-panel" id="descriptionPanel">
+            <div class="description-panel" id="descriptionPanel"{% if user.is_superuser %} data-leaderboard-enabled="true"{% endif %}>
                 <button class="description-collapse-btn" id="descriptionCollapseBtn" title="Скрыть описание">
                     <i class="fas fa-chevron-left"></i>
                 </button>
                 <div class="description-panel-content" id="descriptionPanelContent">
+                    {% if user.is_superuser %}
+                        <div id="descriptionPanelLeaderboard" class="mb-5"></div>
+                    {% endif %}
                     <h2 class="title is-4 mb-4">Описание лабораторной работы</h2>
                     <div class="content">
                         {% with object=object.lab %}

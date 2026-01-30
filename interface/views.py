@@ -374,6 +374,9 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
                 else:
                     assigned_tasks = []
 
+            if self.request.user.is_staff and not assigned_tasks:
+                assigned_tasks = list(competition.tasks.all())
+
             context["assigned_tasks"] = assigned_tasks
 
         patch_lab_description(context["object"], self.request.user)
@@ -494,6 +497,13 @@ def build_competition_context(request, instance, is_team_competition=False):
     total_progress = getattr(instance, "total_progress", 0)
     total_tasks = getattr(instance, "num_tasks", 0) or 0
 
+    show_console_iframe = (not request.user.is_superuser) or (
+        request.user.is_superuser
+        and not is_team_competition
+        and instance.lab
+        and instance.lab.lab_type == "PZ"
+    )
+
     return {
         "object": instance,
         "delta": {"hours": f"{hours:02d}", "minutes": f"{minutes:02d}", "seconds": f"{seconds:02d}"},
@@ -507,6 +517,7 @@ def build_competition_context(request, instance, is_team_competition=False):
         "total_progress": total_progress,
         "total_tasks": total_tasks,
         "is_team_competition": is_team_competition,
+        "show_console_iframe": show_console_iframe,
     }
 
 
@@ -529,6 +540,7 @@ class TeamCompetitionDetailView(CompetitionDetailView):
         if context.get("assigned_tasks", []) == [] and self.team_relation:
             context["assigned_tasks"] = self.team_relation.tasks.all()
         context["is_team_competition"] = True
+        context["show_console_iframe"] = not self.request.user.is_superuser
 
         return context
 

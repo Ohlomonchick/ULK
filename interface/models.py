@@ -528,7 +528,7 @@ class Competition2User(models.Model):
 
         execute_pnet_operation_if_needed(
             self.competition.lab,
-            lambda session_manager: session_manager.delete_lab_for_user(get_pnet_lab_name(self.competition), self.user.username)
+            lambda session_manager: session_manager.delete_lab_for_user(get_pnet_lab_name(self.competition), self.user.pnet_login)
         )
 
         self.deleted = True
@@ -551,13 +551,13 @@ class Competition2User(models.Model):
 
         def _create_operation(session_manager):
             lab_name = get_pnet_lab_name(instance.competition)
-            username = instance.user.username
+            pnet_login = instance.user.pnet_login
 
             # Получаем USB device IDs из deploy_meta
             usb_device_ids = instance.deploy_meta.get('usb_device_ids', []) if instance.deploy_meta else []
 
-            session_manager.create_lab_for_user(lab_name, username)
-            session_manager.create_lab_nodes_and_connectors(lab, lab_name, username, usb_device_ids=usb_device_ids)
+            session_manager.create_lab_for_user(lab_name, pnet_login)
+            session_manager.create_lab_nodes_and_connectors(lab, lab_name, pnet_login, usb_device_ids=usb_device_ids)
 
         execute_pnet_operation_if_needed(lab, _create_operation)
 

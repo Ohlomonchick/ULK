@@ -8,6 +8,76 @@ function initializeIframeControls() {
     let sidebarExpanded = false;
     let descriptionExpanded = false;
     let descriptionScrollPosition = 0; // Сохраняем позицию скролла
+    let leaderboardEnabled = false;
+    let leaderboardState = null;
+
+    function isLeaderboardEnabled() {
+        const descriptionPanel = $('#descriptionPanel');
+        return descriptionPanel.data('leaderboard-enabled') === true;
+    }
+
+    function cacheLeaderboardState() {
+        if (leaderboardState) {
+            return;
+        }
+
+        const solutionsContainer = $('#solutions-container');
+        if (!solutionsContainer.length) {
+            return;
+        }
+
+        const solutionsBox = solutionsContainer.closest('.box');
+        if (!solutionsBox.length) {
+            return;
+        }
+
+        leaderboardState = {
+            element: solutionsBox,
+            parent: solutionsBox.parent(),
+            nextSibling: solutionsBox.next()[0] || null
+        };
+    }
+
+    function moveLeaderboardToDescriptionPanel() {
+        if (!leaderboardEnabled) {
+            return;
+        }
+
+        const target = $('#descriptionPanelLeaderboard');
+        if (!target.length) {
+            return;
+        }
+
+        cacheLeaderboardState();
+        if (!leaderboardState || !leaderboardState.element) {
+            return;
+        }
+
+        if (target[0] && leaderboardState.element[0] && target[0].contains(leaderboardState.element[0])) {
+            return;
+        }
+
+        target.append(leaderboardState.element);
+    }
+
+    function restoreLeaderboardPosition() {
+        if (!leaderboardEnabled || !leaderboardState) {
+            return;
+        }
+
+        const { element, parent, nextSibling } = leaderboardState;
+        if (!element || !parent) {
+            return;
+        }
+
+        if (nextSibling && parent[0] && parent[0].contains(nextSibling)) {
+            element.insertBefore(nextSibling);
+        } else {
+            parent.append(element);
+        }
+    }
+
+    leaderboardEnabled = isLeaderboardEnabled();
     
     /**
      * Клонирует содержимое правой панели в выдвижную панель
@@ -214,6 +284,7 @@ function initializeIframeControls() {
         descriptionPanel.addClass('active');
         $('body').addClass('description-panel-active');
         descriptionExpanded = true;
+        moveLeaderboardToDescriptionPanel();
         
         // Скрываем кнопку разворачивания
         $('#descriptionExpandBtn').fadeOut(200);
@@ -244,6 +315,7 @@ function initializeIframeControls() {
             descriptionScrollPosition = descriptionContent.scrollTop();
         }
         
+        restoreLeaderboardPosition();
         descriptionPanel.removeClass('active');
         $('body').removeClass('description-panel-active');
         descriptionExpanded = false;
