@@ -185,3 +185,10 @@ def get_gunicorn_worker_id():
         except ValueError:
             return None
     return None
+
+
+def show_iframe_for_admin(competition, is_team_competition=False):
+    if not competition.lab: 
+        return False
+    lab = competition.lab
+    return not is_team_competition and lab.lab_type == "PZ" and lab.platform != "NO" and lab.need_iframe_for_admin

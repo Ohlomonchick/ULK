@@ -10,7 +10,7 @@ from django import forms
 from durationwidget.widgets import TimeDurationWidget
 from django.utils import timezone
 
-from interface.utils import get_pnet_password, generate_usb_device_ids
+from interface.utils import get_pnet_password, generate_usb_device_ids, show_iframe_for_admin
 from interface.elastic_utils import create_elastic_user
 from .models import (
     LabType,
@@ -311,6 +311,8 @@ class CompetitionForm(forms.ModelForm):
             logger.info(f"USB IDs distribution: {usb_ids_distribution}")
 
             def _create_users():
+                if show_iframe_for_admin(instance, hasattr(instance, 'teamcompetition')):
+                    self._create_admin_competition_users(instance)
                 return self._create_competition_users(instance, new_users, usb_ids_distribution)
 
             with_pnet_session_if_needed(instance.lab, _create_users)
@@ -354,9 +356,20 @@ class CompetitionForm(forms.ModelForm):
                 competition2user.deploy_meta['usb_device_ids'] = usb_ids
                 competition2user.save(update_fields=['deploy_meta'])
 
+    def _create_admin_competition_users(self, instance):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating admin competition users for {instance.slug}")
+        for user in User.objects.filter(is_superuser=True):
+            Competition2User.objects.update_or_create(
+                competition=instance,
+                user=user,
+                level=instance.level
+            )
+
     def _delete_removed_users(self, instance):
         """Удаляет пользователей, которых больше нет в списке."""
-        all_users = self.get_all_users(instance)
+        all_users = self.get_all_users(instance) | User.objects.filter(is_superuser=True).all().distinct()
         all_users_ids = set(all_users.values_list('pk', flat=True))
         existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
 
