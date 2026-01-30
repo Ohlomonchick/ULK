@@ -10,7 +10,7 @@ from django import forms
 from durationwidget.widgets import TimeDurationWidget
 from django.utils import timezone
 
-from interface.utils import get_pnet_password, generate_usb_device_ids
+from interface.utils import get_pnet_password, generate_usb_device_ids, show_iframe_for_admin
 from interface.elastic_utils import create_elastic_user
 from .models import (
     LabType,
@@ -311,7 +311,8 @@ class CompetitionForm(forms.ModelForm):
             logger.info(f"USB IDs distribution: {usb_ids_distribution}")
 
             def _create_users():
-                self._create_admin_competition_users(instance)
+                if show_iframe_for_admin(instance, hasattr(instance, 'teamcompetition')):
+                    self._create_admin_competition_users(instance)
                 return self._create_competition_users(instance, new_users, usb_ids_distribution)
 
             with_pnet_session_if_needed(instance.lab, _create_users)
@@ -363,6 +364,7 @@ class CompetitionForm(forms.ModelForm):
             Competition2User.objects.update_or_create(
                 competition=instance,
                 user=user,
+                level=instance.level
             )
 
     def _delete_removed_users(self, instance):

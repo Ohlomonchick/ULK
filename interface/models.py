@@ -88,6 +88,7 @@ class Lab(models.Model):
     tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
     need_kibana = models.BooleanField('Показывать дашборд в Kibana', default=False)
     task_checking = models.CharField('Метод проверки заданий', max_length=32, choices=TaskChecking.choices, default=TaskChecking.MULTIPLE_ATTEMPTS)
+    need_iframe_for_admin = models.BooleanField('Выдавать преподавателю сессию в PNEt', default=True)
 
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)

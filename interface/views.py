@@ -28,7 +28,7 @@ from rest_framework import viewsets
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
-from interface.utils import get_kibana_url, get_pnet_password, patch_lab_description
+from interface.utils import get_kibana_url, get_pnet_password, patch_lab_description, show_iframe_for_admin
 from django_summernote.utils import get_attachment_model, get_config
 
 logger = logging.getLogger(__name__)
@@ -499,9 +499,7 @@ def build_competition_context(request, instance, is_team_competition=False):
 
     show_console_iframe = (not request.user.is_superuser) or (
         request.user.is_superuser
-        and not is_team_competition
-        and instance.lab
-        and instance.lab.lab_type == "PZ"
+        and show_iframe_for_admin(instance, is_team_competition)
     )
 
     return {

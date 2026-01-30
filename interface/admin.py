@@ -175,7 +175,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     get_learning_years.short_description = 'Годы обучения'
 
     def get_fieldsets(self, request, obj=None):
-        base_fields = (
+        base_fields = [
             'name',
             'slug',
             'pnet_slug',
@@ -192,9 +192,14 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
             'answer_flag',
             'need_kibana',
             'task_checking',
-        )
+        ]
         pnet_fields = ('NodesData', 'ConnectorsData', 'Connectors2CloudData', 'NetworksData')
         ssh_fields = ('PnetSSHNodeName',)
+
+        if obj.platform != "NO" and obj.lab_type == "PZ":
+            base_fields.append('need_iframe_for_admin')
+
+        base_fields = tuple(base_fields)
 
         if obj and obj.platform == "PN":
             return (
