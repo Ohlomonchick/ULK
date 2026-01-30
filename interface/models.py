@@ -287,9 +287,10 @@ class User(AbstractUser):
                 self.platoon = default_platoon
         if not self.username:
             self.username = self.last_name + "_" + self.first_name
-        if 'admin' in self.username and '-fake' not in self.username:
-            self.username = self.username + '-fake'
+
         self.pnet_login = slugify(self.username)
+        if 'admin' in self.pnet_login and '-fake' not in self.pnet_login:
+            self.pnet_login = self.pnet_login + '-fake'
 
         super(User, self).save(*args, **kwargs)
 
