@@ -1,12 +1,11 @@
 from django.core.management.base import BaseCommand
-from django.conf import settings
 import os
 import random
 import string
 import logging
 from interface.models import User
 from interface.utils import get_pnet_password
-from interface.eveFunctions import pf_login, change_user_password, create_user, create_directory, logout
+from interface.pnet_session_manager import PNetSessionManager
 from interface.config import get_pnet_url, get_pnet_base_dir
 
 
@@ -36,8 +35,8 @@ class Command(BaseCommand):
         characters = string.ascii_letters + string.digits + "!@#$%^&*"
         return ''.join(random.choice(characters) for _ in range(length))
 
-    def update_user_pnet_password(self, user, url, cookie, xsrf, password_length, dry_run=False):
-        """Обновляет пароль пользователя в PNETLab"""
+    def update_user_pnet_password(self, user, session, password_length, dry_run=False):
+        """Обновляет пароль пользователя в PNETLab. session — PNetSessionManager или None при dry_run."""
         try:
             # Генерируем случайный пароль
             random_password = self.generate_random_password(password_length)
@@ -59,9 +58,8 @@ class Command(BaseCommand):
                 )
                 return True
 
-            # Пытаемся изменить пароль пользователя
-
-            result = change_user_password(url, cookie, xsrf, user.pnet_login, pnet_password)
+            # Пытаемся изменить пароль пользователя через сессию
+            result = session.change_user_password(user.pnet_login, pnet_password)
             if result is not None:
                 self.stdout.write(
                     self.style.SUCCESS(f"Пароль пользователя {user.pnet_login} успешно обновлен в PNETLab")
@@ -73,15 +71,14 @@ class Command(BaseCommand):
                 )
 
                 # Создаем директорию для пользователя
-                create_directory(url, get_pnet_base_dir(), user.username, cookie)
+                session.create_directory(get_pnet_base_dir(), user.username)
 
                 # Создаем пользователя
-                create_user(url, user.pnet_login, pnet_password, '1', cookie)
+                session.create_user(user.pnet_login, pnet_password)
 
                 self.stdout.write(
                     self.style.SUCCESS(f"Пользователь {user.pnet_login} успешно создан в PNETLab")
                 )
-
 
             # Обновляем пароль в базе данных Django
             user.pnet_password = pnet_password
@@ -129,17 +126,14 @@ class Command(BaseCommand):
                 return
 
             if not dry_run:
-                # Авторизуемся в PNETLab
-                login = 'admin'
-                password = 'pnet'
-
+                session = PNetSessionManager(do_logout=True)
                 self.stdout.write("Авторизация в PNETLab...")
-                cookie, xsrf = pf_login(pnet_url, login, password)
+                session.login(url=pnet_url)
                 self.stdout.write(
                     self.style.SUCCESS("Успешная авторизация в PNETLab")
                 )
             else:
-                cookie, xsrf = None, None
+                session = None
 
             # Счетчики для статистики
             success_count = 0
@@ -147,14 +141,13 @@ class Command(BaseCommand):
 
             # Обрабатываем каждого пользователя
             for user in users:
-                if self.update_user_pnet_password(user, pnet_url, cookie, xsrf, password_length, dry_run):
+                if self.update_user_pnet_password(user, session, password_length, dry_run):
                     success_count += 1
                 else:
                     error_count += 1
 
             if not dry_run:
-                # Выходим из PNETLab
-                logout(pnet_url)
+                session.logout()
                 self.stdout.write("Выход из PNETLab")
 
             # Выводим статистику

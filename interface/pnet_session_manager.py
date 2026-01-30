@@ -35,12 +35,12 @@ def exclusive_session_lock(func):
     """
     Декоратор для методов класса PNetSessionManager.
     Обеспечивает эксклюзивное выполнение методов с этим декоратором.
-    
+
     Все методы с этим декоратором будут выполняться последовательно:
     - Ни одна другая функция с таким же декоратором не начнёт выполняться,
       пока не закончится выполнение текущей функции
     - Сама функция будет ждать, пока завершатся другие функции с таким же декоратором
-    
+
     Использует блокировку на уровне экземпляра (self._exclusive_lock).
     """
     @wraps(func)
@@ -164,10 +164,10 @@ class PNetSessionManager:
         if self._do_logout:
             self.logout()
 
-    def login(self):
-        """Логин в PNet если еще не залогинены"""
+    def login(self, url=None):
+        """Логин в PNet если еще не залогинены. url — опциональный URL (иначе берётся из настроек)."""
         with self._lock:  # Атомарная проверка и установка флага
-            self._url = get_pnet_url()
+            self._url = url if url is not None else get_pnet_url()
             if not self._url:
                 raise ValueError("PNet URL не настроен")
 
@@ -263,9 +263,9 @@ class PNetSessionManager:
 
     @require_pnet_url
     def change_user_password(self, username, password):
-        """Изменение пароля пользователя"""
+        """Изменение пароля пользователя. Возвращает результат от API или None, если пользователь не найден."""
         url, cookie, xsrf = self.session_data
-        change_user_password(url, cookie, xsrf, username, password)
+        return change_user_password(url, cookie, xsrf, username, password)
 
     @require_pnet_url
     def create_directory(self, path, dir_name):
