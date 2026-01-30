@@ -184,18 +184,18 @@ class LabTaskManager(models.Manager):
 class LabTaskType(models.Model):
     """Тип задания, привязанный к конкретной лабораторной работе"""
     lab = models.ForeignKey(
-        Lab, 
-        on_delete=models.CASCADE, 
+        Lab,
+        on_delete=models.CASCADE,
         related_name='task_types',
         verbose_name="Лабораторная работа"
     )
     name = models.CharField('Название типа', max_length=255)
     default_duration = models.DurationField(
-        'Время на выполнение (одного задания)', 
+        'Время на выполнение (одного задания)',
         default=timedelta(minutes=5),
         help_text="Время, которое дается на выполнение одного задания этого типа"
     )
-    
+
     class Meta:
         verbose_name = 'Тип задания'
         verbose_name_plural = 'Типы заданий'
@@ -287,6 +287,8 @@ class User(AbstractUser):
                 self.platoon = default_platoon
         if not self.username:
             self.username = self.last_name + "_" + self.first_name
+        if 'admin' in self.username and '-fake' not in self.username:
+            self.username = self.username + '-fake'
         self.pnet_login = slugify(self.username)
 
         super(User, self).save(*args, **kwargs)

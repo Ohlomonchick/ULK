@@ -40,10 +40,6 @@ class Command(BaseCommand):
         try:
             # Генерируем случайный пароль
             random_password = self.generate_random_password(password_length)
-            if 'admin' in user.pnet_login and '-fake' not in user.pnet_login:
-                new_pnet_login = user.pnet_login + '-fake'
-                User.objects.filter(pk=user.pk).update(pnet_login=new_pnet_login)
-                user.pnet_login = new_pnet_login
 
             pnet_password = get_pnet_password(random_password)
 
