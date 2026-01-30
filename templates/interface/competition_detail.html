@@ -17,6 +17,43 @@
     <div class="columns is-centered">
         <div class="column is-three-quarters">
             {% if user.is_superuser %}
+                {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
+                    {% if show_console_iframe %}
+                        <div class="iframe-container" style="position: relative;">
+                            <button class="iframe-toggle-slider" id="expandIframeBtn">
+                                <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
+                            </button>
+                            {% if object.lab.platform == "CMD" %}
+                                <button class="console-refresh-slider" id="refreshConsoleBtn" onclick="refreshConsoleSession()">
+                                    <i class="fas fa-sync-alt"></i><span class="slider-text"> Обновить консоль</span>
+                                </button>
+                                <!-- Загрузчик для CMD консоли -->
+                                <div class="cmd-console-loader" id="cmdConsoleLoader">
+                                    <div class="cmd-console-loader-spinner"></div>
+                                    <p class="cmd-console-loader-text">Инициализация консоли...</p>
+                                    <p class="cmd-console-loader-subtext">Включение виртуальных машин</p>
+                                </div>
+                            {% elif object.lab.platform == "PN" %}
+                                <!-- Загрузчик для PNET консоли -->
+                                <div class="cmd-console-loader" id="pnetConsoleLoader">
+                                    <div class="cmd-console-loader-spinner"></div>
+                                    <p class="cmd-console-loader-text">Инициализация PNET...</p>
+                                    <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
+                                </div>
+                            {% endif %}
+                            <iframe
+                                id="pnetFrame"
+                                style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
+                                {% if object.lab.platform == "PN" %}data-src="/pnetlab/"{% endif %}
+                                width="100%"
+                                class="mb-5"
+                                height="680px"
+                                frameborder="0"
+                                tabindex="0">
+                            </iframe>
+                        </div>
+                    {% endif %}
+                {% endif %}
                 {% include 'interface/_solutions_table.html' with instance_slug=object.slug instance_type='competition' show_team_column=is_team_competition show_max_tasks=False progress=progress max_progress=max_progress %}
                 <div style="margin-bottom: 1rem;">
                     {% include 'interface/_control_buttons.html' with button_delete_from_platform=button_delete_from_platform button_start_now=button_start_now button_end_now=button_end_now button_resume=button_resume instance=object instance_type='competition' start_time=object.start finish_time=object.finish %}
@@ -26,42 +63,43 @@
                         {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' lab_name=object.lab.name finish_date=object.finish platoon_number=platoon_number %}
                     </div>
                 {% endif %}
-            {% endif %}
-            {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-                {% if show_console_iframe %}
-                    <div class="iframe-container" style="position: relative;">
-                        <button class="iframe-toggle-slider" id="expandIframeBtn">
-                            <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
-                        </button>
-                        {% if object.lab.platform == "CMD" %}
-                            <button class="console-refresh-slider" id="refreshConsoleBtn" onclick="refreshConsoleSession()">
-                                <i class="fas fa-sync-alt"></i><span class="slider-text"> Обновить консоль</span>
+            {% else %}
+                {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
+                    {% if show_console_iframe %}
+                        <div class="iframe-container" style="position: relative;">
+                            <button class="iframe-toggle-slider" id="expandIframeBtn">
+                                <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
                             </button>
-                            <!-- Загрузчик для CMD консоли -->
-                            <div class="cmd-console-loader" id="cmdConsoleLoader">
-                                <div class="cmd-console-loader-spinner"></div>
-                                <p class="cmd-console-loader-text">Инициализация консоли...</p>
-                                <p class="cmd-console-loader-subtext">Включение виртуальных машин</p>
-                            </div>
-                        {% elif object.lab.platform == "PN" %}
-                            <!-- Загрузчик для PNET консоли -->
-                            <div class="cmd-console-loader" id="pnetConsoleLoader">
-                                <div class="cmd-console-loader-spinner"></div>
-                                <p class="cmd-console-loader-text">Инициализация PNET...</p>
-                                <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
-                            </div>
-                        {% endif %}
-                        <iframe
-                            id="pnetFrame"
-                            style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
-                            {% if object.lab.platform == "PN" %}data-src="/pnetlab/"{% endif %}
-                            width="100%"
-                            class="mb-5"
-                            height="680px"
-                            frameborder="0"
-                            tabindex="0">
-                        </iframe>
-                    </div>
+                            {% if object.lab.platform == "CMD" %}
+                                <button class="console-refresh-slider" id="refreshConsoleBtn" onclick="refreshConsoleSession()">
+                                    <i class="fas fa-sync-alt"></i><span class="slider-text"> Обновить консоль</span>
+                                </button>
+                                <!-- Загрузчик для CMD консоли -->
+                                <div class="cmd-console-loader" id="cmdConsoleLoader">
+                                    <div class="cmd-console-loader-spinner"></div>
+                                    <p class="cmd-console-loader-text">Инициализация консоли...</p>
+                                    <p class="cmd-console-loader-subtext">Включение виртуальных машин</p>
+                                </div>
+                            {% elif object.lab.platform == "PN" %}
+                                <!-- Загрузчик для PNET консоли -->
+                                <div class="cmd-console-loader" id="pnetConsoleLoader">
+                                    <div class="cmd-console-loader-spinner"></div>
+                                    <p class="cmd-console-loader-text">Инициализация PNET...</p>
+                                    <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
+                                </div>
+                            {% endif %}
+                            <iframe
+                                id="pnetFrame"
+                                style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
+                                {% if object.lab.platform == "PN" %}data-src="/pnetlab/"{% endif %}
+                                width="100%"
+                                class="mb-5"
+                                height="680px"
+                                frameborder="0"
+                                tabindex="0">
+                            </iframe>
+                        </div>
+                    {% endif %}
                 {% endif %}
             {% endif %}
             
