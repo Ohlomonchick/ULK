@@ -920,12 +920,15 @@ class SimpleCompetitionForm(forms.Form):
         if not self.lab:
             raise ValidationError("Лабораторная работа не указана")
 
+        explicitly_selected = list(self.cleaned_data.get("tasks") or [])
         task_type_counts = self.cleaned_data.get("task_type_counts", {})
 
-        if task_type_counts:
+        if explicitly_selected:
+            selected_tasks = explicitly_selected
+        elif task_type_counts:
             selected_tasks = self.select_tasks_by_type_counts(self.lab, task_type_counts)
         else:
-            selected_tasks = list(self.cleaned_data.get("tasks") or [])
+            selected_tasks = []
 
         base_data = self._build_base_competition_data(selected_tasks)
 
