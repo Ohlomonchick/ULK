@@ -220,6 +220,7 @@ class LabTask(models.Model):
     )
     question = models.TextField("Вопрос", blank=True, null=True)
     answer = models.TextField("Ответ", blank=True, null=True, help_text="Правильный ответ на вопрос или регулярное выражение для проверки ответа")
+    dependencies = models.CharField("Идентификаторы заданий-зависимостей", max_length=1023, null=True, blank=True, help_text="Вводите идентификаторы через запятую")
 
     objects = LabTaskManager()
 

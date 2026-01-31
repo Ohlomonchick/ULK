@@ -60,7 +60,6 @@ class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         form = SimpleCompetitionForm(request.POST, lab=self.object)
         if form.is_valid():
             competition = form.create_competition()
-            sleep(2)
 
             if self.object.lab_type == LabType.COMPETITION:
                 return redirect('interface:team-competition-detail', slug=competition.slug)
@@ -553,7 +552,6 @@ class CreateKkzView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
     def form_valid(self, form):
         kkz = form.create_kkz()
-        sleep(5)
         return redirect('interface:kkz-detail', pk=kkz.pk)
 
     def get_context_data(self, **kwargs):
@@ -581,7 +579,6 @@ class CreateKkzFromLabView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
     def form_valid(self, form):
         kkz = form.create_kkz()
-        sleep(5)
         return redirect('interface:kkz-detail', pk=kkz.pk)
 
     def get_context_data(self, **kwargs):

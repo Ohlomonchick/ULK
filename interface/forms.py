@@ -198,6 +198,72 @@ class LabTaskInlineForm(forms.ModelForm):
             return None
         return data
 
+    def clean_dependencies(self):
+        """Валидация поля dependencies: проверка формата и существования идентификаторов заданий"""
+        data = self.cleaned_data.get('dependencies', '')
+        
+        if not data or not data.strip():
+            return data
+        
+        if ';' in data:
+            raise forms.ValidationError(
+                'Используйте запятую (,) для разделения идентификаторов, а не точку с запятой (;).'
+            )
+        
+        dependencies_list = [dep.strip() for dep in data.split(',') if dep.strip()]
+        
+        if not dependencies_list:
+            raise forms.ValidationError(
+                'Введите хотя бы один идентификатор задания через запятую.'
+            )
+        
+        split_parts = data.split(',')
+        if any(not part.strip() for part in split_parts):
+            raise forms.ValidationError(
+                'Между запятыми не должно быть пустых значений. Используйте формат: "id1, id2, id3".'
+            )
+        
+        # Получаем родительскую лабораторную работу
+        lab = None
+        if self.instance:
+            if hasattr(self.instance, 'lab') and self.instance.lab:
+                lab = self.instance.lab
+            elif hasattr(self.instance, 'lab_id') and self.instance.lab_id:
+                # Если lab_id установлен, но lab еще не загружен
+                try:
+                    lab = Lab.objects.get(pk=self.instance.lab_id)
+                except Lab.DoesNotExist:
+                    pass
+        
+        if not lab:
+            return data
+
+        existing_task_ids = set(
+            LabTask.objects.filter(lab=lab)
+            .exclude(pk=self.instance.pk if self.instance.pk else None)
+            .exclude(task_id__isnull=True)
+            .values_list('task_id', flat=True)
+        )
+        
+        invalid_ids = []
+        for dep_id in dependencies_list:
+            if dep_id not in existing_task_ids:
+                invalid_ids.append(dep_id)
+        
+        if invalid_ids:
+            if len(invalid_ids) == 1:
+                raise forms.ValidationError(
+                    f'Задание с идентификатором "{invalid_ids[0]}" не существует в данной лабораторной работе.'
+                )
+            else:
+                invalid_ids_str = ', '.join(f'"{id_}"' for id_ in invalid_ids)
+                raise forms.ValidationError(
+                    f'Задания с идентификаторами {invalid_ids_str} '
+                    f'не существуют в данной лабораторной работе.'
+                )
+        
+        return data
+
     def _post_clean(self):
         task_type_value = self.cleaned_data.pop('task_type', None)
         super()._post_clean()
