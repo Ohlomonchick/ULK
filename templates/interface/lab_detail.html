@@ -235,11 +235,24 @@
             font-size: 1rem !important;
             font-weight: 600 !important;
         }
+
+        .task-dependency-highlight {
+            border: 2px solid rgba(255, 56, 96, 0.9);
+            background: rgba(255, 56, 96, 0.08);
+            box-shadow: 0 0 0 2px rgba(255, 56, 96, 0.2), 0 6px 18px rgba(255, 56, 96, 0.15);
+            border-radius: 8px;
+            transition: box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+
+        /* Менее затемненный фон для модалки зависимостей */
+        #dependency-confirm-modal .modal-background {
+            background-color: rgba(10, 10, 10, 0.4);
+        }
     </style>
 {% endblock %}
 
 {% block content %}
-<div class="lab-detail-hero__overlay">
+<div class="lab-detail-hero__overlay" data-has-background="{% if object.background_image %}1{% else %}0{% endif %}">
     <div class="columns is-centered">
         <div class="column">
             <h1 class="title is-2 lab-detail-heading">{{ object.name }} <span class="tag {{ object.lab_type|lab_type_class }}" style="font-size: 1.35rem;">{{ object.get_lab_type_display }}</span></h1>
@@ -442,7 +455,12 @@
                                                                    class="task-checkbox"
                                                                    name="tasks"
                                                                    value="{{ task.pk }}"
-                                                                   data-subtype-id="{{ subtype.id }}">
+                                                                   data-subtype-id="{{ subtype.id }}"
+                                                                   data-task-id="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                                                   data-task-pk="{{ task.pk }}"
+                                                                   data-task-code="{{ task.task_id|default_if_none:'' }}"
+                                                                   data-task-label="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                                                   data-dependencies="{{ task.dependencies|default_if_none:'' }}">
                                                         </label>
                                                     </div>
                                                     <div class="media-content">
@@ -514,7 +532,12 @@
                                                 <input type="checkbox"
                                                        class="task-checkbox"
                                                        name="tasks"
-                                                       value="{{ task.pk }}">
+                                                       value="{{ task.pk }}"
+                                                       data-task-id="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                                       data-task-pk="{{ task.pk }}"
+                                                       data-task-code="{{ task.task_id|default_if_none:'' }}"
+                                                       data-task-label="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                                       data-dependencies="{{ task.dependencies|default_if_none:'' }}">
                                             </label>
                                         </div>
                                         <div class="media-content">
@@ -544,7 +567,16 @@
                 <article class="media task-item" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: 8px; transition: background-color 0.2s ease;">
                     <div class="media-left" style="margin-right: 1rem; display: flex; align-items: start; padding-top: 0.25rem;">
                         <label class="checkbox">
-                            <input type="checkbox" name="tasks" value="{{ task.pk }}" checked>
+                            <input type="checkbox"
+                                   class="task-checkbox"
+                                   name="tasks"
+                                   value="{{ task.pk }}"
+                                   checked
+                                   data-task-id="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                   data-task-pk="{{ task.pk }}"
+                                   data-task-code="{{ task.task_id|default_if_none:'' }}"
+                                   data-task-label="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                   data-dependencies="{{ task.dependencies|default_if_none:'' }}">
                         </label>
                     </div>
                     <div class="media-content">
@@ -601,42 +633,7 @@
 </form>
 </div>
 
-<script>
-    (function() {
-        const root = document.documentElement;
-        const raw = getComputedStyle(root).getPropertyValue('--lab-elements-color').trim() || '#ffffff';
-        const normalizeHex = (hex) => {
-            if (!hex) return null;
-            if (hex.startsWith('#')) hex = hex.slice(1);
-            if (hex.length === 3) {
-                hex = hex.split('').map(ch => ch + ch).join('');
-            }
-            if (hex.length !== 6) return null;
-            return hex;
-        };
-
-        const hex = normalizeHex(raw);
-        if (!hex) return;
-
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-
-        // Perceived brightness formula
-        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-        const textColor = brightness > 140 ? '#0b0b0b' : '#f8f8f8';
-        root.style.setProperty('--lab-elements-text', textColor);
-    })();
-
-    {% if object.background_image %}
-    (function() {
-        const wrapper = document.querySelector('.flex-wrapper');
-        if (wrapper) {
-            wrapper.classList.add('lab-global-bg');
-        }
-    })();
-    {% endif %}
-</script>
+{% include 'interface/_dependency_modal.html' %}
 
 <script src="{% static 'js/lab_detail.js' %}"></script>
 {% if object.lab_type == "COMPETITION" %}

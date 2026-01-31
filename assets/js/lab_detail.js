@@ -99,6 +99,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Запускаем локализацию
     localizeDurationWidget();
+
+    // Применяем тематические цвета и фон
+    applyLabThemeStyles();
     
     // Управление видео при отправке формы
     setupVideoForm();
@@ -115,8 +118,17 @@ function setupTaskSelectionLogic() {
     const hiddenInput = document.getElementById('id_task_type_counts');
     const totalBadge = document.getElementById('total-tasks-badge');
     const groupBlocks = document.querySelectorAll('.task-group-block:not(.task-subtype-block)');
+    const hasTaskGroups = groupBlocks.length > 0;
 
-    if (!groupBlocks.length) return;
+    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    if (!groupBlocks.length && !taskCheckboxes.length) return;
+
+    const dependencyManager = setupTaskDependencies({
+        onSelectionSync: () => {
+            syncAllCountsFromCheckboxes();
+            updateGlobalState();
+        }
+    });
 
     // --- Функция обновления состояния ---
     function updateGlobalState() {
@@ -163,7 +175,51 @@ function setupTaskSelectionLogic() {
         if (hiddenInput) hiddenInput.value = JSON.stringify(jsonData);
 
         // 3. Обновляем виджет времени
-        updateDurationWidget(totalSeconds);
+        if (hasTaskGroups) {
+            updateDurationWidget(totalSeconds);
+        }
+    }
+
+    // --- Полная синхронизация счетчиков по текущим чекбоксам ---
+    function syncAllCountsFromCheckboxes() {
+        const subtypeBlocks = document.querySelectorAll('.task-subtype-block');
+        const regularBlocks = document.querySelectorAll('.task-group-block:not(.task-parent-block):not(.task-subtype-block)');
+        const parentBlocks = document.querySelectorAll('.task-parent-block');
+
+        subtypeBlocks.forEach(subtypeBlock => {
+            const input = subtypeBlock.querySelector('.subtype-count-input');
+            const checkboxes = Array.from(subtypeBlock.querySelectorAll('.task-checkbox'));
+            if (input) {
+                input.value = checkboxes.filter(cb => cb.checked).length;
+            }
+        });
+
+        parentBlocks.forEach(parentBlock => {
+            updateParentCounter(parentBlock);
+            const subtypeBlocksInner = parentBlock.querySelectorAll('.task-subtype-block');
+            const parentSelectAll = parentBlock.querySelector('.parent-select-all-checkbox');
+            if (parentSelectAll) {
+                const allSubtypesSelected = Array.from(subtypeBlocksInner).every(subtypeBlock => {
+                    const input = subtypeBlock.querySelector('.subtype-count-input');
+                    const max = parseInt(input?.getAttribute('max')) || 0;
+                    return parseInt(input?.value) === max && max > 0;
+                });
+                const anySubtypeSelected = Array.from(subtypeBlocksInner).some(subtypeBlock => {
+                    const input = subtypeBlock.querySelector('.subtype-count-input');
+                    return parseInt(input?.value) > 0;
+                });
+                parentSelectAll.checked = allSubtypesSelected;
+                parentSelectAll.indeterminate = anySubtypeSelected && !allSubtypesSelected;
+            }
+        });
+
+        regularBlocks.forEach(block => {
+            const numberInput = block.querySelector('.task-count-input');
+            const checkboxes = Array.from(block.querySelectorAll('.task-checkbox'));
+            if (numberInput) {
+                numberInput.value = checkboxes.filter(cb => cb.checked).length;
+            }
+        });
     }
     
     // --- Обновление счетчика родителя на основе подтипов ---
@@ -301,6 +357,7 @@ function setupTaskSelectionLogic() {
                     });
                     updateParentCounter(parentBlock);
                 }
+                dependencyManager?.handleSelectionChange();
                 updateGlobalState();
             });
         }
@@ -361,6 +418,7 @@ function setupTaskSelectionLogic() {
                     }
                     updateParentCounter(parentBlock);
                     syncParentCheckbox();
+                    dependencyManager?.handleSelectionChange();
                     updateGlobalState();
                 });
             }
@@ -383,6 +441,7 @@ function setupTaskSelectionLogic() {
                     syncSubtypeCheckbox();
                     updateParentCounter(parentBlock);
                     syncParentCheckbox();
+                    dependencyManager?.handleSelectionChange();
                     updateGlobalState();
                 });
             });
@@ -398,6 +457,7 @@ function setupTaskSelectionLogic() {
                 syncSubtypeCheckbox();
                 updateParentCounter(parentBlock);
                 syncParentCheckbox();
+                dependencyManager?.handleSelectionChange();
                 updateGlobalState();
             }
             subtypeInput.addEventListener('input', applySubtypeCount);
@@ -420,6 +480,7 @@ function setupTaskSelectionLogic() {
             cb.addEventListener('change', function() {
                 const checkedCount = checkboxes.filter(c => c.checked).length;
                 numberInput.value = checkedCount;
+                dependencyManager?.handleSelectionChange();
                 updateGlobalState();
             });
         });
@@ -433,12 +494,309 @@ function setupTaskSelectionLogic() {
             this.value = val;
 
             updateCheckboxesFromCount(block, val);
+            dependencyManager?.handleSelectionChange();
             updateGlobalState();
         });
     });
 
     // Инициализация
     updateGlobalState();
+}
+
+function setupTaskDependencies({ onSelectionSync } = {}) {
+    const debug = true; // set to false to disable dependency logs
+    const modal = document.getElementById('dependency-confirm-modal');
+    const modalTitle = document.getElementById('dependency-modal-title');
+    const modalMessage = document.getElementById('dependency-modal-message');
+    const confirmButton = document.getElementById('dependency-modal-confirm');
+    const cancelButton = document.getElementById('dependency-modal-cancel');
+    const closeButton = document.getElementById('dependency-modal-close');
+    const modalBackground = modal?.querySelector('.modal-background');
+
+    const taskCheckboxes = Array.from(document.querySelectorAll('.task-checkbox'));
+    if (!taskCheckboxes.length || !modal || !modalTitle || !modalMessage || !confirmButton || !cancelButton) {
+        if (debug) {
+            console.warn('[lab dependencies] init failed', {
+                hasCheckboxes: taskCheckboxes.length > 0,
+                hasModal: Boolean(modal),
+                hasTitle: Boolean(modalTitle),
+                hasMessage: Boolean(modalMessage),
+                hasConfirm: Boolean(confirmButton),
+                hasCancel: Boolean(cancelButton)
+            });
+        }
+        return null;
+    }
+
+    const recordByPrimary = new Map();
+    const recordByKey = new Map();
+    const dependentsById = new Map();
+
+    function normalizeId(raw) {
+        if (!raw) return null;
+        const trimmed = String(raw).trim();
+        return trimmed.length ? trimmed : null;
+    }
+
+    taskCheckboxes.forEach(cb => {
+        const taskId = normalizeId(cb.dataset.taskId || cb.value);
+        if (!taskId) return;
+        const taskPk = normalizeId(cb.dataset.taskPk || cb.value);
+        const taskCode = normalizeId(cb.dataset.taskCode);
+        const depsRaw = cb.dataset.dependencies || '';
+        const deps = depsRaw
+            .split(',')
+            .map(item => normalizeId(item))
+            .filter(Boolean);
+        const label = cb.dataset.taskLabel || taskId;
+        const container = cb.closest('article') || cb.closest('.media');
+
+        if (recordByPrimary.has(taskId)) {
+            return;
+        }
+
+        const record = {
+            primaryKey: taskId,
+            checkbox: cb,
+            dependencies: deps,
+            label: label,
+            container: container
+        };
+
+        recordByPrimary.set(taskId, record);
+        recordByKey.set(taskId, record);
+        if (taskPk) recordByKey.set(taskPk, record);
+        if (taskCode) recordByKey.set(taskCode, record);
+
+        if (debug) {
+            console.log('[lab dependencies] task mapped', {
+                primary: taskId,
+                pk: taskPk,
+                code: taskCode,
+                deps: deps
+            });
+        }
+    });
+
+    recordByPrimary.forEach(record => {
+        record.dependencies.forEach(depKey => {
+            const depRecord = recordByKey.get(depKey);
+            if (!depRecord) return;
+            const depPrimaryKey = depRecord.primaryKey;
+            if (!dependentsById.has(depPrimaryKey)) {
+                dependentsById.set(depPrimaryKey, new Set());
+            }
+            dependentsById.get(depPrimaryKey).add(record.primaryKey);
+        });
+    });
+
+    if (debug) {
+        console.log('[lab dependencies] ready', {
+            tasks: recordByPrimary.size,
+            dependents: dependentsById.size
+        });
+    }
+
+    let lastSelected = new Set(getSelectedTaskIds());
+    let isProcessing = false;
+
+    function getSelectedTaskIds() {
+        return Array.from(recordByPrimary.keys()).filter(taskId => recordByPrimary.get(taskId).checkbox.checked);
+    }
+
+    function clearHighlights() {
+        recordByPrimary.forEach(info => {
+            if (info.container) {
+                info.container.classList.remove('task-dependency-highlight');
+            }
+        });
+    }
+
+    function highlightTasks(taskIds) {
+        clearHighlights();
+        taskIds.forEach(taskId => {
+            const info = recordByPrimary.get(taskId);
+            if (info?.container) {
+                info.container.classList.add('task-dependency-highlight');
+            }
+        });
+    }
+
+    function sortTaskIds(taskIds) {
+        return [...taskIds].sort((a, b) => {
+            const aNum = parseInt(a, 10);
+            const bNum = parseInt(b, 10);
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                return aNum - bNum;
+            }
+            return String(a).localeCompare(String(b));
+        });
+    }
+
+    function formatTaskList(taskIds) {
+        return taskIds
+            .map(taskId => recordByPrimary.get(taskId)?.label || taskId)
+            .join(', ');
+    }
+
+    function openModal({ title, message, confirmText, cancelText, confirmClass, onConfirm, onCancel }) {
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        confirmButton.textContent = confirmText;
+        cancelButton.textContent = cancelText;
+        confirmButton.className = confirmClass;
+
+        const handleConfirm = () => {
+            cleanup();
+            onConfirm();
+        };
+        const handleCancel = () => {
+            cleanup();
+            onCancel();
+        };
+        const cleanup = () => {
+            confirmButton.removeEventListener('click', handleConfirm);
+            cancelButton.removeEventListener('click', handleCancel);
+            closeButton?.removeEventListener('click', handleCancel);
+            modalBackground?.removeEventListener('click', handleCancel);
+            modal.classList.remove('is-active');
+        };
+
+        confirmButton.addEventListener('click', handleConfirm);
+        cancelButton.addEventListener('click', handleCancel);
+        closeButton?.addEventListener('click', handleCancel);
+        modalBackground?.addEventListener('click', handleCancel);
+        modal.classList.add('is-active');
+    }
+
+    function applySelectionSync() {
+        onSelectionSync?.();
+        lastSelected = new Set(getSelectedTaskIds());
+        clearHighlights();
+    }
+
+    function handleAddDependencies(taskId, missingDeps) {
+        const orderedDeps = sortTaskIds(missingDeps);
+        highlightTasks(orderedDeps);
+        const dependencyList = formatTaskList(orderedDeps);
+        const isSingle = orderedDeps.length === 1;
+        const message = isSingle
+            ? `Это задание зависит от Задания ${dependencyList}. Добавить это задание?`
+            : `Это задание зависит от Заданий ${dependencyList}. Добавить эти задания?`;
+        openModal({
+            title: 'Зависимости задания',
+            message: message,
+            confirmText: 'Добавить',
+            cancelText: 'Отменить выбор',
+            confirmClass: 'button is-info',
+            onConfirm: () => {
+                orderedDeps.forEach(depId => {
+                    const info = recordByPrimary.get(depId);
+                    if (info) {
+                        info.checkbox.checked = true;
+                    }
+                });
+                applySelectionSync();
+                handleSelectionChange();
+            },
+            onCancel: () => {
+                const info = recordByPrimary.get(taskId);
+                if (info) {
+                    info.checkbox.checked = false;
+                }
+                applySelectionSync();
+                handleSelectionChange();
+            }
+        });
+    }
+
+    function handleRemoveDependents(taskId, dependentIds) {
+        highlightTasks(dependentIds);
+        const sortedDependents = sortTaskIds(dependentIds);
+        const dependentList = formatTaskList(sortedDependents);
+        const isSingle = sortedDependents.length === 1;
+        const message = isSingle
+            ? `От этого задания зависит задание ${dependentList}. Вы действительно хотите убрать его и это задание?`
+            : `От этого задания зависят задания ${dependentList}. Вы действительно хотите убрать его и эти задания?`;
+        openModal({
+            title: 'Зависимые задания',
+            message: message,
+            confirmText: 'Убрать',
+            cancelText: 'Оставить',
+            confirmClass: 'button is-danger',
+            onConfirm: () => {
+                dependentIds.forEach(depId => {
+                    const info = recordByPrimary.get(depId);
+                    if (info) {
+                        info.checkbox.checked = false;
+                    }
+                });
+                applySelectionSync();
+                handleSelectionChange();
+            },
+            onCancel: () => {
+                const info = recordByPrimary.get(taskId);
+                if (info) {
+                    info.checkbox.checked = true;
+                }
+                applySelectionSync();
+                handleSelectionChange();
+            }
+        });
+    }
+
+    function handleSelectionChange() {
+        if (isProcessing) return;
+        isProcessing = true;
+
+        const currentSelection = new Set(getSelectedTaskIds());
+        const added = [...currentSelection].filter(taskId => !lastSelected.has(taskId));
+        const removed = [...lastSelected].filter(taskId => !currentSelection.has(taskId));
+
+        if (debug && (added.length || removed.length)) {
+            console.log('[lab dependencies] selection change', { added, removed });
+        }
+
+        for (const taskId of added) {
+            const info = recordByPrimary.get(taskId);
+            if (!info || !info.dependencies.length) continue;
+            const missingDeps = info.dependencies
+                .map(depKey => recordByKey.get(depKey)?.primaryKey || null)
+                .filter(depPrimary => depPrimary && !currentSelection.has(depPrimary));
+            if (missingDeps.length) {
+                if (debug) {
+                    console.warn('[lab dependencies] missing deps', { taskId, missingDeps });
+                }
+                handleAddDependencies(taskId, missingDeps);
+                isProcessing = false;
+                return;
+            }
+        }
+
+        for (const taskId of removed) {
+            const dependents = dependentsById.get(taskId);
+            if (!dependents || !dependents.size) continue;
+            const stillSelected = [...dependents].filter(depId => currentSelection.has(depId));
+            if (stillSelected.length) {
+                if (debug) {
+                    console.warn('[lab dependencies] dependents selected', { taskId, dependents: stillSelected });
+                }
+                handleRemoveDependents(taskId, stillSelected);
+                isProcessing = false;
+                return;
+            }
+        }
+
+        lastSelected = currentSelection;
+        clearHighlights();
+        isProcessing = false;
+    }
+
+    taskCheckboxes.forEach(cb => {
+        cb.addEventListener('change', handleSelectionChange);
+    });
+
+    return { handleSelectionChange };
 }
 
 
@@ -575,5 +933,40 @@ function setupVideoForm() {
     function getCsrfToken() {
         const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
         return csrfInput?.value || '';
+    }
+}
+
+function applyLabThemeStyles() {
+    const root = document.documentElement;
+    const raw = getComputedStyle(root).getPropertyValue('--lab-elements-color').trim() || '#ffffff';
+
+    const normalizeHex = (hex) => {
+        if (!hex) return null;
+        if (hex.startsWith('#')) hex = hex.slice(1);
+        if (hex.length === 3) {
+            hex = hex.split('').map(ch => ch + ch).join('');
+        }
+        if (hex.length !== 6) return null;
+        return hex;
+    };
+
+    const hex = normalizeHex(raw);
+    if (hex) {
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        const textColor = brightness > 140 ? '#0b0b0b' : '#f8f8f8';
+        root.style.setProperty('--lab-elements-text', textColor);
+    }
+
+    const overlay = document.querySelector('.lab-detail-hero__overlay');
+    const hasBackground = overlay?.dataset?.hasBackground === '1';
+    if (hasBackground) {
+        const wrapper = document.querySelector('.flex-wrapper');
+        if (wrapper) {
+            wrapper.classList.add('lab-global-bg');
+        }
     }
 }
