@@ -10,7 +10,7 @@ from django import forms
 from durationwidget.widgets import TimeDurationWidget
 from django.utils import timezone
 
-from interface.utils import get_pnet_password, generate_usb_device_ids
+from interface.utils import get_pnet_password, generate_usb_device_ids, show_iframe_for_admin
 from interface.elastic_utils import create_elastic_user
 from .models import (
     LabType,
@@ -198,6 +198,72 @@ class LabTaskInlineForm(forms.ModelForm):
             return None
         return data
 
+    def clean_dependencies(self):
+        """Валидация поля dependencies: проверка формата и существования идентификаторов заданий"""
+        data = self.cleaned_data.get('dependencies', '')
+        
+        if not data or not data.strip():
+            return data
+        
+        if ';' in data:
+            raise forms.ValidationError(
+                'Используйте запятую (,) для разделения идентификаторов, а не точку с запятой (;).'
+            )
+        
+        dependencies_list = [dep.strip() for dep in data.split(',') if dep.strip()]
+        
+        if not dependencies_list:
+            raise forms.ValidationError(
+                'Введите хотя бы один идентификатор задания через запятую.'
+            )
+        
+        split_parts = data.split(',')
+        if any(not part.strip() for part in split_parts):
+            raise forms.ValidationError(
+                'Между запятыми не должно быть пустых значений. Используйте формат: "id1, id2, id3".'
+            )
+        
+        # Получаем родительскую лабораторную работу
+        lab = None
+        if self.instance:
+            if hasattr(self.instance, 'lab') and self.instance.lab:
+                lab = self.instance.lab
+            elif hasattr(self.instance, 'lab_id') and self.instance.lab_id:
+                # Если lab_id установлен, но lab еще не загружен
+                try:
+                    lab = Lab.objects.get(pk=self.instance.lab_id)
+                except Lab.DoesNotExist:
+                    pass
+        
+        if not lab:
+            return data
+
+        existing_task_ids = set(
+            LabTask.objects.filter(lab=lab)
+            .exclude(pk=self.instance.pk if self.instance.pk else None)
+            .exclude(task_id__isnull=True)
+            .values_list('task_id', flat=True)
+        )
+        
+        invalid_ids = []
+        for dep_id in dependencies_list:
+            if dep_id not in existing_task_ids:
+                invalid_ids.append(dep_id)
+        
+        if invalid_ids:
+            if len(invalid_ids) == 1:
+                raise forms.ValidationError(
+                    f'Задание с идентификатором "{invalid_ids[0]}" не существует в данной лабораторной работе.'
+                )
+            else:
+                invalid_ids_str = ', '.join(f'"{id_}"' for id_ in invalid_ids)
+                raise forms.ValidationError(
+                    f'Задания с идентификаторами {invalid_ids_str} '
+                    f'не существуют в данной лабораторной работе.'
+                )
+        
+        return data
+
     def _post_clean(self):
         task_type_value = self.cleaned_data.pop('task_type', None)
         super()._post_clean()
@@ -311,6 +377,8 @@ class CompetitionForm(forms.ModelForm):
             logger.info(f"USB IDs distribution: {usb_ids_distribution}")
 
             def _create_users():
+                if show_iframe_for_admin(instance, hasattr(instance, 'teamcompetition')):
+                    self._create_admin_competition_users(instance)
                 return self._create_competition_users(instance, new_users, usb_ids_distribution)
 
             with_pnet_session_if_needed(instance.lab, _create_users)
@@ -354,9 +422,20 @@ class CompetitionForm(forms.ModelForm):
                 competition2user.deploy_meta['usb_device_ids'] = usb_ids
                 competition2user.save(update_fields=['deploy_meta'])
 
+    def _create_admin_competition_users(self, instance):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating admin competition users for {instance.slug}")
+        for user in User.objects.filter(is_superuser=True):
+            Competition2User.objects.update_or_create(
+                competition=instance,
+                user=user,
+                level=instance.level
+            )
+
     def _delete_removed_users(self, instance):
         """Удаляет пользователей, которых больше нет в списке."""
-        all_users = self.get_all_users(instance)
+        all_users = self.get_all_users(instance) | User.objects.filter(is_superuser=True).all().distinct()
         all_users_ids = set(all_users.values_list('pk', flat=True))
         existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
 

@@ -110,7 +110,7 @@ class LabTaskInline(TabularInlineWithDescription):
     def get_fields(self, request, obj=None):
         """Динамически определяет поля в зависимости от типа заданий Lab"""
         parent_lab = self._get_parent_lab(request, obj)
-        base_fields = ['task_id', 'task_type', 'description']  
+        base_fields = ['task_id', 'task_type', 'description', 'dependencies']  
 
         # Добавляем json_config только для JSON_CONFIGURED типа
         if parent_lab:
@@ -156,6 +156,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     summernote_fields = 'description'
     list_display = ('name', 'lab_type', 'program', 'get_learning_years')
     ordering = ('name',)
+    search_fields = ['name']
     prepopulated_fields = {'slug': ('name',)}
     formfield_overrides = {
         JSONField: {
@@ -175,7 +176,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     get_learning_years.short_description = 'Годы обучения'
 
     def get_fieldsets(self, request, obj=None):
-        base_fields = (
+        base_fields = [
             'name',
             'slug',
             'pnet_slug',
@@ -192,9 +193,14 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
             'answer_flag',
             'need_kibana',
             'task_checking',
-        )
+        ]
         pnet_fields = ('NodesData', 'ConnectorsData', 'Connectors2CloudData', 'NetworksData')
         ssh_fields = ('PnetSSHNodeName',)
+
+        if obj.platform != "NO" and obj.lab_type == "PZ":
+            base_fields.append('need_iframe_for_admin')
+
+        base_fields = tuple(base_fields)
 
         if obj and obj.platform == "PN":
             return (

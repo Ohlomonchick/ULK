@@ -88,6 +88,7 @@ class Lab(models.Model):
     tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
     need_kibana = models.BooleanField('Показывать дашборд в Kibana', default=False)
     task_checking = models.CharField('Метод проверки заданий', max_length=32, choices=TaskChecking.choices, default=TaskChecking.MULTIPLE_ATTEMPTS)
+    need_iframe_for_admin = models.BooleanField('Выдавать преподавателю сессию в PNEt', default=True)
 
     # Хранение изображения в БД
     cover = models.ImageField('Обложка', upload_to='interface/labs/covers/', blank=True, null=True)
@@ -184,18 +185,18 @@ class LabTaskManager(models.Manager):
 class LabTaskType(models.Model):
     """Тип задания, привязанный к конкретной лабораторной работе"""
     lab = models.ForeignKey(
-        Lab, 
-        on_delete=models.CASCADE, 
+        Lab,
+        on_delete=models.CASCADE,
         related_name='task_types',
         verbose_name="Лабораторная работа"
     )
     name = models.CharField('Название типа', max_length=255)
     default_duration = models.DurationField(
-        'Время на выполнение (одного задания)', 
+        'Время на выполнение (одного задания)',
         default=timedelta(minutes=5),
         help_text="Время, которое дается на выполнение одного задания этого типа"
     )
-    
+
     class Meta:
         verbose_name = 'Тип задания'
         verbose_name_plural = 'Типы заданий'
@@ -219,6 +220,7 @@ class LabTask(models.Model):
     )
     question = models.TextField("Вопрос", blank=True, null=True)
     answer = models.TextField("Ответ", blank=True, null=True, help_text="Правильный ответ на вопрос или регулярное выражение для проверки ответа")
+    dependencies = models.CharField("Идентификаторы заданий-зависимостей", max_length=1023, null=True, blank=True, help_text="Вводите идентификаторы через запятую")
 
     objects = LabTaskManager()
 
@@ -287,7 +289,10 @@ class User(AbstractUser):
                 self.platoon = default_platoon
         if not self.username:
             self.username = self.last_name + "_" + self.first_name
+
         self.pnet_login = slugify(self.username)
+        if 'admin' in self.pnet_login and '-fake' not in self.pnet_login:
+            self.pnet_login = self.pnet_login + '-fake'
 
         super(User, self).save(*args, **kwargs)
 
@@ -530,7 +535,7 @@ class Competition2User(models.Model):
 
         execute_pnet_operation_if_needed(
             self.competition.lab,
-            lambda session_manager: session_manager.delete_lab_for_user(get_pnet_lab_name(self.competition), self.user.username)
+            lambda session_manager: session_manager.delete_lab_for_user(get_pnet_lab_name(self.competition), self.user.pnet_login)
         )
 
         self.deleted = True
@@ -553,13 +558,13 @@ class Competition2User(models.Model):
 
         def _create_operation(session_manager):
             lab_name = get_pnet_lab_name(instance.competition)
-            username = instance.user.username
+            pnet_login = instance.user.pnet_login
 
             # Получаем USB device IDs из deploy_meta
             usb_device_ids = instance.deploy_meta.get('usb_device_ids', []) if instance.deploy_meta else []
 
-            session_manager.create_lab_for_user(lab_name, username)
-            session_manager.create_lab_nodes_and_connectors(lab, lab_name, username, usb_device_ids=usb_device_ids)
+            session_manager.create_lab_for_user(lab_name, pnet_login)
+            session_manager.create_lab_nodes_and_connectors(lab, lab_name, pnet_login, usb_device_ids=usb_device_ids)
 
         execute_pnet_operation_if_needed(lab, _create_operation)
 

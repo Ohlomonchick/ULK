@@ -387,6 +387,14 @@ body.iframe-fullscreen-active.description-panel-active.sidebar-panel-active #pne
     background: rgba(0, 0, 0, 0.3);
 }
 
+/* Скрываем столбцы "Затраченное время" и "Время сдачи" в таблице лидеров в split-screen */
+#descriptionPanelLeaderboard table thead tr th:nth-last-child(1),
+#descriptionPanelLeaderboard table thead tr th:nth-last-child(2),
+#descriptionPanelLeaderboard table tbody tr td:nth-last-child(1),
+#descriptionPanelLeaderboard table tbody tr td:nth-last-child(2) {
+    display: none;
+}
+
 /* Кнопка разворачивания левой панели - полукруглая, у края */
 .description-expand-btn {
     position: fixed;
