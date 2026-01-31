@@ -645,9 +645,13 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
     }
 
     function formatTaskList(taskIds, { multiline = false } = {}) {
-        const items = taskIds.map(taskId => recordByPrimary.get(taskId)?.label || taskId);
-        const quoted = items.map(item => `"${item}"`);
-        return multiline ? quoted.join('\n') : quoted.join(', ');
+        const items = taskIds.map(taskId => {
+            const label = recordByPrimary.get(taskId)?.label || taskId;
+            // Если это номер задания (начинается с "Задание" или просто число), кавычки не нужны
+            const isNumber = /^Задание\s+\d+$/.test(label) || /^\d+$/.test(label);
+            return isNumber ? label : `"${label}"`;
+        });
+        return multiline ? items.join('\n') : items.join(', ');
     }
 
     function openModal({ title, message, confirmText, cancelText, confirmClass, onConfirm, onCancel }) {
