@@ -610,6 +610,9 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
                 info.container.classList.remove('task-dependency-highlight');
             }
         });
+        document.querySelectorAll('.task-dependency-highlight-parent').forEach(node => {
+            node.classList.remove('task-dependency-highlight-parent');
+        });
     }
 
     function highlightTasks(taskIds) {
@@ -618,6 +621,14 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
             const info = recordByPrimary.get(taskId);
             if (info?.container) {
                 info.container.classList.add('task-dependency-highlight');
+                const details = info.container.closest('details');
+                if (details && !details.open) {
+                    details.classList.add('task-dependency-highlight-parent');
+                    const parentBlock = details.closest('.task-group-block');
+                    if (parentBlock) {
+                        parentBlock.classList.add('task-dependency-highlight-parent');
+                    }
+                }
             }
         });
     }
@@ -675,7 +686,13 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
         clearHighlights();
     }
 
-    function handleAddDependencies(taskId, missingDeps) {
+    function restoreSelection(selectionSnapshot) {
+        recordByPrimary.forEach((info, id) => {
+            info.checkbox.checked = selectionSnapshot.has(id);
+        });
+    }
+
+    function handleAddDependencies(taskId, missingDeps, selectionSnapshot) {
         const orderedDeps = sortTaskIds(missingDeps);
         highlightTasks(orderedDeps);
         const dependencyList = formatTaskList(orderedDeps);
@@ -700,17 +717,14 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
                 handleSelectionChange();
             },
             onCancel: () => {
-                const info = recordByPrimary.get(taskId);
-                if (info) {
-                    info.checkbox.checked = false;
-                }
+                restoreSelection(selectionSnapshot);
                 applySelectionSync();
                 handleSelectionChange();
             }
         });
     }
 
-    function handleRemoveDependents(taskId, dependentIds) {
+    function handleRemoveDependents(taskId, dependentIds, selectionSnapshot) {
         highlightTasks(dependentIds);
         const sortedDependents = sortTaskIds(dependentIds);
         const dependentList = formatTaskList(sortedDependents);
@@ -735,10 +749,7 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
                 handleSelectionChange();
             },
             onCancel: () => {
-                const info = recordByPrimary.get(taskId);
-                if (info) {
-                    info.checkbox.checked = true;
-                }
+                restoreSelection(selectionSnapshot);
                 applySelectionSync();
                 handleSelectionChange();
             }
@@ -767,7 +778,8 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
                 if (debug) {
                     console.warn('[lab dependencies] missing deps', { taskId, missingDeps });
                 }
-                handleAddDependencies(taskId, missingDeps);
+                const selectionSnapshot = new Set(lastSelected);
+                handleAddDependencies(taskId, missingDeps, selectionSnapshot);
                 isProcessing = false;
                 return;
             }
@@ -781,7 +793,8 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
                 if (debug) {
                     console.warn('[lab dependencies] dependents selected', { taskId, dependents: stillSelected });
                 }
-                handleRemoveDependents(taskId, stillSelected);
+                const selectionSnapshot = new Set(lastSelected);
+                handleRemoveDependents(taskId, stillSelected, selectionSnapshot);
                 isProcessing = false;
                 return;
             }

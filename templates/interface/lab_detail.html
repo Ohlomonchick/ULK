@@ -248,6 +248,12 @@
         #dependency-confirm-modal .modal-background {
             background-color: rgba(10, 10, 10, 0.4);
         }
+
+        .task-dependency-highlight-parent {
+            outline: 2px dashed rgba(255, 56, 96, 0.7);
+            outline-offset: 4px;
+            background: rgba(255, 56, 96, 0.04);
+        }
     </style>
 {% endblock %}
 
@@ -459,7 +465,7 @@
                                                                    data-task-id="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
                                                                    data-task-pk="{{ task.pk }}"
                                                                    data-task-code="{{ task.task_id|default_if_none:'' }}"
-                                                                   data-task-label="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                                                   data-task-label="{% if task.task_id %}{{ task.task_id }}{% elif task.description %}{{ task.description|truncatechars:40 }}{% elif task.question %}{{ task.question|truncatechars:40 }}{% else %}{{ task.pk }}{% endif %}"
                                                                    data-dependencies="{{ task.dependencies|default_if_none:'' }}">
                                                         </label>
                                                     </div>
@@ -536,7 +542,7 @@
                                                        data-task-id="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
                                                        data-task-pk="{{ task.pk }}"
                                                        data-task-code="{{ task.task_id|default_if_none:'' }}"
-                                                       data-task-label="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                                       data-task-label="{% if task.task_id %}{{ task.task_id }}{% elif task.description %}{{ task.description|truncatechars:40 }}{% elif task.question %}{{ task.question|truncatechars:40 }}{% else %}{{ task.pk }}{% endif %}"
                                                        data-dependencies="{{ task.dependencies|default_if_none:'' }}">
                                             </label>
                                         </div>
@@ -575,7 +581,7 @@
                                    data-task-id="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
                                    data-task-pk="{{ task.pk }}"
                                    data-task-code="{{ task.task_id|default_if_none:'' }}"
-                                   data-task-label="{% if task.task_id %}{{ task.task_id }}{% else %}{{ task.pk }}{% endif %}"
+                                   data-task-label="{% if task.task_id %}{{ task.task_id }}{% elif task.description %}{{ task.description|truncatechars:40 }}{% elif task.question %}{{ task.question|truncatechars:40 }}{% else %}{{ task.pk }}{% endif %}"
                                    data-dependencies="{{ task.dependencies|default_if_none:'' }}">
                         </label>
                     </div>
