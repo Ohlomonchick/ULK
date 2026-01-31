@@ -695,8 +695,8 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
     function handleAddDependencies(taskId, missingDeps, selectionSnapshot) {
         const orderedDeps = sortTaskIds(missingDeps);
         highlightTasks(orderedDeps);
-        const dependencyList = formatTaskList(orderedDeps, { multiline: !isSingle });
         const isSingle = orderedDeps.length === 1;
+        const dependencyList = formatTaskList(orderedDeps, { multiline: !isSingle });
         const message = isSingle
             ? `Это задание зависит от задания: ${dependencyList}. Добавить это задание?`
             : `Это задание зависит от заданий:\n${dependencyList}\nДобавить эти задания?`;
@@ -727,8 +727,8 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
     function handleRemoveDependents(taskId, dependentIds, selectionSnapshot) {
         highlightTasks(dependentIds);
         const sortedDependents = sortTaskIds(dependentIds);
-        const dependentList = formatTaskList(sortedDependents, { multiline: !isSingle });
         const isSingle = sortedDependents.length === 1;
+        const dependentList = formatTaskList(sortedDependents, { multiline: !isSingle });
         const message = isSingle
             ? `От этого задания зависит задание: ${dependentList}. Вы действительно хотите убрать его и это задание?`
             : `От этого задания зависят задания:\n${dependentList}\nВы действительно хотите убрать его и эти задания?`;
