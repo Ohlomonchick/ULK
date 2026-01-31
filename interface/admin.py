@@ -156,6 +156,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     summernote_fields = 'description'
     list_display = ('name', 'lab_type', 'program', 'get_learning_years')
     ordering = ('name',)
+    search_fields = ['name']
     prepopulated_fields = {'slug': ('name',)}
     formfield_overrides = {
         JSONField: {
