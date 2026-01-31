@@ -110,7 +110,7 @@ class LabTaskInline(TabularInlineWithDescription):
     def get_fields(self, request, obj=None):
         """Динамически определяет поля в зависимости от типа заданий Lab"""
         parent_lab = self._get_parent_lab(request, obj)
-        base_fields = ['task_id', 'task_type', 'description']  
+        base_fields = ['task_id', 'task_type', 'description', 'dependencies']  
 
         # Добавляем json_config только для JSON_CONFIGURED типа
         if parent_lab:
