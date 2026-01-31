@@ -517,6 +517,11 @@ class Competition2User(models.Model):
         help_text="Список ID заданий, на которые пользователь больше не может отвечать"
     )
 
+    joined = models.BooleanField(
+        "Подключился к заданию",
+        default=False,
+        help_text="True, если студент заходил на страницу задания (показывается в таблице лидеров)"
+    )
     deleted = models.BooleanField(default=False)
 
     def delete_from_platform(self, final=False):
@@ -646,6 +651,11 @@ class TeamCompetition2Team(models.Model):
         null=True,
         default=list,
         help_text="Список ID заданий, на которые команда больше не может отвечать"
+    )
+    joined = models.BooleanField(
+        "Подключилась к лабе",
+        default=False,
+        help_text="True, если команда заходила на страницу соревнования (показывается в таблице лидеров)"
     )
     deleted = models.BooleanField(default=False)
 

@@ -468,6 +468,12 @@ def build_competition_context(request, instance, is_team_competition=False):
     """
     now = timezone.now()
 
+    # Отмечаем участника как подключившегося к лабе (для таблицы лидеров)
+    if request.user.is_authenticated:
+        Competition2User.objects.filter(
+            competition=instance, user=request.user
+        ).update(joined=True)
+
     remaining = instance.finish - now if hasattr(instance, "finish") else timedelta(0)
     if remaining.total_seconds() < 0:
         remaining = timedelta(0)
@@ -521,6 +527,8 @@ class TeamCompetitionDetailView(CompetitionDetailView):
         # Try to find a team record in which the user is a member.
         self.team_relation = competition.competition_teams.filter(team__users=self.request.user).first()
         if self.team_relation:
+            # Отмечаем команду как подключившуюся к лабе 
+            TeamCompetition2Team.objects.filter(pk=self.team_relation.pk).update(joined=True)
             answer_filters = {'team':self.team_relation.team}
         else:
             answer_filters = {'user':self.request.user}

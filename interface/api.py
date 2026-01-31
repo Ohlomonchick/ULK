@@ -244,6 +244,9 @@ def get_solutions(request, slug):
     solutions_data = []
 
     for uid, user_data in individual_data.items():
+        comp2user = Competition2User.objects.filter(competition=competition, user_id=uid).first()
+        if not comp2user or not comp2user.joined:
+            continue
         dummy_solution = {
             "user_id": uid,
             "datetime": user_data['raw_datetime']
@@ -251,7 +254,6 @@ def get_solutions(request, slug):
         sol = make_solution_data(dummy_solution, competition)
         sol["progress"] = user_data['progress']
 
-        comp2user = Competition2User.objects.filter(competition=competition, user_id=uid).first()
         if comp2user:
             max_tasks = comp2user.tasks.count()
         else:
@@ -265,6 +267,8 @@ def get_solutions(request, slug):
         for tid, t_data in team_data.items():
             team_obj = t_data['team']
             team_record = TeamCompetition2Team.objects.filter(competition=competition, team=team_obj).first()
+            if not team_record or not team_record.joined:
+                continue
             team_max_tasks = team_record.tasks.count() if team_record else (total_tasks or competition.tasks.count() or 1)
 
             for user in team_obj.users.all():
