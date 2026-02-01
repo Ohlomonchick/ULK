@@ -452,7 +452,7 @@
                                         </div>
                                     </div>
                                     
-                                    <details>
+                                    <details {% if subtype.count == 1 %}open{% endif %}>
                                         <summary class="is-size-7 has-text-info has-text-weight-bold" style="cursor: pointer; outline: none;">
                                             Показать список ({{ subtype.count }})
                                         </summary>
@@ -530,7 +530,7 @@
                             </div>
                         </div>
 
-                        <details>
+                        <details {% if group.count == 1 %}open{% endif %}>
                             <summary class="is-size-7 has-text-info has-text-weight-bold" style="cursor: pointer; outline: none;">
                                 Показать список ({{ group.count }})
                             </summary>
