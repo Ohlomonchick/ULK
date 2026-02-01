@@ -10,7 +10,7 @@ import random
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
-from interface.utils import get_kibana_url
+from interface.utils import get_kibana_url, sample_tasks_with_dependencies
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -1347,7 +1347,7 @@ def kkz_preview_random(request):
 
     sets = []
     for _ in range(count):
-        sampled = random.sample(all_tasks, num_tasks)
+        sampled = sample_tasks_with_dependencies(all_tasks, num_tasks)
         sets.append([t.id for t in sampled])
 
     if count == 1:
@@ -1426,14 +1426,30 @@ def kkz_preview_random(request):
         assignments = {}
         if users:
             if unified:
-                picked = random.sample(all_tasks, min(num_tasks, len(all_tasks)))
+                picked = sample_tasks_with_dependencies(all_tasks, min(num_tasks, len(all_tasks)))
                 p_ids = [t.id for t in picked]
                 for u in users:
                     assignments[str(u.id)] = p_ids
             else:
                 for u in users:
-                    sel = random.sample(all_tasks, min(num_tasks, len(all_tasks)))
+                    sel = sample_tasks_with_dependencies(all_tasks, min(num_tasks, len(all_tasks)))
                     assignments[str(u.id)] = [t.id for t in sel]
+
+    if num_tasks == 1 and all_tasks:
+        def _task_has_dependencies(task):
+            deps = getattr(task, 'dependencies', None) or ''
+            return bool([p for p in deps.split(',') if p.strip()])
+        tasks_without_deps = [t for t in all_tasks if not _task_has_dependencies(t)]
+        task_by_id = {t.id: t for t in all_tasks}
+        for uid in list(assignments.keys()):
+            if len(assignments[uid]) == 1:
+                tid = assignments[uid][0]
+                task = task_by_id.get(tid)
+                if task and _task_has_dependencies(task):
+                    if tasks_without_deps:
+                        assignments[uid] = [random.choice(tasks_without_deps).id]
+                    else:
+                        assignments[uid] = []
 
     return JsonResponse({
         "lab": {"id": lab.id, "name": lab.name},
@@ -1511,7 +1527,9 @@ def get_labs_for_platoon(request):
         tasks_data = [
             {
                 'id': task.id,
-                'description': task.description
+                'task_id': (task.task_id or '').strip() or None,
+                'description': task.description,
+                'dependencies': (task.dependencies or '').strip()
             }
             for task in tasks
         ]

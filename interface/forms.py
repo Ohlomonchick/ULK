@@ -10,7 +10,7 @@ from django import forms
 from durationwidget.widgets import TimeDurationWidget
 from django.utils import timezone
 
-from interface.utils import get_pnet_password, generate_usb_device_ids, show_iframe_for_admin
+from interface.utils import get_pnet_password, generate_usb_device_ids, show_iframe_for_admin, sample_tasks_with_dependencies
 from interface.elastic_utils import create_elastic_user
 from .models import (
     LabType,
@@ -414,7 +414,8 @@ class CompetitionForm(forms.ModelForm):
 
             if created and not getattr(instance, 'kkz_id', None):
                 tasks = list(instance.tasks.all() or instance.lab.options.all())
-                assigned_tasks = random.sample(tasks, min(instance.num_tasks, len(tasks)))
+                num = min(instance.num_tasks, len(tasks))
+                assigned_tasks = sample_tasks_with_dependencies(tasks, num)
                 competition2user.tasks.set(assigned_tasks)
             else:
                 if not competition2user.deploy_meta:
@@ -583,7 +584,7 @@ def _assign_tasks_to_users(kkz, labs_info, competitions, users, preview_assignme
         logger.info(f"Using preview_assignments for KKZ {kkz.name}: {len(users)} users, {len(labs_info)} labs")
     elif kkz.unified_tasks:
         if len(all_available_tasks) >= total_tasks_to_assign:
-            unified_picks = random.sample(all_available_tasks, total_tasks_to_assign)
+            unified_picks = sample_tasks_with_dependencies(all_available_tasks, total_tasks_to_assign)
         else:
             unified_picks = list(all_available_tasks)
 
@@ -594,7 +595,7 @@ def _assign_tasks_to_users(kkz, labs_info, competitions, users, preview_assignme
         logger.info(f"Assigning individual tasks for KKZ {kkz.name}: {total_tasks_to_assign} tasks per user, {len(users)} users")
         for user in users:
             if len(all_available_tasks) >= total_tasks_to_assign:
-                picks = random.sample(all_available_tasks, total_tasks_to_assign)
+                picks = sample_tasks_with_dependencies(all_available_tasks, total_tasks_to_assign)
             else:
                 picks = list(all_available_tasks)
             assignments_by_user[str(user.id)] = picks

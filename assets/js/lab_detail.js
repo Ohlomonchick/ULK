@@ -319,14 +319,58 @@ function setupTaskSelectionLogic() {
         daysInput.dispatchEvent(new Event('input'));
     }
 
-    // --- Обновление чекбоксов на основе количества ---
+    // --- Обновление чекбоксов на основе количества (с учётом зависимостей) ---
     function updateCheckboxesFromCount(block, count) {
         const checkboxes = Array.from(block.querySelectorAll('.task-checkbox'));
         checkboxes.forEach(cb => cb.checked = false);
-        if (count > 0) {
-            const shuffled = [...checkboxes].sort(() => 0.5 - Math.random());
-            shuffled.slice(0, count).forEach(cb => cb.checked = true);
+        if (count <= 0) return;
+
+        function normalizeId(raw) {
+            if (!raw) return null;
+            const s = String(raw).trim();
+            return s.length ? s : null;
         }
+
+        const keyToPrimary = new Map();
+        const idToDeps = new Map();
+        checkboxes.forEach(cb => {
+            const primary = normalizeId(cb.dataset.taskId || cb.value);
+            if (!primary) return;
+            keyToPrimary.set(primary, primary);
+            const pk = normalizeId(cb.dataset.taskPk);
+            if (pk) keyToPrimary.set(pk, primary);
+            const code = normalizeId(cb.dataset.taskCode);
+            if (code) keyToPrimary.set(code, primary);
+        });
+        checkboxes.forEach(cb => {
+            const primary = normalizeId(cb.dataset.taskId || cb.value);
+            if (!primary) return;
+            const depsRaw = cb.dataset.dependencies || '';
+            const deps = depsRaw
+                .split(',')
+                .map(s => keyToPrimary.get(normalizeId(s)))
+                .filter(Boolean);
+            idToDeps.set(primary, deps);
+        });
+
+        const allIds = Array.from(idToDeps.keys());
+        const shuffled = [...allIds].sort(() => 0.5 - Math.random());
+        const selectedIds = new Set();
+
+        for (const taskId of shuffled) {
+            if (selectedIds.has(taskId)) continue;
+            const need = new Set([taskId]);
+            (idToDeps.get(taskId) || []).forEach(d => need.add(d));
+            const addCount = [...need].filter(id => !selectedIds.has(id)).length;
+            if (selectedIds.size + addCount <= count) {
+                need.forEach(id => selectedIds.add(id));
+            }
+        }
+
+        checkboxes.forEach(cb => {
+            const primary = normalizeId(cb.dataset.taskId || cb.value);
+            cb.checked = primary ? selectedIds.has(primary) : false;
+        });
     }
 
     // --- Обработчики для типов ---
@@ -604,6 +648,20 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
         return Array.from(recordByPrimary.keys()).filter(taskId => recordByPrimary.get(taskId).checkbox.checked);
     }
 
+    /** Выбранные задания + все их зависимости (для подсветки «что будет выдано») */
+    function getSelectionClosure(selectedIds) {
+        const closure = new Set(selectedIds);
+        selectedIds.forEach(taskId => {
+            const info = recordByPrimary.get(taskId);
+            if (!info) return;
+            info.dependencies.forEach(depKey => {
+                const depRecord = recordByKey.get(depKey);
+                if (depRecord) closure.add(depRecord.primaryKey);
+            });
+        });
+        return Array.from(closure);
+    }
+
     function clearHighlights() {
         recordByPrimary.forEach(info => {
             if (info.container) {
@@ -688,6 +746,9 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
         onSelectionSync?.();
         lastSelected = new Set(getSelectedTaskIds());
         clearHighlights();
+        const current = getSelectedTaskIds();
+        const toHighlight = getSelectionClosure(current);
+        if (toHighlight.length) highlightTasks(toHighlight);
     }
 
     function restoreSelection(selectionSnapshot) {
@@ -806,12 +867,22 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
 
         lastSelected = currentSelection;
         clearHighlights();
+        // Подсветка зависимостей при выборе заданий (аналогично выдаче не в рамках ККЗ)
+        const toHighlight = getSelectionClosure([...currentSelection]);
+        if (toHighlight.length) highlightTasks(toHighlight);
         isProcessing = false;
     }
 
     taskCheckboxes.forEach(cb => {
         cb.addEventListener('change', handleSelectionChange);
     });
+
+    // Начальная подсветка выбранных заданий и их зависимостей
+    clearHighlights();
+    const initialSelected = getSelectedTaskIds();
+    if (initialSelected.length) {
+        highlightTasks(getSelectionClosure(initialSelected));
+    }
 
     return { handleSelectionChange };
 }

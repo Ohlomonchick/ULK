@@ -651,6 +651,43 @@ document.addEventListener('DOMContentLoaded', function() {
         return shuffled;
     }
 
+    function selectTasksWithDependencies(pool, n) {
+        if (!pool.length || n <= 0) return [];
+        const keyToTask = {};
+        pool.forEach(t => {
+            keyToTask[String(t.id)] = t;
+            if (t.task_id) keyToTask[String(t.task_id).trim()] = t;
+        });
+        function getDepKeys(task) {
+            const s = (task.dependencies || '').trim();
+            return s ? s.split(',').map(p => p.trim()).filter(Boolean) : [];
+        }
+        function getDeps(task) {
+            return getDepKeys(task).map(k => keyToTask[k]).filter(Boolean);
+        }
+        function allDepsInPool(task) {
+            return getDepKeys(task).every(k => keyToTask[k] != null);
+        }
+        const shuffled = shuffleArray([...pool]);
+        const selected = [];
+        const selectedIds = new Set();
+        for (const task of shuffled) {
+            if (selectedIds.has(task.id)) continue;
+            const depKeys = getDepKeys(task);
+            if (depKeys.length && !allDepsInPool(task)) continue;
+            const need = [task, ...getDeps(task)];
+            const needIds = new Set(need.map(t => t.id));
+            const addCount = [...needIds].filter(id => !selectedIds.has(id)).length;
+            if (selectedIds.size + addCount <= n) {
+                needIds.forEach(id => selectedIds.add(id));
+                need.forEach(t => {
+                    if (!selected.find(s => s.id === t.id)) selected.push(t);
+                });
+            }
+        }
+        return selected;
+    }
+
     function loadCombinedPreview(includedLabs) {
         const platoonId = platoonSelect.value;
         const maxTasksInput = document.getElementById('max-tasks-limit');
@@ -697,16 +734,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     ? Math.min(maxTasks, allTasksWithLab.length)
                     : allTasksWithLab.length;
 
+                function taskHasDependencies(task) {
+                    const deps = (task.dependencies || '').trim();
+                    return deps.length > 0 && deps.split(',').some(p => p.trim());
+                }
+                const poolForOne = allTasksWithLab.filter(t => !taskHasDependencies(t));
+                const effectivePool = (totalTasksToAssign === 1)
+                    ? (poolForOne.length > 0 ? poolForOne : [])
+                    : allTasksWithLab;
+
+                function pickTasks(pool, limit) {
+                    if (limit <= 0 || !pool.length) return [];
+                    if (limit === 1) return poolForOne.length > 0 ? shuffleArray([...poolForOne]).slice(0, 1) : [];
+                    return selectTasksWithDependencies(pool, limit);
+                }
+
                 const assignments = {};
 
                 if (unified) {
-                    const selectedTasks = shuffleArray([...allTasksWithLab]).slice(0, totalTasksToAssign);
+                    const selectedTasks = pickTasks(effectivePool, totalTasksToAssign);
                     users.forEach(user => {
                         assignments[user.id] = selectedTasks;
                     });
                 } else {
                     users.forEach(user => {
-                        const selectedTasks = shuffleArray([...allTasksWithLab]).slice(0, totalTasksToAssign);
+                        const selectedTasks = pickTasks(effectivePool, totalTasksToAssign);
                         assignments[user.id] = selectedTasks;
                     });
                 }

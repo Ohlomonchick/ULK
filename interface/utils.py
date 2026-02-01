@@ -192,3 +192,61 @@ def show_iframe_for_admin(competition, is_team_competition=False):
         return False
     lab = competition.lab
     return not is_team_competition and lab.lab_type == "PZ" and lab.platform != "NO" and lab.need_iframe_for_admin
+
+
+def sample_tasks_with_dependencies(tasks, n):
+    """
+    Выбирает до n заданий случайным образом с сохранением зависимостей:
+    если задание попадает в выборку, все его зависимости тоже включаются.
+    Возвращает список заданий.
+    """
+    import random
+    if not tasks or n <= 0:
+        return []
+    task_list = list(tasks)
+    key_to_task = {}
+    for t in task_list:
+        key_to_task[str(t.pk)] = t
+        if getattr(t, 'task_id', None) and str(t.task_id).strip():
+            key_to_task[str(t.task_id).strip()] = t
+
+    def get_dep_keys(task):
+        deps_str = getattr(task, 'dependencies', None) or ''
+        return [part.strip() for part in deps_str.split(',') if part.strip()]
+
+    def get_deps(task):
+        result = []
+        for key in get_dep_keys(task):
+            dep = key_to_task.get(key)
+            if dep is not None:
+                result.append(dep)
+        return result
+
+    def all_deps_in_pool(task):
+        """Все зависимости задания должны быть в пуле (task_list)."""
+        for key in get_dep_keys(task):
+            if key_to_task.get(key) is None:
+                return False
+        return True
+
+    shuffled = list(task_list)
+    random.shuffle(shuffled)
+    selected = []
+    selected_ids = set()
+    for task in shuffled:
+        if task.pk in selected_ids:
+            continue
+        dep_keys = get_dep_keys(task)
+        if dep_keys and not all_deps_in_pool(task):
+            continue
+        if n == 1 and dep_keys:
+            continue
+        need = [task] + get_deps(task)
+        need_ids = {t.pk for t in need}
+        add_count = len(need_ids - selected_ids)
+        if len(selected_ids) + add_count <= n:
+            selected_ids |= need_ids
+            for t in need:
+                if t.pk not in {x.pk for x in selected}:
+                    selected.append(t)
+    return selected
