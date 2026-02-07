@@ -746,9 +746,6 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
         onSelectionSync?.();
         lastSelected = new Set(getSelectedTaskIds());
         clearHighlights();
-        const current = getSelectedTaskIds();
-        const toHighlight = getSelectionClosure(current);
-        if (toHighlight.length) highlightTasks(toHighlight);
     }
 
     function restoreSelection(selectionSnapshot) {
@@ -867,9 +864,6 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
 
         lastSelected = currentSelection;
         clearHighlights();
-        // Подсветка зависимостей при выборе заданий (аналогично выдаче не в рамках ККЗ)
-        const toHighlight = getSelectionClosure([...currentSelection]);
-        if (toHighlight.length) highlightTasks(toHighlight);
         isProcessing = false;
     }
 
@@ -877,12 +871,9 @@ function setupTaskDependencies({ onSelectionSync } = {}) {
         cb.addEventListener('change', handleSelectionChange);
     });
 
-    // Начальная подсветка выбранных заданий и их зависимостей
+    // Инициализация без подсветки
     clearHighlights();
-    const initialSelected = getSelectedTaskIds();
-    if (initialSelected.length) {
-        highlightTasks(getSelectionClosure(initialSelected));
-    }
+    lastSelected = new Set(getSelectedTaskIds());
 
     return { handleSelectionChange };
 }
