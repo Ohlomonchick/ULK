@@ -18,7 +18,7 @@
         <div class="column is-three-quarters">
             {% if user.is_superuser %}
                 {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-                    {% if show_console_iframe %}
+                    {% if show_console_iframe and available %}
                         <div class="iframe-container" style="position: relative;">
                             <button class="iframe-toggle-slider" id="expandIframeBtn">
                                 <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
@@ -65,7 +65,7 @@
                 {% endif %}
             {% else %}
                 {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-                    {% if show_console_iframe %}
+                    {% if show_console_iframe and available %}
                         <div class="iframe-container" style="position: relative;">
                             <button class="iframe-toggle-slider" id="expandIframeBtn">
                                 <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
@@ -184,7 +184,7 @@
     {% endif %}
 
     {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-        {% if show_console_iframe %}
+        {% if show_console_iframe and available %}
             <script src="{% static 'js/common_utils.js' %}"></script>
             <script src="{% static 'js/console_loader.js' %}"></script>
             <script src="{% static 'js/pnet_iframe_controller.js' %}"></script>
@@ -197,7 +197,7 @@
     {% endif %}
 
     {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-        {% if show_console_iframe %}
+        {% if show_console_iframe and available %}
             <div class="iframe-fullscreen-overlay" id="iframeOverlay"></div>
             <button class="iframe-collapse-btn" id="collapseIframeBtn">
                 <i class="fas fa-compress"></i>
