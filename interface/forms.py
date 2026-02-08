@@ -1024,10 +1024,12 @@ class SimpleCompetitionForm(forms.Form):
         platoon_ids = self._get_target_platoon_ids()
         selected_level = self.cleaned_data.get("level")
 
+        # К выбранной длительности добавляем 5 минут при сохранении
+        duration_with_buffer = self.cleaned_data["duration"] + timedelta(minutes=5)
         data = {
             "lab": str(self.lab.pk),
             "start": timezone.now(),
-            "finish": timezone.now() + self.cleaned_data["duration"],
+            "finish": timezone.now() + duration_with_buffer,
             "num_tasks": len(selected_tasks) if selected_tasks else 1,
             "platoons": [str(pk) for pk in platoon_ids],
             "tasks": [str(task.pk) for task in selected_tasks],
@@ -1166,10 +1168,12 @@ class SimpleKkzForm(forms.Form):
         if labs_data and len(labs_data) > 0:
             max_tasks_limit = labs_data[0].get("max_tasks_limit")
 
+        # К выбранной длительности добавляем 5 минут при сохранении 
+        duration_with_buffer = duration + timedelta(minutes=5)
         kkz = Kkz.objects.create(
             name=self.cleaned_data["name"],
             start=timezone.now(),
-            finish=timezone.now() + duration,
+            finish=timezone.now() + duration_with_buffer,
             unified_tasks=self.cleaned_data["unified_tasks"]
         )
 
