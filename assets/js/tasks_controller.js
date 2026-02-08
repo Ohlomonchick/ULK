@@ -97,13 +97,16 @@ class TasksController {
                 
                 if (result.success) {
                     this.showCheckResults(result.results);
+                    // Сразу обновляем счётчик по результатам проверки (на проде get_user_tasks_status
+                    // может приходить с задержкой реплики или падать — счётчик уже будет верным)
+                    this.updateCounterFromCheckResults(result.results);
                 }
             } else {
                 // Если не было ответов для проверки, показываем уведомление
                 this.showNotification('Обновлено', 'info');
             }
             
-            // Всегда обновляем статусы заданий из БД
+            // Всегда подтягиваем статусы из БД (может не успеть на проде — счётчик уже обновлён выше)
             await this.loadTasksStatus();
         } catch (error) {
             console.error('Error in proceedWithCheck:', error);
@@ -169,13 +172,25 @@ class TasksController {
      * Загружает текущий статус заданий
      */
     loadTasksStatus() {
-        $.ajax({
+        return $.ajax({
             url: '/api/get_user_tasks_status/',
             method: 'GET',
             data: { competition_slug: this.competitionSlug }
         })
         .done(data => this.updateTasksUI(data.tasks))
-        .fail(() => console.error('Error loading tasks status'));
+        .fail((xhr) => {
+            console.error('Error loading tasks status', xhr.status, xhr.responseText);
+        });
+    }
+
+    updateCounterFromCheckResults(results) {
+        const $counter = $('#tasks-completion-counter');
+        if (!$counter.length) return;
+        const correctCount = Object.values(results).filter(r => r && r.status === 'correct').length;
+        if (correctCount === 0) return;
+        const current = parseInt($counter.find('.completed-count').text(), 10) || 0;
+        const total = parseInt($counter.find('.total-count').text(), 10) || 0;
+        this.updateCompletionCounter(current + correctCount, total);
     }
 
     /**
