@@ -2,7 +2,10 @@ from unittest.mock import Mock, patch
 from django.test import TestCase
 import requests
 
-from interface.eveFunctions import retry_pnet_request, create_node, create_p2p, create_network, create_p2p_nat, destroy_session
+from interface.eveFunctions import (
+    retry_pnet_request, create_node, create_p2p, create_network, create_p2p_nat, destroy_session,
+    UnauthorizedException
+)
 
 
 class RetryPnetRequestDecoratorTest(TestCase):
@@ -263,6 +266,51 @@ class RetryPnetRequestDecoratorTest(TestCase):
                     found_function_name = True
                     break
             self.assertTrue(found_function_name, "Название реальной функции должно быть в логе ошибки")
+    
+    def test_412_unauthorized_no_retry(self):
+        """Тест: 412 Unauthorized не должен вызывать ретраи, а выбрасывать UnauthorizedException"""
+        mock_response = Mock(spec=requests.Response)
+        mock_response.status_code = 412
+        mock_response.text = '{"code":412,"status":"unauthorized","message":"User is not authenticated"}'
+        self.mock_func.return_value = mock_response
+        
+        decorated_func = retry_pnet_request(max_attempts=3)(self.mock_func)
+        
+        with patch('interface.eveFunctions.logger') as mock_logger:
+            with self.assertRaises(UnauthorizedException) as context:
+                decorated_func('url', {}, {}, 'xsrf')
+            
+            # Проверяем, что функция вызвана только один раз (без ретраев)
+            self.assertEqual(self.mock_func.call_count, 1)
+            
+            # Проверяем, что исключение содержит response
+            self.assertEqual(context.exception.response, mock_response)
+            
+            # Проверяем логирование предупреждения
+            warning_calls = [call for call in mock_logger.warning.call_args_list 
+                           if 'Unauthorized (412)' in str(call)]
+            self.assertGreater(len(warning_calls), 0, "Должно быть логирование предупреждения о 412")
+    
+    def test_412_unauthorized_vs_other_errors(self):
+        """Тест: 412 выбрасывает UnauthorizedException, другие ошибки ретраятся"""
+        # Первый вызов - 412, второй - 500
+        unauthorized_response = Mock(spec=requests.Response)
+        unauthorized_response.status_code = 412
+        unauthorized_response.text = '{"code":412,"status":"unauthorized"}'
+        
+        bad_response = Mock(spec=requests.Response)
+        bad_response.status_code = 500
+        
+        self.mock_func.side_effect = [unauthorized_response, bad_response]
+        
+        decorated_func = retry_pnet_request(max_attempts=3)(self.mock_func)
+        
+        # 412 должен выбрасывать UnauthorizedException сразу, без ретраев
+        with self.assertRaises(UnauthorizedException):
+            decorated_func('url', {}, {}, 'xsrf')
+        
+        # Проверяем, что функция вызвана только один раз
+        self.assertEqual(self.mock_func.call_count, 1)
 
 
 class RealFunctionsRetryTest(TestCase):
@@ -401,4 +449,28 @@ class RealFunctionsRetryTest(TestCase):
         self.assertEqual(mock_post.call_count, 1)
         # Проверяем, что возвращен успешный response
         self.assertEqual(result, good_response)
+    
+    @patch('interface.eveFunctions.requests.post')
+    def test_create_node_412_unauthorized_no_retry(self, mock_post):
+        """Тест: create_node выбрасывает UnauthorizedException при 412 без ретраев"""
+        unauthorized_response = Mock(spec=requests.Response)
+        unauthorized_response.status_code = 412
+        unauthorized_response.text = '{"code":412,"status":"unauthorized","message":"User is not authenticated"}'
+        
+        mock_post.return_value = unauthorized_response
+        
+        with patch('interface.eveFunctions.logger') as mock_logger:
+            with self.assertRaises(UnauthorizedException) as context:
+                create_node(self.test_url, {"template": "test"}, self.test_cookie, self.test_xsrf)
+            
+            # Проверяем, что requests.post вызван только один раз (без ретраев)
+            self.assertEqual(mock_post.call_count, 1)
+            
+            # Проверяем, что исключение содержит response
+            self.assertEqual(context.exception.response, unauthorized_response)
+            
+            # Проверяем логирование предупреждения
+            warning_calls = [call for call in mock_logger.warning.call_args_list 
+                           if 'Unauthorized (412)' in str(call)]
+            self.assertGreater(len(warning_calls), 0, "Должно быть логирование предупреждения о 412")
 

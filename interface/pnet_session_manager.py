@@ -2,8 +2,11 @@ import logging
 import threading
 from functools import wraps
 
-from interface.eveFunctions import change_user_password, create_directory, create_user, pf_login, create_lab, logout, create_all_lab_nodes_and_connectors, \
-    delete_lab_with_session_destroy, change_user_workspace
+from interface.eveFunctions import (
+    change_user_password, create_directory, create_user, pf_login, create_lab, logout, 
+    create_all_lab_nodes_and_connectors, delete_lab_with_session_destroy, change_user_workspace,
+    UnauthorizedException
+)
 from interface.config import get_pnet_url, get_pnet_base_dir, cache_for_minutes
 from interface.utils import get_gunicorn_worker_id
 from dynamic_config.utils import get_worker_credentials
@@ -207,6 +210,15 @@ class PNetSessionManager:
                     self._xsrf = None
                     self._pnet_login = None
 
+    def force_relogin(self):
+        """
+        Принудительный повторный логин.
+        Используется при получении 412 Unauthorized для обновления cookie/xsrf.
+        """
+        with self._lock:
+            self._is_authenticated = False
+        self.login()  # Выполняем повторный логин
+
     @property
     def session_data(self):
         """Возвращает данные сессии для использования в операциях"""
@@ -232,10 +244,13 @@ class PNetSessionManager:
     @exclusive_session_lock
     @require_pnet_url
     def create_lab_nodes_and_connectors(self, lab, lab_name, username, post_nodes_callback=None, usb_device_ids=None):
-        """Создание узлов и коннекторов для пользователя"""
+        """Создание узлов и коннекторов для пользователя с автоматическим повторным логином при 412"""
         url, cookie, xsrf = self.session_data
         pnet_login = self.pnet_login
-        return create_all_lab_nodes_and_connectors(url, lab, get_pnet_base_dir(), lab_name, cookie, xsrf, username, post_nodes_callback, usb_device_ids, pnet_login)
+        return create_all_lab_nodes_and_connectors(
+            url, lab, get_pnet_base_dir(), lab_name, cookie, xsrf, username, 
+            post_nodes_callback, usb_device_ids, pnet_login, session_manager=self
+        )
 
     @require_pnet_url
     def delete_lab_for_team(self, lab_name, team_slug):

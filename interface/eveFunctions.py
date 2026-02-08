@@ -9,6 +9,16 @@ from .config import *
 logger = logging.getLogger(__name__)
 
 
+class UnauthorizedException(Exception):
+    """
+    Исключение, выбрасываемое при получении 412 ответа от PNET.
+    Указывает на необходимость повторного логина.
+    """
+    def __init__(self, response):
+        self.response = response
+        super().__init__(f"Unauthorized (412): {response.text if hasattr(response, 'text') else 'Session expired'}")
+
+
 def retry_pnet_request(max_attempts=3):
     """
     Декоратор для повторных попыток HTTP запросов к PNET.
@@ -35,6 +45,12 @@ def retry_pnet_request(max_attempts=3):
                         status_code = result.status_code
                         if 200 <= status_code < 400:
                             return result
+                        elif status_code == 412:
+                            # 412 Unauthorized - не ретраим, выбрасываем специальное исключение
+                            logger.warning(
+                                f"Unauthorized (412) in {func_name}: Session expired, re-login required"
+                            )
+                            raise UnauthorizedException(result)
                         else:
                             # Неуспешный статус код - поднимаем исключение для ретрая
                             if attempt == max_attempts:
@@ -49,6 +65,10 @@ def retry_pnet_request(max_attempts=3):
                     
                     # Если функция не возвращает response или возвращает что-то другое
                     return result
+                    
+                except UnauthorizedException:
+                    # 412 Unauthorized - не ретраим, пробрасываем исключение дальше
+                    raise
                     
                 except requests.exceptions.Timeout as e:
                     last_exception = e
@@ -553,7 +573,7 @@ def get_session_id(url, cookie):
     return sess_id
 
 
-def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username, post_nodes_callback=None, usb_device_ids=None, pnet_login=None):
+def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, cookie, xsrf, username, post_nodes_callback=None, usb_device_ids=None, pnet_login=None, session_manager=None):
     """
     Создание узлов и коннекторов лаборатории.
     
@@ -569,6 +589,7 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
                            Принимает (url, cookie, xsrf, sess_id) и должна вернуть данные для дальнейшей обработки
         usb_device_ids: Список USB device IDs для замены в qemu_options (например, [1, 2, 3])
         pnet_login: Логин PNet сессии для поиска сессии (если не указан, используется 'pnet_scripts')
+        session_manager: Опциональный PNetSessionManager для автоматического повторного логина при 412
     """
     from interface.utils import replace_usb_device_ids_in_nodes
     
@@ -578,6 +599,56 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
     lab_slash_name = "/" + lab_name
     lab = lab_path + lab_slash_name
     logger.debug(lab)
+
+    # Вспомогательная функция для выполнения операций с автоматическим повторным логином
+    def execute_with_reauth_if_needed(func, *args, **kwargs):
+        """Выполняет функцию, при 412 обновляет cookie/xsrf из session_manager и повторяет"""
+        if session_manager is None:
+            # Если session_manager не передан, выполняем как обычно
+            return func(*args, **kwargs)
+        
+        try:
+            return func(*args, **kwargs)
+        except UnauthorizedException:
+            # Выполняем повторный логин в session_manager
+            logger.warning("Unauthorized (412) detected, performing re-login")
+            session_manager.force_relogin()  # Принудительный повторный логин
+            
+            # Получаем обновленные cookie и xsrf
+            new_url, new_cookie, new_xsrf = session_manager.session_data
+            
+            # Обновляем локальные переменные
+            nonlocal cookie, xsrf
+            cookie = new_cookie
+            xsrf = new_xsrf
+            logger.info("Cookie and XSRF updated after re-login, retrying operation")
+            
+            # Обновляем аргументы функции для повторного вызова
+            # Функции обычно принимают cookie и xsrf как позиционные аргументы после url
+            updated_args = list(args)
+            # Определяем позиции cookie и xsrf в аргументах на основе сигнатуры функции
+            # create_node(url, node, cookie, xsrf) - cookie на позиции 2, xsrf на позиции 3
+            # create_network(url, network, cookie) - cookie на позиции 2
+            # create_p2p(url, connector, cookie) - cookie на позиции 2
+            # create_p2p_nat(url, cloudConnector, cookie) - cookie на позиции 2
+            # destroy_session(url, sess_id, cookie) - cookie на позиции 2
+            
+            # Обновляем cookie (обычно на позиции 2)
+            if len(updated_args) >= 3:
+                updated_args[2] = new_cookie
+            # Обновляем xsrf (если есть, обычно на позиции 3)
+            if len(updated_args) >= 4:
+                updated_args[3] = new_xsrf
+            
+            # Обновляем через kwargs, если они есть
+            updated_kwargs = dict(kwargs)
+            if 'cookie' in updated_kwargs:
+                updated_kwargs['cookie'] = new_cookie
+            if 'xsrf' in updated_kwargs:
+                updated_kwargs['xsrf'] = new_xsrf
+            
+            # Повторяем операцию с обновленными аргументами (только один раз)
+            return func(*updated_args, **updated_kwargs)
 
     create_session(url, lab, cookie)
     sess_id = get_session_id(url, cookie)
@@ -589,19 +660,19 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
 
     for node in nodes_data:
         if node:
-            create_node(url, node, cookie, xsrf)
+            execute_with_reauth_if_needed(create_node, url, node, cookie, xsrf)
 
     for network in lab_object.NetworksData:
         if network:
-            create_network(url, network, cookie)
+            execute_with_reauth_if_needed(create_network, url, network, cookie)
 
     for connector in lab_object.ConnectorsData:
         if connector:
-            create_p2p(url, connector, cookie)
+            execute_with_reauth_if_needed(create_p2p, url, connector, cookie)
 
     for cloudConnector in lab_object.Connectors2CloudData:
         if cloudConnector:
-            create_p2p_nat(url, cloudConnector, cookie)
+            execute_with_reauth_if_needed(create_p2p_nat, url, cloudConnector, cookie)
 
     callback_result = None
     if post_nodes_callback:
@@ -614,7 +685,7 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
     else:
         logger.debug(f"No post_nodes_callback provided for {username}")
 
-    destroy_session(url, sess_id, cookie)
+    execute_with_reauth_if_needed(destroy_session, url, sess_id, cookie)
     
     return callback_result
 

@@ -1,7 +1,7 @@
 import threading
 import time
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
 
 from django.test import TestCase
 from interface.pnet_session_manager import (
@@ -10,6 +10,7 @@ from interface.pnet_session_manager import (
     reset_admin_pnet_session, 
     ensure_admin_pnet_session
 )
+from interface.eveFunctions import UnauthorizedException
 
 
 class GlobalPNetSessionTest(TestCase):
@@ -197,6 +198,58 @@ class GlobalPNetSessionTest(TestCase):
             self.assertTrue(True)
         except Exception as e:
             self.fail(f"Сброс несуществующей сессии вызвал ошибку: {e}")
+
+    @patch('interface.pnet_session_manager.get_pnet_url')
+    @patch('interface.pnet_session_manager.pf_login')
+    @patch('interface.eveFunctions.create_node')
+    def test_create_lab_nodes_and_connectors_with_reauth(self, mock_create_node, mock_pf_login, mock_get_pnet_url):
+        """Тест: create_lab_nodes_and_connectors обрабатывает 412 с повторным логином"""
+        from unittest.mock import MagicMock
+        
+        # Мокаем внешние зависимости
+        mock_get_pnet_url.return_value = "http://test-pnet.com"
+        mock_pf_login.return_value = ("test_cookie", "test_xsrf")
+        
+        # Создаем сессию
+        session = ensure_admin_pnet_session()
+        
+        # Мокаем lab объект
+        mock_lab = MagicMock()
+        mock_lab.NodesData = [{"template": "test_node"}]
+        mock_lab.NetworksData = []
+        mock_lab.ConnectorsData = []
+        mock_lab.Connectors2CloudData = []
+        
+        # Мокаем другие функции
+        with patch('interface.eveFunctions.create_session'), \
+             patch('interface.eveFunctions.get_session_id', return_value=12345), \
+             patch('interface.eveFunctions.destroy_session'):
+            
+            # Настраиваем create_node: первый вызов - 412, второй - успех
+            unauthorized_response = Mock()
+            unauthorized_response.status_code = 412
+            unauthorized_response.text = '{"code":412,"status":"unauthorized"}'
+            
+            good_response = Mock()
+            good_response.status_code = 200
+            
+            mock_create_node.side_effect = [
+                UnauthorizedException(unauthorized_response),
+                good_response  # После повторного логина - успех
+            ]
+            
+            # Выполняем операцию
+            result = session.create_lab_nodes_and_connectors(
+                mock_lab, 
+                "test_lab", 
+                "test_user"
+            )
+            
+            # Проверяем, что create_node вызван дважды (первый раз - 412, второй - успех)
+            self.assertEqual(mock_create_node.call_count, 2)
+            
+            # Проверяем, что повторный логин был выполнен
+            self.assertEqual(mock_pf_login.call_count, 2)  # Первый логин + повторный логин
 
 
 if __name__ == '__main__':
