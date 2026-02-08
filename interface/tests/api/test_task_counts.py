@@ -90,6 +90,9 @@ class TaskCountsTestCase(TransactionTestCase):
 
         competition = form.save()
 
+        # get_solutions returns only users with joined=True; form creates with joined=False
+        Competition2User.objects.filter(competition=competition).update(joined=True)
+
         url = reverse("interface_api:get_solutions", kwargs={"slug": competition.slug})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
@@ -156,6 +159,10 @@ class TaskCountsTestCase(TransactionTestCase):
         self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
 
         competition = form.save()
+
+        # get_solutions returns only participants with joined=True
+        Competition2User.objects.filter(competition=competition).update(joined=True)
+        TeamCompetition2Team.objects.filter(competition=competition).update(joined=True)
 
         url = reverse("interface_api:get_solutions", kwargs={"slug": competition.slug})
         response = self.client.get(url)
@@ -294,7 +301,8 @@ class TaskCountsTestCase(TransactionTestCase):
         for i, user in enumerate(self.users):
             comp2user = Competition2User.objects.create(
                 competition=competition,
-                user=user
+                user=user,
+                joined=True
             )
             tasks_to_assign = self.tasks[:2 + i]
             comp2user.tasks.set(tasks_to_assign)

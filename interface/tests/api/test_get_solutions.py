@@ -26,7 +26,7 @@ class GetSolutionsAPITestCase(TestCase):
         """
         lab = Lab.objects.create(
             name="Test Lab No Tasks",
-            platform="PN",
+            platform="NO",
             slug="lab-no-tasks",
             description="desc",
             answer_flag="FLAG",
@@ -68,6 +68,10 @@ class GetSolutionsAPITestCase(TestCase):
 
         comp.non_platoon_users.add(*non_platoon_users)
         comp.save()
+
+        # Create Competition2User with joined=True so users appear in leaderboard
+        for u in platoon_users + non_platoon_users:
+            Competition2User.objects.create(competition=comp, user=u, joined=True)
 
         now = timezone.now()
         # Create Answers for 2 platoon users and 1 non-platoon user.
@@ -158,7 +162,7 @@ class GetSolutionsAPITestCase(TestCase):
                 last_name="User"
             )
             platoon_users.append(u)
-            issue = Competition2User.objects.create(competition=comp, user=u)
+            issue = Competition2User.objects.create(competition=comp, user=u, joined=True)
             issue.tasks.add(task1, task2)
         non_platoon_users = []
         for i in range(2):
@@ -169,7 +173,7 @@ class GetSolutionsAPITestCase(TestCase):
                 last_name="User"
             )
             non_platoon_users.append(u)
-            issue = Competition2User.objects.create(competition=comp, user=u)
+            issue = Competition2User.objects.create(competition=comp, user=u, joined=True)
             issue.tasks.add(task1, task2)
             
 
@@ -247,7 +251,7 @@ class GetSolutionsAPITestCase(TestCase):
             first_name="Individual", last_name="User"
         )
         comp.non_platoon_users.add(individual_user)
-        Competition2User.objects.create(competition=comp, user=individual_user)
+        Competition2User.objects.create(competition=comp, user=individual_user, joined=True)
 
         now = timezone.now()
         Answers.objects.create(user=individual_user, lab=lab, datetime=now - timedelta(minutes=15))
@@ -297,8 +301,8 @@ class GetSolutionsAPITestCase(TestCase):
             first_name="Team", last_name="User"
         )
         team.users.add(team_user)
-        # Link team to competition.
-        TeamCompetition2Team.objects.create(competition=comp, team=team)
+        # Link team to competition (joined=True so team appears in leaderboard).
+        TeamCompetition2Team.objects.create(competition=comp, team=team, joined=True)
 
         now = timezone.now()
         Answers.objects.create(team=team, lab=lab, datetime=now - timedelta(minutes=20))
@@ -345,7 +349,7 @@ class GetSolutionsAPITestCase(TestCase):
             first_name="Indiv", last_name="User"
         )
         comp.non_platoon_users.add(indiv)
-        Competition2User.objects.create(competition=comp, user=indiv)
+        Competition2User.objects.create(competition=comp, user=indiv, joined=True)
         # Create a team and add a user.
         team = Team.objects.create(name="Beta Team")
         team_user = User.objects.create_user(
@@ -353,7 +357,7 @@ class GetSolutionsAPITestCase(TestCase):
             first_name="Team2", last_name="User"
         )
         team.users.add(team_user)
-        TeamCompetition2Team.objects.create(competition=comp, team=team)
+        TeamCompetition2Team.objects.create(competition=comp, team=team, joined=True)
         now = timezone.now()
         # Create answers: individual gets 1 answer; team gets 1 answer.
         Answers.objects.create(user=indiv, lab=lab, datetime=now - timedelta(minutes=40))
