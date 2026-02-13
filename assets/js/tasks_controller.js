@@ -23,6 +23,9 @@ class TasksController {
         
         // Загружаем начальный статус заданий
         this.loadTasksStatus();
+        
+        // Автообновление счётчика и статусов заданий каждые 10 секунд (без отправки ответов)
+        this._statusIntervalId = setInterval(() => this.loadTasksStatus(), 10000);
     }
 
     /**
