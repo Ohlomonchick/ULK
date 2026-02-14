@@ -383,6 +383,22 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
         first_platoon = competition.platoons.all().first()
         context["platoon_number"] = first_platoon.number if first_platoon else None
 
+        # Оценка студента 
+        if self.request.user.is_authenticated and not self.request.user.is_staff:
+            student_grade = None
+            try:
+                c2u = Competition2User.objects.get(competition=competition, user=self.request.user)
+                student_grade = c2u.grade
+            except Competition2User.DoesNotExist:
+                try:
+                    t2t = TeamCompetition2Team.objects.get(competition=competition, team__users=self.request.user)
+                    student_grade = t2t.grade
+                except TeamCompetition2Team.DoesNotExist:
+                    pass
+            context["student_grade"] = student_grade
+        else:
+            context["student_grade"] = None
+
         return context
 
 

@@ -527,6 +527,11 @@ class Competition2User(models.Model):
         default=False,
         help_text="True, если студент заходил на страницу задания (показывается в таблице лидеров)"
     )
+    grade = models.PositiveSmallIntegerField(
+        "Оценка",
+        null=True,
+        blank=True,
+    )
     deleted = models.BooleanField(default=False)
 
     def delete_from_platform(self, final=False):
@@ -661,6 +666,11 @@ class TeamCompetition2Team(models.Model):
         "Подключилась к лабе",
         default=False,
         help_text="True, если команда заходила на страницу соревнования (показывается в таблице лидеров)"
+    )
+    grade = models.PositiveSmallIntegerField(
+        "Оценка",
+        null=True,
+        blank=True,
     )
     deleted = models.BooleanField(default=False)
 

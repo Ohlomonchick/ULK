@@ -58,11 +58,9 @@
                 <div style="margin-bottom: 1rem;">
                     {% include 'interface/_control_buttons.html' with button_delete_from_platform=button_delete_from_platform button_start_now=button_start_now button_end_now=button_end_now button_resume=button_resume instance=object instance_type='competition' start_time=object.start finish_time=object.finish %}
                 </div>
-                {% if available == False %}
-                    <div class="box">
-                        {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' lab_name=object.lab.name finish_date=object.finish platoon_number=platoon_number %}
-                    </div>
-                {% endif %}
+                <div class="box" id="export-rating-wrapper" style="{% if available %}display: none;{% endif %}">
+                    {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' lab_name=object.lab.name finish_date=object.finish platoon_number=platoon_number %}
+                </div>
             {% else %}
                 {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
                     {% if show_console_iframe and available %}
@@ -110,6 +108,15 @@
         </div>
         <div class="column is-one-quarter">
             {% include 'interface/_timer.html' with delta=delta instance_id=object.id instance_type='competition' %}
+
+            {% if not user.is_superuser %}
+            <div id="student-grade-panel" class="mb-3" style="display: none;" data-competition-slug="{{ object.slug }}" data-lab-finished="{% if not available %}true{% else %}false{% endif %}" data-initial-grade="{% if student_grade %}{{ student_grade }}{% endif %}">
+                <div id="student-grade-box" style="border-radius: 12px; padding: 1rem 1.25rem; text-align: center; color: #fff; {% if student_grade == 5 %}background: #48c774;{% elif student_grade == 4 %}background: #3273dc;{% elif student_grade == 3 %}background: #ffdd57; color: #363636;{% elif student_grade == 2 %}background: #f14668;{% else %}background: #7a7a7a;{% endif %}">
+                    <div style="font-size: 0.95rem; margin-bottom: 0.25rem;">Ваша оценка</div>
+                    <div id="student-grade-value" style="font-size: 2.5rem; font-weight: bold;">{% if student_grade %}{{ student_grade }}{% else %}—{% endif %}</div>
+                </div>
+            </div>
+            {% endif %}
 
             {% if not user.is_superuser %}
                 <span class="tag is-medium mb-3">
@@ -176,11 +183,10 @@
     
     {% if user.is_superuser %}
         <script src="{% static 'js/control_buttons.js' %}"></script>
-        {% if available == False %}
-            <script src="{% static 'js/export_rating.js' %}"></script>
-        {% endif %}
+        <script src="{% static 'js/export_rating.js' %}"></script>
     {% else %}
         <script src="{% static 'js/tasks_controller.js' %}"></script>
+        <script src="{% static 'js/student_grade.js' %}"></script>
     {% endif %}
 
     {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}

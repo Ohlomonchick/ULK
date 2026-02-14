@@ -306,7 +306,7 @@ class Competition2UserInline(admin.TabularInline):
     model = Competition2User
     form = Competition2UserInlineForm
     extra = 0
-    fields = ('user', 'level', 'tasks')
+    fields = ('user', 'level', 'tasks', 'grade')
     readonly_fields = ('user',)
     can_delete = False
 

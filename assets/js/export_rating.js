@@ -143,7 +143,7 @@ class ExportRating {
         // Sort by last name alphabetically for display
         this.grades.sort((a, b) => a.user_last_name.localeCompare(b.user_last_name, 'ru'));
 
-        this.showPreview();
+        this.saveGradesToServerThenPreview();
     }
 
     generateGradesByPosition() {
@@ -186,7 +186,41 @@ class ExportRating {
         // Sort by last name alphabetically for display
         this.grades.sort((a, b) => a.user_last_name.localeCompare(b.user_last_name, 'ru'));
 
-        this.showPreview();
+        this.saveGradesToServerThenPreview();
+    }
+
+    saveGradesToServerThenPreview() {
+        if (this.grades.length === 0 || this.type !== 'competition') {
+            this.showPreview();
+            return;
+        }
+        const grades = this.grades.map(item => {
+            const uid = item.user_id != null && item.user_id !== '' ? parseInt(item.user_id, 10) : null;
+            return {
+                user_id: (uid !== null && !isNaN(uid)) ? uid : null,
+                user_last_name: item.user_last_name || item.last_name || '',
+                user_first_name: item.user_first_name || item.first_name || '',
+                grade: item.grade
+            };
+        });
+        const payload = { type: this.type, slug: this.slug, grades: grades };
+        const csrftoken = $('[name=csrf-token]').attr('content') || $('meta[name=csrf-token]').attr('content');
+        const self = this;
+        $.ajax({
+            url: '/api/save_grades/',
+            type: 'POST',
+            headers: { 'X-CSRFToken': csrftoken },
+            contentType: 'application/json',
+            data: JSON.stringify(payload),
+            success: () => {
+                self.showPreview();
+            },
+            error: (xhr) => {
+                const msg = (xhr.responseJSON && xhr.responseJSON.error) || xhr.statusText || 'Ошибка';
+                self.showError('Не удалось сохранить оценки: ' + msg);
+                self.showPreview();
+            }
+        });
     }
 
     showPreview() {
@@ -316,7 +350,7 @@ class ExportRating {
 
     showError(message) {
         const $errorDiv = $('#error-message');
-        $errorDiv.text(message).show();
+        $errorDiv.removeClass('is-success').addClass('is-danger').text(message).show();
         
         // Scroll to error
         $('html, body').animate({
@@ -337,5 +371,15 @@ $(document).ready(function() {
     const $container = $('#export-rating-container');
     if ($container.length) {
         window.exportRating = new ExportRating($container[0]);
+    }
+
+    const $wrapper = $('#export-rating-wrapper');
+    if ($wrapper.length) {
+        setInterval(function() {
+            const countdown = document.getElementById('countdown');
+            if (countdown && countdown.textContent.trim() === 'Работа завершена' && $wrapper.css('display') === 'none') {
+                $wrapper.show();
+            }
+        }, 2000);
     }
 });

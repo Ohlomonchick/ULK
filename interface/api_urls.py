@@ -27,4 +27,6 @@ urlpatterns = [
     path('get_user_tasks_status/', get_user_tasks_status, name='get_user_tasks_status'),
     path('get_kkz_solutions/<int:kkz_id>/', get_kkz_solutions, name='get_kkz_solutions'),
     path('export_grades_xlsx/', export_grades_xlsx, name='export_grades_xlsx'),
+    path('save_grades/', save_grades, name='save_grades'),
+    path('my_grade/<slug:slug>/', my_grade, name='my_grade'),
 ]

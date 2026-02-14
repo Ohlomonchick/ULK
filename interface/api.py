@@ -482,6 +482,109 @@ def export_grades_xlsx(request):
         return JsonResponse({'error': f'Error exporting grades: {str(e)}'}, status=500)
 
 
+@api_view(['POST'])
+def save_grades(request):
+    """Сохранить оценки в Competition2User / TeamCompetition2Team."""
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+    try:
+        data = getattr(request, 'data', None) if isinstance(getattr(request, 'data', None), dict) else None
+        if not data or 'grades' not in data:
+            raw = request.body
+            if raw:
+                data = json.loads(raw.decode('utf-8') if isinstance(raw, bytes) else raw)
+        if not data:
+            return JsonResponse({'error': 'No data'}, status=400)
+        slug = data.get('slug')
+        instance_type = data.get('type')
+        grades_data = data.get('grades') or []
+
+        if not slug or instance_type != 'competition':
+            return JsonResponse({'error': 'slug and type=competition required'}, status=400)
+        competition, is_team_competition = get_competition_by_slug(slug)
+        updated = 0
+        # Участники соревнования для fallback по ФИ
+        comp_user_ids = set(
+            Competition2User.objects.filter(competition=competition).values_list('user_id', flat=True)
+        )
+        comp_team_user_ids = set()
+        if is_team_competition:
+            comp_team_user_ids = set(
+                User.objects.filter(team__in=competition.teams.all()).values_list('id', flat=True)
+            )
+
+        for item in grades_data:
+            grade_val = item.get('grade')
+            if grade_val is None:
+                continue
+            try:
+                grade = int(grade_val)
+            except (TypeError, ValueError):
+                continue
+            if grade not in (2, 3, 4, 5):
+                continue
+
+            user_id = None
+            raw_uid = item.get('user_id')
+            if raw_uid not in (None, ''):
+                try:
+                    user_id = int(raw_uid)
+                except (TypeError, ValueError):
+                    pass
+            if user_id is None:
+                last_name = (item.get('user_last_name') or item.get('last_name') or '').strip()
+                first_name = (item.get('user_first_name') or item.get('first_name') or '').strip()
+                if last_name or first_name:
+                    q = User.objects.filter(last_name__iexact=last_name, first_name__iexact=first_name)
+                    allowed_ids = comp_user_ids | comp_team_user_ids
+                    if allowed_ids:
+                        q = q.filter(id__in=allowed_ids)
+                    u = q.first()
+                    if u:
+                        user_id = u.id
+            if user_id is None:
+                continue
+
+            n = Competition2User.objects.filter(
+                competition=competition, user_id=user_id
+            ).update(grade=grade)
+            if n > 0:
+                updated += 1
+            elif is_team_competition:
+                team_record = TeamCompetition2Team.objects.filter(
+                    competition=competition, team__users=user_id
+                ).first()
+                if team_record:
+                    TeamCompetition2Team.objects.filter(pk=team_record.pk).update(grade=grade)
+                    updated += 1
+        return JsonResponse({'ok': True, 'updated': updated})
+    except json.JSONDecodeError as e:
+        return JsonResponse({'error': 'Invalid JSON: ' + str(e)}, status=400)
+    except Exception as e:
+        logging.exception("Error saving grades")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def my_grade(request, slug):
+    """Вернуть оценку текущего пользователя за лабу."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    competition, is_team = get_competition_by_slug(slug)
+    if is_team:
+        grade = TeamCompetition2Team.objects.filter(
+            competition=competition, team__users=request.user
+        ).values_list('grade', flat=True).first()
+    else:
+        grade = Competition2User.objects.filter(
+            competition=competition, user=request.user
+        ).values_list('grade', flat=True).first()
+    response = JsonResponse({'grade': grade})
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    return response
+
+
 @api_view(['GET'])
 def load_levels(request, lab_name):  # pragma: no cover
     try:
