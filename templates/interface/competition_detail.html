@@ -18,7 +18,7 @@
         <div class="column is-three-quarters">
             {% if user.is_superuser %}
                 {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-                    {% if show_console_iframe and available %}
+                    {% if show_console_iframe %}
                         <div class="iframe-container" style="position: relative;">
                             <button class="iframe-toggle-slider" id="expandIframeBtn">
                                 <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
@@ -58,12 +58,14 @@
                 <div style="margin-bottom: 1rem;">
                     {% include 'interface/_control_buttons.html' with button_delete_from_platform=button_delete_from_platform button_start_now=button_start_now button_end_now=button_end_now button_resume=button_resume instance=object instance_type='competition' start_time=object.start finish_time=object.finish %}
                 </div>
-                <div class="box" id="export-rating-wrapper" style="{% if available %}display: none;{% endif %}">
-                    {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' lab_name=object.lab.name finish_date=object.finish platoon_number=platoon_number %}
-                </div>
+                {% if available == False %}
+                    <div class="box">
+                        {% include 'interface/_export_rating.html' with instance_slug=object.slug instance_type='competition' lab_name=object.lab.name finish_date=object.finish platoon_number=platoon_number %}
+                    </div>
+                {% endif %}
             {% else %}
                 {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-                    {% if show_console_iframe and available %}
+                    {% if show_console_iframe %}
                         <div class="iframe-container" style="position: relative;">
                             <button class="iframe-toggle-slider" id="expandIframeBtn">
                                 <i class="fas fa-expand"></i><span class="slider-text"> Развернуть на весь экран</span>
@@ -100,7 +102,7 @@
                     {% endif %}
                 {% endif %}
             {% endif %}
-            
+
             {% with object=object.lab %}
                 {% include 'interface/lab_data.html' %}
             {% endwith %}
@@ -109,16 +111,7 @@
         <div class="column is-one-quarter">
             {% include 'interface/_timer.html' with delta=delta instance_id=object.id instance_type='competition' %}
 
-            {% if not user.is_superuser %}
-            <div id="student-grade-panel" class="mb-3" style="display: none;" data-competition-slug="{{ object.slug }}" data-lab-finished="{% if not available %}true{% else %}false{% endif %}" data-initial-grade="{% if student_grade %}{{ student_grade }}{% endif %}">
-                <div id="student-grade-box" style="border-radius: 12px; padding: 1rem 1.25rem; text-align: center; color: #fff; {% if student_grade == 5 %}background: #48c774;{% elif student_grade == 4 %}background: #3273dc;{% elif student_grade == 3 %}background: #ffdd57; color: #363636;{% elif student_grade == 2 %}background: #f14668;{% else %}background: #7a7a7a;{% endif %}">
-                    <div style="font-size: 0.95rem; margin-bottom: 0.25rem;">Ваша оценка</div>
-                    <div id="student-grade-value" style="font-size: 2.5rem; font-weight: bold;">{% if student_grade %}{{ student_grade }}{% else %}—{% endif %}</div>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if not user.is_superuser %}
+            {% if not user.is_superuser or show_console_iframe %}
                 <span class="tag is-medium mb-3">
                     <h5 class="title is-5 mb-0">Ваше имя пользователя: <br>{{ pnet_username }}</h5>
                 </span>
@@ -131,6 +124,11 @@
             {% endif %}
 
             {% if object.lab.need_kibana and not user.is_superuser %}
+                <a href="{% url 'interface:kibana-dashboard' slug=object.slug %}" class="button is-dark is-medium mb-3 mt-0">
+                    <img src="{% static 'icons/kibana-dark-logo.svg' %}" style="width: 20px; height: 20px; filter: invert(1); margin-right: 8px;" alt="Kibana">
+                    Перейти в ELK
+                </a>
+            {% elif user.is_superuser and show_console_iframe and object.lab.need_kibana %}
                 <a href="{% url 'interface:kibana-dashboard' slug=object.slug %}" class="button is-dark is-medium mb-3 mt-0">
                     <img src="{% static 'icons/kibana-dark-logo.svg' %}" style="width: 20px; height: 20px; filter: invert(1); margin-right: 8px;" alt="Kibana">
                     Перейти в ELK
@@ -174,23 +172,24 @@
     </div>
 
     <meta name="csrf-token" content="{{ csrf_token }}">
-    
+
     <script src="{% static 'admin/js/jquery-3.7.1.min.js' %}"></script>
     <script src="{% static 'js/gsap.min.js' %}"></script>
     <script src="{% static 'js/Flip.min.js' %}"></script>
     <script src="{% static 'js/timer.js' %}"></script>
     <script src="{% static 'js/solutions_table.js' %}"></script>
-    
+
     {% if user.is_superuser %}
         <script src="{% static 'js/control_buttons.js' %}"></script>
-        <script src="{% static 'js/export_rating.js' %}"></script>
+        {% if available == False %}
+            <script src="{% static 'js/export_rating.js' %}"></script>
+        {% endif %}
     {% else %}
         <script src="{% static 'js/tasks_controller.js' %}"></script>
-        <script src="{% static 'js/student_grade.js' %}"></script>
     {% endif %}
 
     {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-        {% if show_console_iframe and available %}
+        {% if show_console_iframe %}
             <script src="{% static 'js/common_utils.js' %}"></script>
             <script src="{% static 'js/console_loader.js' %}"></script>
             <script src="{% static 'js/pnet_iframe_controller.js' %}"></script>
@@ -199,26 +198,21 @@
             {% elif object.lab.platform == "CMD" %}
                 <script src="{% static 'js/cmd_controller.js' %}"></script>
             {% endif %}
-        {% endif %}
-    {% endif %}
-
-    {% if object.lab.platform == "PN" or object.lab.platform == "CMD" %}
-        {% if show_console_iframe and available %}
             <div class="iframe-fullscreen-overlay" id="iframeOverlay"></div>
             <button class="iframe-collapse-btn" id="collapseIframeBtn">
                 <i class="fas fa-compress"></i>
             </button>
-            
+
             <!-- Кнопка разворачивания правой панели -->
             <button class="sidebar-expand-btn" id="sidebarExpandBtn" title="Показать информацию">
                 <i class="fas fa-chevron-left"></i>
             </button>
-            
+
             <!-- Кнопка разворачивания левой панели с описанием -->
             <button class="description-expand-btn" id="descriptionExpandBtn" title="Показать описание">
                 <i class="fas fa-chevron-right"></i>
             </button>
-            
+
             <!-- Выдвижная правая панель -->
             <div class="sidebar-panel" id="sidebarPanel">
                 <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Скрыть информацию">
@@ -228,7 +222,7 @@
                     <!-- Контент будет скопирован из правой колонки -->
                 </div>
             </div>
-            
+
             <!-- Левая панель с описанием (split-screen) -->
             <div class="description-panel" id="descriptionPanel"{% if user.is_superuser %} data-leaderboard-enabled="true"{% endif %}>
                 <button class="description-collapse-btn" id="descriptionCollapseBtn" title="Скрыть описание">
