@@ -73,6 +73,11 @@ class TaskChecking(models.TextChoices):
     ONE_ATTEMPT = "ONE_ATTEMPT", "Одна попытка"
 
 
+class KibanaDashboardType(models.TextChoices):
+    SURICATA = "SURICATA", "Suricata"
+    SNORT = "SNORT", "Snort"
+
+
 class Lab(models.Model):
     id = models.AutoField(primary_key=True, serialize=False)
     name = models.CharField('Имя', max_length=255)
@@ -87,6 +92,7 @@ class Lab(models.Model):
     default_duration = models.DurationField('Время на работу', null=True, blank=True, default=timedelta(days=1))
     tasks_type = models.CharField('Тип заданий', max_length=32, choices=LabTasksType.choices, default=LabTasksType.CLASSIC)
     need_kibana = models.BooleanField('Показывать дашборд в Kibana', default=False)
+    kibana_dashboard = models.CharField('Тип дашборда', max_length=32, choices=KibanaDashboardType.choices, default=KibanaDashboardType.SURICATA)
     task_checking = models.CharField('Метод проверки заданий', max_length=32, choices=TaskChecking.choices, default=TaskChecking.MULTIPLE_ATTEMPTS)
     need_iframe_for_admin = models.BooleanField('Выдавать преподавателю сессию в PNEt', default=True)
 

@@ -63,9 +63,9 @@ class LabTaskTypeInline(admin.TabularInline):
     formfield_overrides = {
         DurationField: {
             'widget': TimeDurationWidget(
-                show_days=False, 
-                show_hours=False, 
-                show_minutes=True, 
+                show_days=False,
+                show_hours=False,
+                show_minutes=True,
                 show_seconds=True,
                 attrs={'style': 'width:5em;'}
             ),
@@ -76,7 +76,7 @@ class LabTaskInline(TabularInlineWithDescription):
     model = LabTask
     form = LabTaskInlineForm
     extra = 1
-    fields = ['task_id', 'task_type', 'description']  
+    fields = ['task_id', 'task_type', 'description']
 
     formfield_overrides = {
         JSONField: {
@@ -110,7 +110,7 @@ class LabTaskInline(TabularInlineWithDescription):
     def get_fields(self, request, obj=None):
         """Динамически определяет поля в зависимости от типа заданий Lab"""
         parent_lab = self._get_parent_lab(request, obj)
-        base_fields = ['task_id', 'task_type', 'description', 'dependencies']  
+        base_fields = ['task_id', 'task_type', 'description', 'dependencies']
 
         # Добавляем json_config только для JSON_CONFIGURED типа
         if parent_lab:
@@ -200,6 +200,9 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
         if obj and obj.platform != "NO" and obj.lab_type == "PZ":
             base_fields.append('need_iframe_for_admin')
 
+        if obj and obj.need_kibana:
+            base_fields.append('kibana_dashboard')
+
         base_fields = tuple(base_fields)
 
         if obj and obj.platform == "PN":
@@ -256,11 +259,11 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
                 if subform.instance.pk and subform.cleaned_data.get('DELETE'):
                     subform.instance.delete()
                     continue
-                
+
                 if subform.cleaned_data and not subform.cleaned_data.get('DELETE'):
                     instance = subform.instance
-                    raw_value = subform.cleaned_data.get('task_type') 
-                    
+                    raw_value = subform.cleaned_data.get('task_type')
+
                     if raw_value:
                         if raw_value.startswith('name:'):
                             type_name = raw_value.split('name:', 1)[1]
@@ -276,7 +279,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
                                 instance.task_type = None
                     else:
                         instance.task_type = None
-                    
+
                     instance.save()
             return
 

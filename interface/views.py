@@ -383,7 +383,7 @@ class CompetitionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView)
         first_platoon = competition.platoons.all().first()
         context["platoon_number"] = first_platoon.number if first_platoon else None
 
-        # Оценка студента 
+        # Оценка студента
         if self.request.user.is_authenticated and not self.request.user.is_staff:
             student_grade = None
             try:
@@ -551,7 +551,7 @@ class TeamCompetitionDetailView(CompetitionDetailView):
         # Try to find a team record in which the user is a member.
         self.team_relation = competition.competition_teams.filter(team__users=self.request.user).first()
         if self.team_relation:
-            # Отмечаем команду как подключившуюся к лабе 
+            # Отмечаем команду как подключившуюся к лабе
             TeamCompetition2Team.objects.filter(pk=self.team_relation.pk).update(joined=True)
             answer_filters = {'team':self.team_relation.team}
         else:
@@ -897,7 +897,12 @@ def utils_console(request, slug, node_name):
 
 def kibana_dashboard(request, slug):
     competition = Competition.objects.get(slug=slug)
-    dashboard_url = get_kibana_url() + f"/app/dashboards#/view/78289c40-86da-11e8-b59d-21efb914e65c-ecs?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-90d%2Fd,to:now))&_a=(filters:!(),query:(language:kuery,query:'_index:{competition.lab.slug}-{request.user.pnet_login}*'))"
+    if competition.lab.kibana_dashboard == KibanaDashboardType.SURICATA:
+        dash = "78289c40-86da-11e8-b59d-21efb914e65c-ecs"
+    else:
+        dash = "78289c40-86da-11e8-b59d-21efb914e65c-ecs"
+    dashboard_url = get_kibana_url() + f"/app/dashboards#/view/{dash}?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-7d%2Fd,to:now))&_a=(filters:!(),query:(language:kuery,query:'_index:{competition.lab.slug}-{request.user.pnet_login}*'))"
+
     return render(request, 'interface/kibana_dashboard.html', {'dashboard_url': dashboard_url, 'slug': slug})
 
 # Кастомная форма для загрузки файлов (не только изображений)
