@@ -900,8 +900,8 @@ def kibana_dashboard(request, slug):
     if competition.lab.kibana_dashboard == KibanaDashboardType.SURICATA:
         dash = "78289c40-86da-11e8-b59d-21efb914e65c-ecs"
     else:
-        dash = "78289c40-86da-11e8-b59d-21efb914e65c-ecs"
-    dashboard_url = get_kibana_url() + f"/app/dashboards#/view/{dash}?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-7d%2Fd,to:now))&_a=(filters:!(),query:(language:kuery,query:'_index:{competition.lab.slug}-{request.user.pnet_login}*'))"
+        dash = "ccdaf445-a62a-4fb0-9300-5b2cd38c687e"
+    dashboard_url = get_kibana_url() + f"/app/dashboards#/view/{dash}?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-1d%2Fd,to:now))&_a=(filters:!(),query:(language:kuery,query:'_index:{competition.lab.slug}-{request.user.pnet_login}*'))"
 
     return render(request, 'interface/kibana_dashboard.html', {'dashboard_url': dashboard_url, 'slug': slug})
 
