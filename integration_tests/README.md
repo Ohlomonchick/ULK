@@ -38,6 +38,12 @@ export PNET_IP=192.168.0.108
 pytest -m integration integration_tests/test_*_e2e.py -v
 ```
 
+Для browser-level сценариев (`test_frontend_iframe_playwright_e2e.py`) нужен браузер Playwright:
+
+```bash
+playwright install chromium
+```
+
 или:
 
 ```bash
@@ -50,6 +56,12 @@ integration_tests/run_e2e.sh
 ```powershell
 $env:PNET_IP="192.168.0.108"
 pytest -m integration integration_tests/test_*_e2e.py -v
+```
+
+Для browser-level сценариев:
+
+```powershell
+playwright install chromium
 ```
 
 или:
@@ -90,6 +102,10 @@ pytest -m integration integration_tests/test_*_e2e.py -v
 - аутентификация в PNET через ручку приложения поверх Nginx;
 - создание сессии лабы через ручку, проверка `session_id` через `get_session_id()` и filter-flow;
 - KKZ: множественные лабы для каждого пользователя + выборочная проверка топологии.
+- усложненная topology-конфигурация (`docker` + `vpcs`) в целевых топологических e2e;
+- browser e2e через Playwright: проверка iframe для PN/CMD и PZ-admin flow;
+- конкурентные POST `/api/create_pnet_lab_session/` с проверкой распределения по gunicorn воркерам;
+- team shared-session: включение ноды одним участником и видимость состояния у другого.
 
 ## Очистка побочных эффектов
 

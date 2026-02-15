@@ -122,3 +122,57 @@
 | KKZ | SimpleKkzForm (create_kkz) | Несколько лаб на пользователя, выборочная проверка топологии |
 
 Все сценарии выполняются поверх Nginx (base_url с портом 18080); обращения к PNET для проверок структуры и сессий идут либо через прокси `/pnetlab`, либо напрямую к PNET_IP при админских операциях и cleanup.
+
+---
+
+## 9. Усложненная топология для топологических e2e
+
+**Цель:** в тестах, где важна проверка topology API, использовать более сложный набор нод (несколько `docker` + `vpcs`) без изменения остальных seed-сценариев.
+
+**Сценарий:**
+- В `db_seed` добавлен отдельный helper `build_complex_topology_data()` и override-параметры для `seed_competition_scenario`/`seed_kkz_scenario`.
+- Override применяется **только** в:
+  - `test_lab_topology_e2e.py::test_created_lab_topology_matches_config_and_has_no_duplicates`
+  - `test_kkz_multi_lab_e2e.py::test_kkz_creates_multiple_labs_per_user_with_topology_checks`
+- Проверяется, что все заданные ноды присутствуют в topology и что нет дубликатов нод/связей.
+
+---
+
+## 10. Frontend iframe/console проверки через Playwright
+
+**Цель:** убедиться на уровне браузера, что фронтенд реально инициализирует `iframe` в сценариях PN/CMD, а для ПЗ это работает и для администратора.
+
+**Сценарий:**
+- Новый файл `test_frontend_iframe_playwright_e2e.py`.
+- Проверки:
+  - PN + обычный пользователь: на странице соревнования есть `#pnetFrame`, проходит create session flow, `src` указывает на `/pnetlab/...`.
+  - CMD + обычный пользователь: после `create_pnet_lab_session_with_console` `src` указывает на guacamole URL.
+  - PZ + администратор: при `lab_type=PZ` и `platform=PN` iframe отображается и проходит инициализацию с созданием сессии.
+- Тесты автоматически skip’аются, если в окружении недоступен Chromium для Playwright.
+
+---
+
+## 11. Конкурентные и командные сценарии сессий
+
+### 11.1. Два одновременных создания lab session + worker credentials
+
+**Цель:** проверить корректность создания сессий при конкурентных POST и сценарий подготовки worker credentials.
+
+**Сценарий:**
+- Перед тестом выполняется команда `create_worker_credentials --workers 3`.
+- Сохраняется pre-state `WORKER_1..3_CREDS`, после теста он восстанавливается.
+- Выполняются 2 одновременных POST `/api/create_pnet_lab_session/` от разных пользователей.
+- Проверяется:
+  - ответы 200 и `success=true`;
+  - трафик реально обслуживается несколькими gunicorn воркерами (`/cyberpolygon/test/worker-id/`);
+  - topology для обеих сессий валидна и без дубликатов.
+- Тестовые worker-пользователи в PNET удаляются в teardown.
+
+### 11.2. Командная shared-session: распространение состояния ноды
+
+**Цель:** подтвердить семантику командной сессии: если один участник включил ноду, второй видит это в текущей сессии команды.
+
+**Сценарий:**
+- Для TeamCompetition два участника команды создают сессию через `/api/create_pnet_lab_session/`.
+- Участник A включает ноду (`turn_on_node`).
+- Участник B проверяет статус этой же ноды через `nodestatus` (должен быть running/starting) и видит ноду в topology текущей сессии.

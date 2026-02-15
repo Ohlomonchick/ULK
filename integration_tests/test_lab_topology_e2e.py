@@ -12,6 +12,7 @@ def test_created_lab_topology_matches_config_and_has_no_duplicates(
     from interface.eveFunctions import get_lab_topology
     from integration_tests.utils.db_seed import (
         INTEGRATION_TEST_PASSWORD,
+        build_complex_topology_data,
         register_competition_cleanup,
         seed_competition_scenario,
     )
@@ -19,7 +20,15 @@ def test_created_lab_topology_matches_config_and_has_no_duplicates(
     from integration_tests.utils.topology import extract_nodes_and_links
 
     prefix = f"it-topology-{int(time.time())}"
-    scenario = seed_competition_scenario(prefix, users_count=1)
+    nodes_data, connectors_data, connectors2cloud_data, networks_data = build_complex_topology_data()
+    scenario = seed_competition_scenario(
+        prefix,
+        users_count=1,
+        nodes_data_override=nodes_data,
+        connectors_data_override=connectors_data,
+        connectors2cloud_data_override=connectors2cloud_data,
+        networks_data_override=networks_data,
+    )
     register_competition_cleanup(cleanup_context, prefix, scenario)
 
     user = scenario.users[0]

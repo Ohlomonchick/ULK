@@ -14,6 +14,7 @@ def test_kkz_creates_multiple_labs_per_user_with_topology_checks(
     from interface.utils import get_pnet_lab_name
     from integration_tests.utils.db_seed import (
         INTEGRATION_TEST_PASSWORD,
+        build_complex_topology_data,
         register_kkz_cleanup,
         seed_kkz_scenario,
     )
@@ -21,7 +22,16 @@ def test_kkz_creates_multiple_labs_per_user_with_topology_checks(
     from integration_tests.utils.http_client import login_to_django
 
     prefix = f"it-kkz-{int(time.time())}"
-    scenario = seed_kkz_scenario(prefix, users_count=3, labs_count=2)
+    nodes_data, connectors_data, connectors2cloud_data, networks_data = build_complex_topology_data()
+    scenario = seed_kkz_scenario(
+        prefix,
+        users_count=3,
+        labs_count=2,
+        nodes_data_override=nodes_data,
+        connectors_data_override=connectors_data,
+        connectors2cloud_data_override=connectors2cloud_data,
+        networks_data_override=networks_data,
+    )
     register_kkz_cleanup(cleanup_context, prefix, scenario)
 
     competitions = list(scenario.kkz.competitions.all())
