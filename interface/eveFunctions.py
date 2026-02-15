@@ -165,7 +165,7 @@ def create_user(url, username, password, user_role='1', cookie=None):
             verify=False
         )
         logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(
-            username, password, f'{relative_path}/{username}', r.text)
+            username, password, user_workspace, r.text)
         )
     except Exception as e:
         logger.debug("Error with creating user\n{}\n".format(e))
@@ -184,6 +184,61 @@ def create_directory(url, path, dir_name, cookie):
         cookies=cookie, verify=False
     )
     logger.debug(r.text)
+
+
+def delete_folder(url, path, cookie):
+    """
+    Удаляет директорию или файл в Pnet.
+
+    API: POST /api/folders/delete
+    Body: {"path": "/Practice Work/Test_Labs/api_test_dir/New Folder 2"}
+    Response: {"code":200,"status":"success","message":"Folder has been deleted (60012)."}
+
+    Args:
+        url: URL PNET сервера
+        path: Полный путь к папке или файлу (например, "/Practice Work/Test_Labs/api_test_dir/New Folder 2")
+        cookie: Cookie для аутентификации
+
+    Returns:
+        requests.Response: ответ сервера
+    """
+    payload = {"path": path}
+    r = requests.post(
+        url + '/api/folders/delete',
+        json=payload,
+        headers={'content-type': 'application/json'},
+        cookies=cookie,
+        verify=False
+    )
+    logger.debug("delete_folder %s: %s", path, r.text)
+    return r
+
+
+def get_folders(url, path, cookie):
+    """
+    Получает список директорий и файлов в указанной папке Pnet.
+
+    API: GET /api/folders?path=/Practice%20Work/Test_Labs/api_test_dir
+    Response: {"code":200,"status":"success","message":"...","data":{"folders":[...],"files":[...]}}
+
+    Args:
+        url: URL PNET сервера
+        path: Путь к папке (например, "/Practice Work/Test_Labs/api_test_dir")
+        cookie: Cookie для аутентификации
+
+    Returns:
+        requests.Response: ответ сервера; в response.json()["data"] — словарь с ключами
+            "folders" (список {"name", "path"}) и при наличии "files"
+    """
+    r = requests.get(
+        url + '/api/folders',
+        params={'path': path},
+        headers={'content-type': 'application/json'},
+        cookies=cookie,
+        verify=False
+    )
+    logger.debug("get_folders %s: %s", path, r.text[:200] if r.text else "")
+    return r
 
 
 def logout(url):
@@ -306,6 +361,75 @@ def change_user_workspace(url, cookie, xsrf, pnet_login, new_workspace):
         user_params["user_workspace"] = new_workspace
         return change_user_params(url, cookie, xsrf, user_params)
     return None
+
+
+def delete_user(url, cookie, xsrf, pnet_login):
+    """
+    Удаляет аккаунт пользователя в Pnet по логину.
+
+    API: POST /store/public/admin/users/offDrop
+    Body: {"data":{"17":{"pod":17}}} — pod берётся из ответа offFilter (filter_user).
+
+    Args:
+        url: URL PNET сервера
+        cookie: Cookie для аутентификации
+        xsrf: XSRF токен
+        pnet_login: Логин пользователя для удаления
+
+    Returns:
+        requests.Response: ответ сервера при успехе, иначе None если пользователь не найден
+    """
+    user_params = get_user_params(url, cookie, xsrf, pnet_login)
+    if not user_params:
+        logger.warning("delete_user: user %s not found", pnet_login)
+        return None
+    pod = user_params["pod"]
+    payload = {"data": {str(pod): {"pod": pod}}}
+    header = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "X-XSRF-TOKEN": xsrf
+    }
+    r = requests.post(
+        url + '/store/public/admin/users/offDrop',
+        headers=header,
+        json=payload,
+        cookies=cookie,
+        verify=False
+    )
+    logger.debug("delete_user %s (pod=%s): %s", pnet_login, pod, r.text)
+    return r
+
+
+def delete_user_by_pod(url, cookie, xsrf, pod):
+    """
+    Удаляет аккаунт пользователя в Pnet по pod (id пользователя).
+
+    API: POST /store/public/admin/users/offDrop
+    Body: {"data":{"17":{"pod":17}}}
+
+    Args:
+        url: URL PNET сервера
+        cookie: Cookie для аутентификации
+        xsrf: XSRF токен
+        pod: Pod (id) пользователя (можно получить из offFilter / filter_user)
+
+    Returns:
+        requests.Response: ответ сервера
+    """
+    payload = {"data": {str(pod): {"pod": pod}}}
+    header = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "X-XSRF-TOKEN": xsrf
+    }
+    r = requests.post(
+        url + '/store/public/admin/users/offDrop',
+        headers=header,
+        json=payload,
+        cookies=cookie,
+        verify=False
+    )
+    logger.debug("delete_user_by_pod pod=%s: %s", pod, r.text)
+    return r
 
 
 def get_sessions_count(url, cookie):

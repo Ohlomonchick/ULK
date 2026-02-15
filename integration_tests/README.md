@@ -1,214 +1,115 @@
-# Интеграционные тесты
+# Интеграционные e2e тесты (Docker + Nginx + Postgres + Elasticsearch + PNET)
 
-Этот каталог содержит интеграционные тесты для проверки взаимодействия различных компонентов системы.
+Этот набор тестов проверяет реальную интеграцию:
+- Django-приложение в Docker (`web`),
+- Nginx в Docker (`nginx`),
+- Postgres в отдельном контейнере,
+- Elasticsearch (single-node, TLS) в отдельном контейнере,
+- внешний PNET (поднят отдельно, например в VirtualBox).
 
-## Структура
+## Что поднимается
 
-```
-integration_tests/
-├── README.md                    # Этот файл
-├── __init__.py
-├── gunicorn/                    # Тесты для Gunicorn
-│   ├── __init__.py
-│   └── test_gunicorn_conf.py
-└── conftest.py                  # Общие фикстуры pytest
-```
+Файл: `integration_tests/docker/compose.yml`
 
-## Рекомендуемые библиотеки
+Сервисы:
+- `postgres` на `localhost:55431`
+- `elasticsearch` на `https://localhost:19200` (TLS, `elastic/elastic`)
+- `web` (build через Dockerfile со слоем зависимостей + migrate + gunicorn)
+- `nginx` на `localhost:18080` (проксирует `/api` в Django и `/pnetlab` в PNET)
+- `web` ожидает healthcheck Postgres перед запуском миграций (исключает race condition с БД)
 
-### Для управления процессами
+Примечание: первый старт может идти несколько минут, так как `web` контейнер устанавливает зависимости.
 
-1. **pytest-xprocess** - управление внешними процессами
-   ```bash
-   pip install pytest-xprocess
-   ```
+Единственный обязательный внешний параметр для compose: `PNET_IP`.
 
-2. **pytest-timeout** - автоматические таймауты для тестов
-   ```bash
-   pip install pytest-timeout
-   ```
+## Ключевые пути
 
-3. **psutil** - более удобная работа с процессами
-   ```bash
-   pip install psutil
-   ```
+- `integration_tests/conftest.py` — orchestration Docker стека, env, cleanup context
+- `integration_tests/utils/db_seed.py` — подготовка тестовых сущностей (Competition/TeamCompetition/KKZ), регистрация cleanup (`register_*_cleanup`)
+- `integration_tests/utils/pnet_cleanup.py` — очистка пользователей/директорий/лаб в PNET
+- `integration_tests/utils/topology.py` — извлечение nodes/links из ответа PNET topology
+- `integration_tests/utils/http_client.py` — helper для логина в Django
+- `interface/config.py` — поддержка env override для `PNET_BASE_DIR`, `STUDENT_WORKSPACE`, `WEB_URL`
 
-### Для HTTP-тестирования
+## Запуск (Linux/WSL)
 
-1. **httpx** - современная альтернатива requests с async поддержкой
-   ```bash
-   pip install httpx
-   ```
-
-2. **responses** - мокирование HTTP-запросов
-   ```bash
-   pip install responses
-   ```
-
-### Для Docker/контейнеров
-
-1. **pytest-docker** - управление Docker-контейнерами в тестах
-   ```bash
-   pip install pytest-docker
-   ```
-
-2. **testcontainers-python** - библиотека для тестовых контейнеров
-   ```bash
-   pip install testcontainers
-   ```
-
-## Best Practices
-
-### 1. Использование фикстур для процессов
-
-Создайте `integration_tests/conftest.py` с переиспользуемыми фикстурами:
-
-```python
-import pytest
-import subprocess
-import signal
-import os
-import time
-from pathlib import Path
-
-@pytest.fixture(scope="session")
-def gunicorn_server_process():
-    """Фикстура для запуска Gunicorn сервера на уровне сессии"""
-    process = None
-    try:
-        # Запуск процесса
-        process = subprocess.Popen(...)
-        yield process
-    finally:
-        # Гарантированная очистка
-        if process:
-            process.terminate()
-            process.wait(timeout=10)
-```
-
-### 2. Использование context managers
-
-```python
-from contextlib import contextmanager
-
-@contextmanager
-def managed_process(cmd, **kwargs):
-    """Context manager для управления процессами"""
-    process = subprocess.Popen(cmd, **kwargs)
-    try:
-        yield process
-    finally:
-        if process.poll() is None:
-            process.terminate()
-            process.wait(timeout=10)
-```
-
-### 3. Маркировка тестов
-
-Используйте pytest markers для категоризации:
-
-```python
-import pytest
-
-@pytest.mark.integration
-@pytest.mark.slow
-def test_worker_restart():
-    """Тест с маркерами"""
-    pass
-```
-
-Запуск только интеграционных тестов:
 ```bash
-pytest -m integration
+export PNET_IP=192.168.0.108
+pytest -m integration integration_tests/test_*_e2e.py -v
 ```
 
-### 4. Конфигурация pytest
+или:
 
-Создайте `pytest.ini` или `pyproject.toml`:
-
-```ini
-[pytest]
-markers =
-    integration: интеграционные тесты
-    slow: медленные тесты (> 5 секунд)
-    requires_linux: требует Linux окружения
-    requires_docker: требует Docker
-
-testpaths = 
-    interface/tests
-    integration_tests
-
-timeout = 300
-timeout_method = thread
-```
-
-### 5. Изоляция тестов
-
-- Используйте уникальные порты для каждого теста
-- Очищайте временные файлы в `tearDown`/`finally`
-- Используйте временные директории для файлов маппинга
-
-### 6. Логирование и отладка
-
-```python
-import logging
-
-logger = logging.getLogger(__name__)
-
-def test_with_logging():
-    logger.info("Starting test")
-    # ...
-    logger.debug("Debug information")
-```
-
-Запуск с подробным логированием:
 ```bash
-pytest -v -s --log-cli-level=DEBUG
+chmod +x integration_tests/run_e2e.sh
+integration_tests/run_e2e.sh
 ```
 
-## Пример улучшенной структуры
+## Запуск (Windows PowerShell)
 
-```python
-# integration_tests/conftest.py
-import pytest
-import subprocess
-import signal
-import os
-from pathlib import Path
-
-@pytest.fixture(scope="session")
-def test_port():
-    """Генерирует уникальный порт для тестов"""
-    import socket
-    with socket.socket() as s:
-        s.bind(('', 0))
-        return s.getsockname()[1]
-
-@pytest.fixture
-def cleanup_processes():
-    """Фикстура для очистки процессов после теста"""
-    pids = []
-    yield pids
-    for pid in pids:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+```powershell
+$env:PNET_IP="192.168.0.108"
+pytest -m integration integration_tests/test_*_e2e.py -v
 ```
 
-## CI/CD интеграция
+или:
 
-Добавьте в `.github/workflows/tests.yml` или аналогичный файл:
-
-```yaml
-- name: Run integration tests
-  run: |
-    pytest integration_tests/ -m integration --timeout=600
+```powershell
+.\integration_tests\run_e2e.ps1 -PnetIp 192.168.0.108
 ```
 
-## Дополнительные ресурсы
+Скрипты запуска включают live-вывод (`-s --log-cli-level=INFO`), поэтому во время прогона видно, где именно выполняется тест.
 
-- [pytest documentation](https://docs.pytest.org/)
-- [Testing Django Applications](https://docs.djangoproject.com/en/stable/topics/testing/)
-- [pytest-xprocess](https://pytest-xprocess.readthedocs.io/)
+Дополнительно для каждого теста создается отдельный файл:
+- `integration_tests/logs/<run_id>/<timestamp>_<nodeid>.log`
+
+Это упрощает разбор падений и долгих сценариев.
+
+## Elasticsearch сертификаты
+
+При запуске `integration_stack` сертификаты для Elasticsearch генерируются автоматически, если их нет в `integration_tests/docker/certs/`.
+
+Генерация делается через одноразовые Linux-контейнеры (`docker run`) с утилитами:
+- `elasticsearch-certutil` для `ca.p12` и `elasticsearch.p12`,
+- `openssl` для конвертации в `ca.crt`, `elasticsearch.crt`, `elasticsearch.key`.
+
+Сертификаты монтируются в `elasticsearch` контейнер и доступны приложению в `web` через путь репозитория (`/app/integration_tests/docker/certs/...`).
+
+## Маркеры pytest
+
+- `integration` — интеграционный контур
+- `docker` — требует docker compose
+- `pnet` — требует доступ к PNET
+- `slow` — длительные проверки
+
+## Что покрывается сценариями
+
+- создание пользователей и смена паролей + проверка workspace директорий;
+- создание `CompetitionForm`/`TeamCompetitionForm` и наличие лаб на каждого участника;
+- проверка смены workspace у командных участников и возврата после удаления;
+- аутентификация в PNET через ручку приложения поверх Nginx;
+- создание сессии лабы через ручку, проверка `session_id` через `get_session_id()` и filter-flow;
+- KKZ: множественные лабы для каждого пользователя + выборочная проверка топологии.
+
+## Очистка побочных эффектов
+
+Cleanup выполняется в fixture `cleanup_context` после каждого теста:
+- удаление созданных лаб (`delete_lab_with_session_destroy`);
+- удаление тестовых пользователей PNET (`delete_user`);
+- удаление тестовых директорий (`delete_folder`);
+- удаление seed-сущностей в Postgres по тестовому префиксу.
+
+**По умолчанию** очистка выполняется всегда (и при успехе, и при падении теста).
+
+Опция **`--keep-pnet-on-fail`**: если передан этот аргумент и тест **упал**, очистка PNET и БД для этого теста **не выполняется** — артефакты остаются для разбора. При успешном прохождении теста очистка выполняется как обычно.
+
+Пример (оставить артефакты при падении):
+```bash
+pytest -m integration integration_tests/test_*_e2e.py -v --keep-pnet-on-fail
+```
+
+Для каждого прогона лабы и папки пользователей создаются под базовым воркспейсом Student в PNET (`/Practice Work/Test_Labs`):
+- `STUDENT_WORKSPACE=Practice Work/Test_Labs`
+- `PNET_BASE_DIR=/Practice Work/Test_Labs/IT_TestLabs/it_<timestamp>`
+Воркспейс пользователя в PNET задаётся относительно `STUDENT_WORKSPACE`: `/IT_TestLabs/it_<timestamp>/<username>`.
 

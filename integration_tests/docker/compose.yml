@@ -1,0 +1,103 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: cyberpolygon_it_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cyberpolygon
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "55431:5432"
+    volumes:
+      - cyberpolygon_it_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cyberpolygon"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.1.1
+    container_name: cyberpolygon_it_elasticsearch
+    restart: unless-stopped
+    environment:
+      - node.name=cyberpolygon-it-es-node
+      - cluster.name=cyberpolygon-it-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD=elastic
+      - xpack.security.enabled=true
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.security.http.ssl.verification_mode=certificate
+      - xpack.security.transport.ssl.key=/usr/share/elasticsearch/config/certs/elasticsearch.key
+      - xpack.security.transport.ssl.certificate=/usr/share/elasticsearch/config/certs/elasticsearch.crt
+      - xpack.security.transport.ssl.certificate_authorities=/usr/share/elasticsearch/config/certs/ca.crt
+      - xpack.security.http.ssl.key=/usr/share/elasticsearch/config/certs/elasticsearch.key
+      - xpack.security.http.ssl.certificate=/usr/share/elasticsearch/config/certs/elasticsearch.crt
+      - xpack.security.http.ssl.certificate_authorities=/usr/share/elasticsearch/config/certs/ca.crt
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "19200:9200"
+    volumes:
+      - cyberpolygon_it_elasticsearch_data:/usr/share/elasticsearch/data
+      - ./certs:/usr/share/elasticsearch/config/certs:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../../
+      dockerfile: integration_tests/docker/Dockerfile.web
+    container_name: cyberpolygon_it_web
+    working_dir: /app
+    command: >
+      bash -lc "python manage.py migrate --noinput &&
+      gunicorn Cyberpolygon.wsgi:application --bind 0.0.0.0:8002 --workers 2 --timeout 60"
+    environment:
+      PROD: "True"
+      USE_POSTGRES: "yes"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: cyberpolygon
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      ELASTIC_PASSWORD: "elastic"
+      PNET_URL: "${PNET_URL}"
+      WEB_URL: "http://nginx"
+      PNET_BASE_DIR: "${PNET_BASE_DIR}"
+      STUDENT_WORKSPACE: "${STUDENT_WORKSPACE}"
+    volumes:
+      - ../../:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_started
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cyberpolygon_it_nginx
+    environment:
+      PNET_IP: ${PNET_IP}
+    command: >
+      /bin/sh -lc "envsubst '$$PNET_IP' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
+      nginx -g 'daemon off;'"
+    ports:
+      - "18080:80"
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+    depends_on:
+      - web
+
+volumes:
+  cyberpolygon_it_postgres_data:
+  cyberpolygon_it_elasticsearch_data:
