@@ -545,17 +545,24 @@ def save_grades(request):
             if user_id is None:
                 continue
 
-            n = Competition2User.objects.filter(
-                competition=competition, user_id=user_id
-            ).update(grade=grade)
-            if n > 0:
-                updated += 1
-            elif is_team_competition:
+            if is_team_competition:
                 team_record = TeamCompetition2Team.objects.filter(
                     competition=competition, team__users=user_id
                 ).first()
                 if team_record:
                     TeamCompetition2Team.objects.filter(pk=team_record.pk).update(grade=grade)
+                    updated += 1
+            else:
+                n = Competition2User.objects.filter(
+                    competition=competition, user_id=user_id
+                ).update(grade=grade)
+                if n > 0:
+                    updated += 1
+                else:
+                    comp2user, _ = Competition2User.objects.get_or_create(
+                        competition=competition, user_id=user_id, defaults={'joined': True}
+                    )
+                    Competition2User.objects.filter(pk=comp2user.pk).update(grade=grade)
                     updated += 1
         return JsonResponse({'ok': True, 'updated': updated})
     except json.JSONDecodeError as e:
