@@ -53,6 +53,16 @@ def _docker_compose(*args: str, stream: bool = False) -> subprocess.CompletedPro
     return subprocess.run(command, cwd=PROJECT_ROOT, capture_output=True, text=True, check=False)
 
 
+def _get_web_container_logs(tail: int = 500) -> str:
+    """Возвращает последние строки логов контейнера web (при падении теста)."""
+    proc = _docker_compose("logs", "web", "--no-color", "--tail", str(tail))
+    out = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    if err and out:
+        return f"{out}\n\n--- stderr ---\n{err}"
+    return out or err or "(no output)"
+
+
 def _ensure_pnet_base_dir(pnet_url: str, cookie, base_dir: str) -> None:
     from integration_tests.utils.pnet_dirs import (
         PnetDirectoryProvisionError,
@@ -312,11 +322,28 @@ def pytest_addoption(parser):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Store test outcome so cleanup_context can skip PNET/DB cleanup on failure when --keep-pnet-on-fail is set."""
+    """Store test outcome so cleanup_context can skip PNET/DB cleanup on failure when --keep-pnet-on-fail is set.
+    On failure, append web container logs to the report and to the per-test log file."""
     outcome = yield
     rep = outcome.get_result()
     if rep.when == "call":
         item._test_outcome = rep.outcome  # "passed", "failed", "skipped"
+        if rep.failed and "integration_tests" in (item.nodeid or ""):
+            try:
+                web_logs = _get_web_container_logs(tail=500)
+                section_title = "Web container (docker compose logs web --tail=500)"
+                rep.sections.append((section_title, web_logs))
+                log_path = getattr(item, "_integration_log_path", None)
+                if log_path and Path(log_path).exists():
+                    with Path(log_path).open("a", encoding="utf-8") as f:
+                        f.write("\n\n")
+                        f.write("=" * 60 + "\n")
+                        f.write(f" {section_title} (test failed)\n")
+                        f.write("=" * 60 + "\n\n")
+                        f.write(web_logs)
+                        f.write("\n")
+            except Exception as e:
+                rep.sections.append(("Web container logs (capture failed)", str(e)))
 
 
 @pytest.hookimpl(tryfirst=True)

@@ -187,6 +187,22 @@ def get_gunicorn_worker_id():
     return None
 
 
+def get_gunicorn_worker_index():
+    """
+    Возвращает 0-based индекс воркера Gunicorn (0, 1, 2, ...) или None, если не запущено через Gunicorn.
+    Соответствует переменной окружения GUNICORN_WORKER_INDEX, выставляемой в gunicorn.conf.py.
+    """
+    import os
+    raw = os.getenv('GUNICORN_WORKER_INDEX')
+    if raw is not None:
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+    worker_id = get_gunicorn_worker_id()
+    return (worker_id - 1) if worker_id is not None else None
+
+
 def show_iframe_for_admin(competition, is_team_competition=False):
     if not competition.lab: 
         return False

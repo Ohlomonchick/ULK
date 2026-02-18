@@ -404,6 +404,78 @@ class CompetitionScenario:
     tasks: list[LabTask]
 
 
+@dataclass
+class TwoLabsSamePlatoonScenario:
+    """Два разных лаба и один взвод с пользователями; соревнования не созданы (для конкурентного POST)."""
+
+    lab1: Lab
+    lab2: Lab
+    level1: LabLevel
+    level2: LabLevel
+    tasks1: list[LabTask]
+    tasks2: list[LabTask]
+    platoon: Platoon
+    users: list[User]
+
+
+def seed_two_labs_same_platoon_scenario(
+    prefix: str,
+    users_count: int = 15,
+    *,
+    nodes_data_override: list[dict] | None = None,
+    connectors_data_override: list[dict] | None = None,
+    connectors2cloud_data_override: list[dict] | None = None,
+    networks_data_override: list[dict] | None = None,
+    make_first_user_staff: bool = True,
+) -> TwoLabsSamePlatoonScenario:
+    """
+    Создаёт два лаба (разные) с одной и той же сложной топологией и один взвод
+    с users_count пользователями. Соревнования не создаются — для сценария двух
+    одновременных POST на SimpleCompetitionForm (один и тот же взвод для обоих лаб).
+    """
+    from interface.pnet_session_manager import reset_admin_pnet_session
+
+    reset_admin_pnet_session()
+    nodes_data = nodes_data_override
+    connectors_data = connectors_data_override
+    connectors2cloud_data = connectors2cloud_data_override
+    networks_data = networks_data_override
+
+    lab1, level1, tasks1 = create_lab_with_level_and_tasks_overrides(
+        f"{prefix}-a",
+        lab_type=LabType.EXAM,
+        platform="PN",
+        nodes_data_override=nodes_data,
+        connectors_data_override=connectors_data,
+        connectors2cloud_data_override=connectors2cloud_data,
+        networks_data_override=networks_data,
+    )
+    lab2, level2, tasks2 = create_lab_with_level_and_tasks_overrides(
+        f"{prefix}-b",
+        lab_type=LabType.EXAM,
+        platform="PN",
+        nodes_data_override=nodes_data,
+        connectors_data_override=connectors_data,
+        connectors2cloud_data_override=connectors2cloud_data,
+        networks_data_override=networks_data,
+    )
+    platoon, users = create_platoon_with_users(prefix, users_count=users_count)
+    if make_first_user_staff and users:
+        User.objects.filter(pk=users[0].pk).update(is_superuser=True, is_staff=True)
+        users[0].refresh_from_db(fields=["is_superuser", "is_staff", "pnet_login"])
+
+    return TwoLabsSamePlatoonScenario(
+        lab1=lab1,
+        lab2=lab2,
+        level1=level1,
+        level2=level2,
+        tasks1=tasks1,
+        tasks2=tasks2,
+        platoon=platoon,
+        users=users,
+    )
+
+
 def seed_competition_scenario(
     prefix: str,
     users_count: int = 3,
