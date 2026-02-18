@@ -62,9 +62,10 @@ services:
     command: >
       bash -lc "python manage.py migrate --noinput &&
       python manage.py collectstatic --noinput &&
-      gunicorn Cyberpolygon.wsgi:application --bind 0.0.0.0:8002 --workers 2 --timeout 60"
+      gunicorn Cyberpolygon.wsgi:application -c sre/gunicorn.conf.py"
     environment:
       PROD: "True"
+      INTEGRATION_GUNICORN: "1"
       USE_POSTGRES: "yes"
       DB_HOST: postgres
       DB_PORT: "5432"

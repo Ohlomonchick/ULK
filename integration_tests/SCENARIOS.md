@@ -32,23 +32,23 @@
 
 ## 3. Создание лаб в рамках мероприятия (Competition / TeamCompetition)
 
-**Цель:** проверить, что при сохранении форм мероприятия (CompetitionForm, TeamCompetitionForm) для каждого участника (взвода или команды) в PNET создаётся лаба и соблюдается ожидаемая структура директорий.
+**Цель:** проверить, что при создании сценария мероприятия через `SimpleCompetitionForm` для каждого участника (взвода или команды) в PNET создаётся лаба и соблюдается ожидаемая структура директорий. Соревнование создаётся сразу в статусе «идёт» (start=now), без отдельного запуска.
 
-### 3.1. Соревнование по взводам (CompetitionForm)
+### 3.1. Соревнование по взводам (SimpleCompetitionForm)
 
 **Сценарий:**
-- Подготовка сценария через `seed_competition_scenario(prefix, users_count=3)`: создаётся лаба с уровнями и заданиями, взвод, пользователи через `CustomUserCreationForm`, затем заполняется и сохраняется `CompetitionForm` (даты, лаба, уровень, взводы, задания). Валидность формы проверяется перед `form.save()`.
+- Подготовка сценария через `seed_competition_scenario(prefix, users_count=3)`: создаётся лаба (тип EXAM) с уровнями и заданиями, взвод, пользователи через `CustomUserCreationForm`, затем заполняется и сохраняется `SimpleCompetitionForm` (duration, level, tasks); форма внутри создаёт Competition через `CompetitionForm`. Валидность проверяется перед `form.create_competition()`.
 - Для каждого пользователя из сценария проверяется наличие файла лабы в его директории в PNET: путь пользователя `{PNET_BASE_DIR}/{pnet_login}`, имя лабы — `get_pnet_lab_name(competition)`. Используется `folder_contains_lab_file(pnet_url, cookie, user_path, pnet_lab_name)` (поиск `{lab_name}.unl` в ответе `get_folders` по пути).
 - Лабы и пользователи регистрируются в `cleanup_context` для удаления после теста.
 
 **Файл:** `test_competition_lab_provisioning_e2e.py::test_competition_form_creates_lab_for_each_user`.
 
-### 3.2. Командное соревнование (TeamCompetitionForm) и смена воркспейса
+### 3.2. Командное соревнование (SimpleCompetitionForm) и смена воркспейса
 
 **Цель:** убедиться, что при создании командного мероприятия воркспейс участников команды переключается на командную директорию (slug команды), а после удаления мероприятия возвращается к персональному воркспейсу.
 
 **Сценарий:**
-- Подготовка через `seed_team_competition_scenario(prefix, team_size=2)`: лаба, команда, пользователи команды, сохранение `TeamCompetitionForm` с привязкой к команде.
+- Подготовка через `seed_team_competition_scenario(prefix, team_size=2)`: лаба (тип COMPETITION), команда, пользователи команды, сохранение через `SimpleCompetitionForm` (duration, level, tasks, teams) с привязкой к команде.
 - Для каждого участника команды запрашивается текущий воркспейс в PNET (`get_user_workspace` по `get_user_params`). Проверяется, что путь заканчивается на `/{team.slug}`.
 - Выполняется `scenario.competition.delete()`.
 - Для каждого участника снова запрашивается воркспейс. Проверяется, что путь заканчивается на `/{pnet_login}` и содержит базовый относительный путь воркспейса (`get_user_workspace_relative_path`), т.е. воркспейс вернулся к персональному.
@@ -114,8 +114,8 @@
 | Сценарий | Форма/API | Проверяемое поведение |
 |----------|------------|------------------------|
 | Жизненный цикл пользователя | CustomUserCreationForm, change_user_password | Директория пользователя в PNET, user_workspace, вход с новым паролем |
-| Лабы по взводу | CompetitionForm (POST/form.save) | Наличие .unl лабы у каждого участника во взводе |
-| Воркспейс команды | TeamCompetitionForm | Воркспейс = team.slug при наличии мероприятия; возврат к pnet_login после delete |
+| Лабы по взводу | SimpleCompetitionForm (create_competition) | Наличие .unl лабы у каждого участника во взводе |
+| Воркспейс команды | SimpleCompetitionForm (create_competition) | Воркспейс = team.slug при наличии мероприятия; возврат к pnet_login после delete |
 | Топология лабы | — | Совпадение узлов с конфигом, уникальность nodes/links |
 | PNET auth через Nginx | POST /api/get_pnet_auth/ | 200, cookies, GET /pnetlab/api/auth без Unauthorized |
 | Сессия лабы через Nginx | POST /api/create_pnet_lab_session/ | 200, lab_path, совпадение get_session_id и get_session_id_by_filter(lab_path) |

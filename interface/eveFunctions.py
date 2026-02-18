@@ -1,8 +1,11 @@
+import logging
+import random
+import time
+from functools import wraps
+
 import requests
 from slugify import slugify
-import logging
 import json
-from functools import wraps
 
 from .config import *
 
@@ -970,48 +973,85 @@ def login_user_to_pnet(url, username, password):
         return None, None
 
 
-def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
-    """Общая логика создания сессии лаборатории в PNET"""
+# Retry при Duplicate entry от PNET (конкурентное создание сессий)
+CREATE_SESSION_DUPLICATE_RETRIES = 2
+CREATE_SESSION_DUPLICATE_DELAY_RANGE = (0.05, 0.25)
+
+
+def _post_create_session_request(url, lab_path, cookie):
+    """Один HTTP POST на создание сессии PNET. Возвращает response."""
+    full_url = f"{url}/api/labs/session/factory/create"
+    return requests.post(
+        full_url,
+        headers={
+            "Content-Type": "application/json;charset=UTF-8",
+            "Accept": "application/json, text/plain, */*",
+            "Referer": f"{url}/store/public/admin/main/view",
+            "X-Requested-With": "XMLHttpRequest",
+        },
+        json={"path": lab_path},
+        cookies=cookie,
+        timeout=10,
+        verify=False,
+    )
+
+
+def _create_session_failure_response(create_session_response, cookie, lab_path, user_pnet_login):
+    """Формирует кортеж (False, message, pnet_code) из ответа PNET."""
+    pnet_code = None
     try:
-        # Создаем сессию лабы
-        full_url = f"{url}/api/labs/session/factory/create"
-        payload = {'path': lab_path}
+        payload = create_session_response.json()
+        if isinstance(payload, dict):
+            pnet_code = payload.get("code")
+    except ValueError:
+        pass
+    cookie_names = (
+        list(cookie.keys())
+        if hasattr(cookie, "keys")
+        else list(cookie)
+        if isinstance(cookie, dict)
+        else []
+    )
+    logger.error(
+        "create_pnet_lab_session_common: PNET returned %s for path=%s pnet_login=%s "
+        "cookies_sent_names=%s response=%s",
+        create_session_response.status_code,
+        lab_path,
+        user_pnet_login,
+        cookie_names,
+        (create_session_response.text or "")[:400],
+    )
+    return False, f"Failed to create lab session: {create_session_response.text}", pnet_code
 
-        create_session_response = requests.post(
-            full_url,
-            headers={
-                'Content-Type': 'application/json;charset=UTF-8',
-                'Accept': 'application/json, text/plain, */*',
-                'Referer': f"{url}/store/public/admin/main/view",
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            json=payload,
-            cookies=cookie,
-            timeout=10,
-            verify=False
-        )
 
-        if create_session_response.status_code != 200:
-            pnet_code = None
-            try:
-                payload = create_session_response.json()
-                if isinstance(payload, dict):
-                    pnet_code = payload.get("code")
-            except ValueError:
-                pass
-            cookie_names = list(cookie.keys()) if hasattr(cookie, "keys") else list(cookie) if isinstance(cookie, dict) else []
-            logger.error(
-                "create_pnet_lab_session_common: PNET returned %s for path=%s pnet_login=%s "
-                "cookies_sent_names=%s response=%s",
-                create_session_response.status_code,
+def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
+    """Общая логика создания сессии лаборатории в PNET. При Duplicate entry — до 2 ретраев с рандомной задержкой."""
+    try:
+        for attempt in range(1 + CREATE_SESSION_DUPLICATE_RETRIES):
+            create_session_response = _post_create_session_request(url, lab_path, cookie)
+
+            if create_session_response.status_code == 200:
+                return True, "Lab session created successfully", None
+
+            is_duplicate = (
+                create_session_response.status_code == 400
+                and "Duplicate entry" in (create_session_response.text or "")
+            )
+            if not is_duplicate or attempt >= CREATE_SESSION_DUPLICATE_RETRIES:
+                return _create_session_failure_response(
+                    create_session_response, cookie, lab_path, user_pnet_login
+                )
+
+            delay = random.uniform(*CREATE_SESSION_DUPLICATE_DELAY_RANGE)
+            logger.warning(
+                "create_pnet_lab_session_common: Duplicate entry, retry %s/%s in %.2fs path=%s pnet_login=%s",
+                attempt + 1,
+                CREATE_SESSION_DUPLICATE_RETRIES,
+                delay,
                 lab_path,
                 user_pnet_login,
-                cookie_names,
-                (create_session_response.text or "")[:400],
             )
-            return False, f"Failed to create lab session: {create_session_response.text}", pnet_code
-
-        return True, "Lab session created successfully", None
+            time.sleep(delay)
 
     except requests.exceptions.Timeout:
         logger.error("PNET request timeout")
@@ -1020,7 +1060,7 @@ def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
         logger.error("Failed to connect to PNET")
         return False, "Failed to connect to PNET", None
     except Exception as e:
-        logger.error(f"Session creation error: {str(e)}")
+        logger.error("Session creation error: %s", e)
         return False, f"Session creation error: {str(e)}", None
 
 

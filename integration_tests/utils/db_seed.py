@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import timedelta
 
 from django.utils import timezone
 
-from interface.forms import CompetitionForm, SimpleKkzForm, TeamCompetitionForm
+from interface.forms import SimpleCompetitionForm, SimpleKkzForm
 from interface.models import (
     Kkz,
     Competition,
@@ -409,7 +408,7 @@ def seed_competition_scenario(
     prefix: str,
     users_count: int = 3,
     *,
-    lab_type: str = LabType.COMPETITION,
+    lab_type: str = LabType.EXAM,
     platform: str = "PN",
     make_first_user_superuser: bool = False,
     nodes_data_override: list[dict] | None = None,
@@ -417,6 +416,10 @@ def seed_competition_scenario(
     connectors2cloud_data_override: list[dict] | None = None,
     networks_data_override: list[dict] | None = None,
 ) -> CompetitionScenario:
+    """
+    Создаёт сценарий соревнования по взводам через SimpleCompetitionForm.
+    lab_type=EXAM чтобы форма подставила platoons по learning_years; соревнование сразу в статусе «идёт» (start=now).
+    """
     from interface.pnet_session_manager import reset_admin_pnet_session
 
     reset_admin_pnet_session()
@@ -435,21 +438,20 @@ def seed_competition_scenario(
         User.objects.filter(pk=users[0].pk).update(is_superuser=True, is_staff=True)
         users[0].refresh_from_db(fields=["is_superuser", "is_staff", "pnet_login"])
 
-    form = CompetitionForm(
+    form = SimpleCompetitionForm(
         data={
-            "start": timezone.now() + timedelta(minutes=5),
-            "finish": timezone.now() + timedelta(hours=2),
-            "lab": lab.pk,
-            "level": level.pk,
-            "platoons": [platoon.pk],
-            "tasks": [task.pk for task in tasks],
-            "num_tasks": 2,
-            "non_platoon_users": [],
-        }
+            "duration_0": "0",
+            "duration_1": "2",
+            "duration_2": "0",
+            "duration_3": "0",
+            "level": str(level.pk),
+            "tasks": [str(task.pk) for task in tasks],
+        },
+        lab=lab,
     )
     if not form.is_valid():
-        raise AssertionError(f"CompetitionForm is invalid: {form.errors}")
-    competition = form.save()
+        raise AssertionError(f"SimpleCompetitionForm is invalid: {form.errors}")
+    competition = form.create_competition()
     return CompetitionScenario(competition=competition, users=users, lab=lab, tasks=tasks)
 
 
@@ -467,6 +469,10 @@ def seed_team_competition_scenario(
     *,
     nodes_data_override: list[dict] | None = None,
 ) -> TeamCompetitionScenario:
+    """
+    Создаёт сценарий командного соревнования через SimpleCompetitionForm.
+    Соревнование сразу в статусе «идёт» (start=now), без отдельного запуска.
+    """
     from interface.pnet_session_manager import reset_admin_pnet_session
 
     reset_admin_pnet_session()
@@ -481,22 +487,21 @@ def seed_team_competition_scenario(
     team.users.set(team_users)
     _ensure_participant_dirs([team.slug])
 
-    form = TeamCompetitionForm(
+    form = SimpleCompetitionForm(
         data={
-            "start": timezone.now() + timedelta(minutes=5),
-            "finish": timezone.now() + timedelta(hours=2),
-            "lab": lab.pk,
-            "level": level.pk,
-            "platoons": [],
-            "teams": [team.pk],
-            "tasks": [task.pk for task in tasks],
-            "num_tasks": 2,
-            "non_platoon_users": [],
-        }
+            "duration_0": "0",
+            "duration_1": "2",
+            "duration_2": "0",
+            "duration_3": "0",
+            "level": str(level.pk),
+            "tasks": [str(task.pk) for task in tasks],
+            "teams": [str(team.pk)],
+        },
+        lab=lab,
     )
     if not form.is_valid():
-        raise AssertionError(f"TeamCompetitionForm is invalid: {form.errors}")
-    competition = form.save()
+        raise AssertionError(f"SimpleCompetitionForm is invalid: {form.errors}")
+    competition = form.create_competition()
     return TeamCompetitionScenario(competition=competition, team=team, team_users=team_users, lab=lab)
 
 

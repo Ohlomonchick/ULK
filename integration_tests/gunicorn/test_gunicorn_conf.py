@@ -6,39 +6,31 @@
 2. Стабильность номеров при перезапусках
 3. Корректную работу при падениях воркеров
 
-ВАЖНО: 
-- Эти тесты требуют Linux-окружения, так как используют fcntl для файловых блокировок.
-- Тесты используют продовый конфиг sre/gunicorn.conf.py
-- Для запуска на Windows используйте WSL или Linux-окружение.
-- Требуется pytest-xprocess для управления процессами
+Запуск в рамках общих интеграционных тестов: тесты выполняются внутри Docker-контейнера
+(web), где уже запущен Gunicorn с sre/gunicorn.conf.py. На хосте (в т.ч. Windows)
+gunicorn-тесты не запускаются; run_e2e.ps1 выполняет их через docker compose exec web.
 """
 import os
 import sys
 import time
 import signal
 import json
-import errno
 from pathlib import Path
+
 import pytest
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from xprocess import ProcessStarter
-
-# Проверка доступности fcntl (требуется для Linux)
-try:
-    import fcntl
-    HAS_FCNTL = True
-except ImportError:
-    HAS_FCNTL = False
-    pytestmark = pytest.mark.skip(reason="fcntl not available (requires Linux)")
 
 # Добавляем корневую директорию проекта в путь
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# Путь к продовому конфигу Gunicorn
+# В интеграционном Docker (INTEGRATION_GUNICORN=1) используем уже запущенный Gunicorn
+INTEGRATION_GUNICORN_BASE_URL = "http://127.0.0.1:8002"
 PROD_GUNICORN_CONF = PROJECT_ROOT / "sre" / "gunicorn.conf.py"
+
+pytestmark = [pytest.mark.integration]
 
 
 class GunicornClient:
@@ -147,9 +139,17 @@ class GunicornClient:
 @pytest.fixture(scope="session")
 def gunicorn_server(xprocess, test_port):
     """
-    Фикстура для запуска Gunicorn сервера через xprocess.
-    Автоматически управляет жизненным циклом процесса.
+    В режиме INTEGRATION_GUNICORN=1 (Docker) используем уже запущенный Gunicorn.
+    Иначе запускаем свой процесс через xprocess (нужен Linux из-за fcntl в конфиге).
     """
+    if os.environ.get("INTEGRATION_GUNICORN") == "1":
+        time.sleep(2)  # дать воркерам записать маппинг
+        yield INTEGRATION_GUNICORN_BASE_URL
+        return
+
+    import xprocess
+    from xprocess import ProcessStarter
+
     class GunicornStarter(ProcessStarter):
         """Класс для запуска Gunicorn через xprocess"""
         # Не используем pattern, так как при log-level=error он не виден
@@ -190,16 +190,9 @@ def gunicorn_server(xprocess, test_port):
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
                 return False
     
-    # xprocess автоматически управляет процессом
     xprocess.ensure("gunicorn", GunicornStarter)
-    
-    # Ждем немного для полной инициализации всех воркеров
-    # При использовании gevent может потребоваться больше времени
     time.sleep(3)
-    
     yield f"http://127.0.0.1:{test_port}"
-    
-    # xprocess автоматически остановит процесс при завершении тестов
 
 
 @pytest.fixture

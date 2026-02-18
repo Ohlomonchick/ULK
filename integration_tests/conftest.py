@@ -23,6 +23,8 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Cyberpolygon.settings")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = PROJECT_ROOT / "integration_tests" / "docker" / "compose.yml"
 INTEGRATION_BASE_URL = "http://127.0.0.1:18080"
+# Из контейнера web до nginx по имени сервиса (для одного прогона pytest в контейнере)
+INTEGRATION_BASE_URL_IN_CONTAINER = "http://nginx"
 INTEGRATION_LOGS_DIR = PROJECT_ROOT / "integration_tests" / "logs"
 INTEGRATION_RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
 INTEGRATION_RUN_LOGS_DIR = INTEGRATION_LOGS_DIR / INTEGRATION_RUN_ID
@@ -402,7 +404,8 @@ def integration_env() -> dict:
 @pytest.fixture(scope="session")
 def integration_stack(integration_env):
     """
-    Поднимает Docker stack: postgres + web + nginx.
+    Поднимает Docker stack: postgres + web + nginx (или только ждёт готовности,
+    если стек уже поднят снаружи — INTEGRATION_STACK_EXTERNAL=1, см. run_e2e.ps1).
     """
     os.environ.update(
         {
@@ -414,33 +417,43 @@ def integration_stack(integration_env):
     )
     _ensure_elastic_certs()
 
-    print("[integration] docker compose down -v")
-    down_before = _docker_compose("down", "-v", stream=True)
-    if down_before.returncode != 0:
-        # Шум от отсутствующих контейнеров допустим.
-        pass
+    stack_external = os.environ.get("INTEGRATION_STACK_EXTERNAL") == "1"
 
-    print("[integration] docker compose up -d")
-    up = _docker_compose("up", "-d", stream=True)
-    if up.returncode != 0:
-        logs = _docker_compose("logs", "--no-color", stream=True)
-        raise RuntimeError(f"docker compose up failed with exit code: {up.returncode}; logs exit code: {logs.returncode}")
+    if not stack_external:
+        print("[integration] docker compose down -v")
+        down_before = _docker_compose("down", "-v", stream=True)
+        if down_before.returncode != 0:
+            pass
 
-    print(f"[integration] waiting http ready: {INTEGRATION_BASE_URL}")
-    _wait_http_ready(INTEGRATION_BASE_URL)
+        print("[integration] docker compose up -d")
+        up = _docker_compose("up", "-d", stream=True)
+        if up.returncode != 0:
+            logs = _docker_compose("logs", "--no-color", stream=True)
+            raise RuntimeError(
+                f"docker compose up failed with exit code: {up.returncode}; logs exit code: {logs.returncode}"
+            )
+
+    base_url = (
+        INTEGRATION_BASE_URL_IN_CONTAINER
+        if os.environ.get("INTEGRATION_GUNICORN") == "1"
+        else INTEGRATION_BASE_URL
+    )
+    print(f"[integration] waiting http ready: {base_url}")
+    _wait_http_ready(base_url)
     print(f"[integration] waiting elastic ready: {INTEGRATION_ELASTIC_URL}")
     _wait_elasticsearch_ready(INTEGRATION_ELASTIC_URL)
     print("[integration] stack is ready")
 
     yield {
-        "base_url": INTEGRATION_BASE_URL,
+        "base_url": base_url,
         "compose_file": str(COMPOSE_FILE),
     }
 
-    print("[integration] docker compose down -v")
-    down = _docker_compose("down", "-v", stream=True)
-    if down.returncode != 0:
-        raise RuntimeError(f"docker compose down failed with exit code: {down.returncode}")
+    if not stack_external:
+        print("[integration] docker compose down -v")
+        down = _docker_compose("down", "-v", stream=True)
+        if down.returncode != 0:
+            raise RuntimeError(f"docker compose down failed with exit code: {down.returncode}")
 
 
 @pytest.fixture(scope="session")
