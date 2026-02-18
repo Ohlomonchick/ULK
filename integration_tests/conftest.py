@@ -22,6 +22,8 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Cyberpolygon.settings")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = PROJECT_ROOT / "integration_tests" / "docker" / "compose.yml"
+# Должно совпадать с $ComposeProject в run_e2e.ps1, иначе фикстура управляет другим проектом и порты конфликтуют
+COMPOSE_PROJECT = "cyberpolygon_it"
 INTEGRATION_BASE_URL = "http://127.0.0.1:18080"
 # Из контейнера web до nginx по имени сервиса (для одного прогона pytest в контейнере)
 INTEGRATION_BASE_URL_IN_CONTAINER = "http://nginx"
@@ -30,6 +32,8 @@ INTEGRATION_RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
 INTEGRATION_RUN_LOGS_DIR = INTEGRATION_LOGS_DIR / INTEGRATION_RUN_ID
 INTEGRATION_ELASTIC_PORT = 19200
 INTEGRATION_ELASTIC_URL = f"https://127.0.0.1:{INTEGRATION_ELASTIC_PORT}"
+# Из контейнера web до Elasticsearch по имени сервиса (порт 9200 — внутренний)
+INTEGRATION_ELASTIC_URL_IN_CONTAINER = "https://elasticsearch:9200"
 INTEGRATION_ELASTIC_CERTS_DIR = PROJECT_ROOT / "integration_tests" / "docker" / "certs"
 INTEGRATION_ELASTIC_CA_RELATIVE_PATH = "integration_tests/docker/certs/ca.crt"
 
@@ -43,7 +47,7 @@ def find_free_port():
 
 
 def _docker_compose(*args: str, stream: bool = False) -> subprocess.CompletedProcess:
-    command = ["docker", "compose", "-f", str(COMPOSE_FILE), *args]
+    command = ["docker", "compose", "-f", str(COMPOSE_FILE), "-p", COMPOSE_PROJECT, *args]
     if stream:
         return subprocess.run(command, cwd=PROJECT_ROOT, check=False)
     return subprocess.run(command, cwd=PROJECT_ROOT, capture_output=True, text=True, check=False)
@@ -115,6 +119,10 @@ def _ensure_elastic_cert_permissions() -> None:
             # Best effort on non-POSIX filesystems (e.g. Windows hosts).
             pass
 
+    # When pytest runs inside the web container (INTEGRATION_STACK_EXTERNAL=1), docker is not
+    # available; certs are bind-mounted from host, permissions are already set.
+    if os.environ.get("INTEGRATION_STACK_EXTERNAL") == "1":
+        return
     # Also normalize permissions from inside a Linux container (important for Docker bind mounts).
     certs_volume = f"{_docker_mount_path(certs_dir)}:/certs"
     chmod_in_container = [
@@ -144,7 +152,12 @@ def _ensure_elastic_certs() -> None:
     if all(path.exists() for path in required_files):
         _ensure_elastic_cert_permissions()
         return
-
+    # When pytest runs inside the web container, docker is not available; certs must exist on host mount.
+    if os.environ.get("INTEGRATION_STACK_EXTERNAL") == "1":
+        raise RuntimeError(
+            "Elasticsearch certs not found and INTEGRATION_STACK_EXTERNAL=1 (no docker in container). "
+            "Ensure certs are generated on host before running pytest in container."
+        )
     INTEGRATION_ELASTIC_CERTS_DIR.mkdir(parents=True, exist_ok=True)
     certs_volume = f"{_docker_mount_path(INTEGRATION_ELASTIC_CERTS_DIR)}:/certs"
     es_image = "docker.elastic.co/elasticsearch/elasticsearch:9.1.1"
@@ -382,15 +395,25 @@ def integration_env() -> dict:
     student_workspace = "Practice Work/Test_Labs"
     pnet_base_dir = f"/Practice Work/Test_Labs/IT_TestLabs/{run_id}"
 
+    in_container = os.environ.get("INTEGRATION_GUNICORN") == "1"
+    if in_container:
+        web_url = INTEGRATION_BASE_URL_IN_CONTAINER
+        db_host = "postgres"
+        db_port = "5432"
+    else:
+        web_url = INTEGRATION_BASE_URL
+        db_host = "127.0.0.1"
+        db_port = "55431"
+
     env = {
         "PNET_IP": pnet_ip,
         "PNET_URL": f"http://{pnet_ip}",
         "PNET_BASE_DIR": pnet_base_dir,
         "STUDENT_WORKSPACE": student_workspace,
-        "WEB_URL": "http://127.0.0.1:18080",
+        "WEB_URL": web_url,
         "USE_POSTGRES": "yes",
-        "DB_HOST": "127.0.0.1",
-        "DB_PORT": "55431",
+        "DB_HOST": db_host,
+        "DB_PORT": db_port,
         "DB_NAME": "cyberpolygon",
         "DB_USER": "postgres",
         "DB_PASSWORD": "postgres",
@@ -433,15 +456,17 @@ def integration_stack(integration_env):
                 f"docker compose up failed with exit code: {up.returncode}; logs exit code: {logs.returncode}"
             )
 
+    in_container = os.environ.get("INTEGRATION_GUNICORN") == "1"
     base_url = (
-        INTEGRATION_BASE_URL_IN_CONTAINER
-        if os.environ.get("INTEGRATION_GUNICORN") == "1"
-        else INTEGRATION_BASE_URL
+        INTEGRATION_BASE_URL_IN_CONTAINER if in_container else INTEGRATION_BASE_URL
+    )
+    elastic_url = (
+        INTEGRATION_ELASTIC_URL_IN_CONTAINER if in_container else INTEGRATION_ELASTIC_URL
     )
     print(f"[integration] waiting http ready: {base_url}")
     _wait_http_ready(base_url)
-    print(f"[integration] waiting elastic ready: {INTEGRATION_ELASTIC_URL}")
-    _wait_elasticsearch_ready(INTEGRATION_ELASTIC_URL)
+    print(f"[integration] waiting elastic ready: {elastic_url}")
+    _wait_elasticsearch_ready(elastic_url)
     print("[integration] stack is ready")
 
     yield {
@@ -469,7 +494,12 @@ def django_ready(integration_env, integration_stack):
     from dynamic_config.utils import set_config
 
     # Make Elasticsearch config deterministic for integration tests.
-    set_config("ELASTIC_URL", INTEGRATION_ELASTIC_URL)
+    elastic_url = (
+        INTEGRATION_ELASTIC_URL_IN_CONTAINER
+        if os.environ.get("INTEGRATION_GUNICORN") == "1"
+        else INTEGRATION_ELASTIC_URL
+    )
+    set_config("ELASTIC_URL", elastic_url)
     set_config("ELASTIC_USERNAME", "elastic")
     set_config("ELASTIC_PASSWORD", "elastic")
     set_config("ELASTIC_USE_HTTPS", "true")

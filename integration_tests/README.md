@@ -70,6 +70,8 @@ playwright install chromium
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.0.108
 ```
 
+Скрипт поднимает стек (`compose up -d`), ждёт готовности, затем запускает pytest **внутри контейнера web** (`compose exec web pytest ...`), чтобы один прогон покрывал и e2e, и тесты Gunicorn в том же окружении, что и приложение (сеть между контейнерами: nginx, elasticsearch по имени сервиса).
+
 Скрипты запуска включают live-вывод (`-s --log-cli-level=INFO`), поэтому во время прогона видно, где именно выполняется тест.
 
 Дополнительно для каждого теста создается отдельный файл:
@@ -106,6 +108,7 @@ playwright install chromium
 - browser e2e через Playwright: проверка iframe для PN/CMD и PZ-admin flow;
 - конкурентные POST `/api/create_pnet_lab_session/` с проверкой распределения по gunicorn воркерам;
 - team shared-session: включение ноды одним участником и видимость состояния у другого;
+- отображение засчитанных по API заданий: студент видит зачёт в списке заданий и счётчике на competition_detail, админ — в таблице решений (с ожиданием анимации);
 - тесты Gunicorn (`integration_tests/gunicorn/`): нумерация воркеров, стабильность после перезапусков — выполняются **внутри контейнера** при полном прогоне `run_e2e.ps1` (без skip на Windows).
 
 ## Очистка побочных эффектов
@@ -128,6 +131,8 @@ pytest -m integration integration_tests/test_*_e2e.py -v --keep-pnet-on-fail
 ```powershell
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -KeepPnetOnFail
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "test_team_shared_session_e2e.py::test_team_shared_session_propagates_node_state_between_users" -KeepPnetOnFail
+# Удаление лаб PNET через час после окончания соревнования (management-скрипт):
+.\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "test_pnet_lab_cleanup_after_competition_end_e2e.py::test_pnet_labs_removed_by_management_job_one_hour_after_competition_end"
 # Только тесты Gunicorn (так же через -Test):
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "gunicorn/test_gunicorn_conf.py"
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "gunicorn/test_gunicorn_conf.py::test_worker_numbering"

@@ -30,7 +30,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 INTEGRATION_GUNICORN_BASE_URL = "http://127.0.0.1:8002"
 PROD_GUNICORN_CONF = PROJECT_ROOT / "sre" / "gunicorn.conf.py"
 
-pytestmark = [pytest.mark.integration]
+pytestmark = [pytest.mark.integration, pytest.mark.gunicorn_only]
 
 
 class GunicornClient:
