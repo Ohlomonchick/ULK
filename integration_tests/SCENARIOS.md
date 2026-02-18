@@ -148,7 +148,6 @@
   - PN + обычный пользователь: на странице соревнования есть `#pnetFrame`, проходит create session flow, `src` указывает на `/pnetlab/...`.
   - CMD + обычный пользователь: после `create_pnet_lab_session_with_console` `src` указывает на guacamole URL.
   - PZ + администратор: при `lab_type=PZ` и `platform=PN` iframe отображается и проходит инициализацию с созданием сессии.
-- Тесты автоматически skip’аются, если в окружении недоступен Chromium для Playwright.
 
 ---
 

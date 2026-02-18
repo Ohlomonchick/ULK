@@ -818,10 +818,16 @@ def get_pnet_auth(request):
 
         # Возвращаем cookies и устанавливаем их в ответе
         cookies_dict = {cookie.name: cookie.value for cookie in session.cookies}
-        response = JsonResponse({'success': True, 'cookies': cookies_dict, 'xsrf_token': xsrf_token})
-
-        # Устанавливаем cookies в HTTP-ответе для автоматической синхронизации
+        cookie_names = list(cookies_dict.keys())
         logger = logging.getLogger(__name__)
+        logger.info(
+            "get_pnet_auth: success for user=%s pnet_login=%s setting %s cookies: %s",
+            user.username,
+            getattr(user, "pnet_login", None),
+            len(cookie_names),
+            cookie_names,
+        )
+        response = JsonResponse({'success': True, 'cookies': cookies_dict, 'xsrf_token': xsrf_token})
 
         for cookie in session.cookies:
             logger.info(f"Setting cookie {cookie.name}={cookie.value} domain={cookie.domain} path={cookie.path}")
@@ -1072,7 +1078,7 @@ def _create_master_session(pnet_url, master_user, lab_path, cookie, xsrf):
     if not session:
         return None, "Failed to login as master user"
 
-    success, message = create_pnet_lab_session_common(
+    success, message, _ = create_pnet_lab_session_common(
         pnet_url, master_user.pnet_login, lab_path, session.cookies
     )
     if not success:
@@ -1132,6 +1138,7 @@ def create_pnet_lab_session(request):
     if not slug:
         return JsonResponse({'error': 'Competition slug required'}, status=400)
 
+    logger = logging.getLogger(__name__)
     try:
         from .api_utils import get_issue_for_user, create_lab_session_for_issue
         
@@ -1151,19 +1158,40 @@ def create_pnet_lab_session(request):
         session = requests.Session()
         session.verify = False
 
-        # Копируем cookies из запроса (должны быть установлены после аутентификации)
+        # Копируем cookies из запроса (должны быть установлены после get_pnet_auth)
+        request_cookie_names = list(request.COOKIES.keys()) if request.COOKIES else []
+        logger.info(
+            "create_pnet_lab_session: user=%s request.COOKIES names=%s",
+            request.user.username,
+            request_cookie_names,
+        )
         _copy_request_cookies_to_session(session, request)
-        
-        # Получаем XSRF токен
+        session_cookie_names = list(session.cookies.keys())
+        logger.info(
+            "create_pnet_lab_session: after copy session.cookies names=%s",
+            session_cookie_names,
+        )
         xsrf_token = session.cookies.get('XSRF-TOKEN', '')
 
         # Создаем сессию лабы
-        success, message, lab_path = create_lab_session_for_issue(
+        success, message, lab_path, pnet_code = create_lab_session_for_issue(
             competition, user, issue, pnet_url, session.cookies, xsrf_token
         )
         
         if not success:
-            status_code = 404 if message == 'Team for user not found in competition' else 500
+            logger.warning(
+                "create_pnet_lab_session: failed user=%s success=False message=%s pnet_code=%s cookies_sent=%s",
+                request.user.username,
+                message[:200] if message else None,
+                pnet_code,
+                list(session.cookies.keys()),
+            )
+            if message == 'Team for user not found in competition':
+                status_code = 404
+            elif isinstance(pnet_code, int) and 400 <= pnet_code <= 599:
+                status_code = pnet_code
+            else:
+                status_code = 500
             return JsonResponse({'error': message}, status=status_code)
 
         return JsonResponse({
@@ -1250,12 +1278,17 @@ def create_pnet_lab_session_with_console(request):
         cookies, xsrf_token = pf_login(pnet_url, user.pnet_login, user.pnet_password)
         
         # Создаем сессию лабы
-        success, message, lab_path = create_lab_session_for_issue(
+        success, message, lab_path, pnet_code = create_lab_session_for_issue(
             competition, user, issue, pnet_url, cookies, xsrf_token
         )
         
         if not success:
-            status_code = 404 if message == 'Team for user not found in competition' else 500
+            if message == 'Team for user not found in competition':
+                status_code = 404
+            elif isinstance(pnet_code, int) and 400 <= pnet_code <= 599:
+                status_code = pnet_code
+            else:
+                status_code = 500
             return JsonResponse({'error': message}, status=status_code)
 
         # Получаем топологию лаборатории и инкапсулируем в класс

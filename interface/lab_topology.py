@@ -15,8 +15,27 @@ class LabTopology:
             topology_data: JSON данные топологии из get_lab_topology
         """
         self.data = topology_data
-        self.nodes = topology_data.get('data', {}).get('nodes', {})
-        self.networks = topology_data.get('data', {}).get('networks', {})
+        raw_nodes = topology_data.get('data', {}).get('nodes', {})
+        raw_networks = topology_data.get('data', {}).get('networks', {})
+        self.nodes = self._normalize_indexed_map(raw_nodes)
+        self.networks = self._normalize_indexed_map(raw_networks)
+
+    @staticmethod
+    def _normalize_indexed_map(value):
+        """
+        Приводит структуру к словарю {id: payload}.
+        PNET может вернуть nodes/networks как dict или как list.
+        """
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, list):
+            normalized = {}
+            for idx, item in enumerate(value):
+                if isinstance(item, dict):
+                    item_id = item.get('id', idx)
+                    normalized[str(item_id)] = item
+            return normalized
+        return {}
     
     def get_ssh_nodes(self) -> List[Dict]:
         """

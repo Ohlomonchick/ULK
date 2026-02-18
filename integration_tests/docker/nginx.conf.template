@@ -58,8 +58,10 @@ http {
         }
 
         location /static/ {
-            proxy_pass http://django;
-            proxy_set_header Host $host;
+            alias /static/;
+            access_log off;
+            expires 1h;
+            add_header Cache-Control "public";
         }
 
         location /media/ {

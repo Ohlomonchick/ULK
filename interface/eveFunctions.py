@@ -141,6 +141,7 @@ def pf_login(url, name, password):
 
 def create_user(url, username, password, user_role='1', cookie=None):
     relative_path = get_user_workspace_relative_path()
+    user_workspace = f"{relative_path}/{username}"
     user_params = {
         "data": [
             {
@@ -150,7 +151,7 @@ def create_user(url, username, password, user_role='1', cookie=None):
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
-                "user_workspace": f'{relative_path}/{username}',
+                "user_workspace": user_workspace,
                 "note": "",
                 "max_node": "",
                 "max_node_lab": ""
@@ -678,22 +679,40 @@ def delete_lab(url, cookie, lab_path):
 def get_session_id(url, cookie):
         # Получаем session_id через /api/auth
     auth_response = get_auth_info(url, cookie)
+    logger.info(
+        "get_session_id: /api/auth response status=%s body_len=%s",
+        auth_response.status_code,
+        len(auth_response.text or ""),
+    )
     if auth_response.status_code != 200:
-        logger.error(f"Failed to get auth info: {auth_response.status_code} - {auth_response.text}")
+        logger.error(
+            "get_session_id: Failed to get auth info: %s - %s",
+            auth_response.status_code,
+            (auth_response.text or "")[:500],
+        )
         raise Exception(f"Failed to get auth info: {auth_response.status_code}")
-    
-    auth_data = auth_response.json()
+    try:
+        auth_data = auth_response.json()
+    except Exception as e:
+        logger.error("get_session_id: /api/auth response is not JSON: %s", e)
+        raise
     if auth_data.get("code") != 200 or "data" not in auth_data:
-        logger.error(f"Invalid auth response: {auth_data}")
+        logger.error(
+            "get_session_id: Invalid auth response code=%s data_keys=%s full_data=%s",
+            auth_data.get("code"),
+            list(auth_data.get("data", {}).keys()) if isinstance(auth_data.get("data"), dict) else None,
+            auth_data,
+        )
         raise Exception(f"Invalid auth response: {auth_data}")
-    
     sess_id = auth_data["data"].get("lab")
     if not sess_id:
-        logger.error(f"Session ID not found in auth response: {auth_data}")
-        raise Exception(f"Session ID not found in auth response")
-    
-    logger.debug(f"Session ID obtained from /api/auth: {sess_id}")
-
+        logger.error(
+            "get_session_id: Session ID not found in auth response. data.lab=%s data_keys=%s",
+            auth_data.get("data"),
+            list(auth_data["data"].keys()) if isinstance(auth_data.get("data"), dict) else None,
+        )
+        raise Exception("Session ID not found in auth response")
+    logger.debug("get_session_id: Session ID obtained from /api/auth: %s", sess_id)
     return sess_id
 
 
@@ -978,20 +997,36 @@ def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
         )
 
         if create_session_response.status_code != 200:
-            logger.error(f"Failed to create lab session: {create_session_response.text}")
-            return False, f"Failed to create lab session: {create_session_response.text}"
+            pnet_code = None
+            try:
+                payload = create_session_response.json()
+                if isinstance(payload, dict):
+                    pnet_code = payload.get("code")
+            except ValueError:
+                pass
+            cookie_names = list(cookie.keys()) if hasattr(cookie, "keys") else list(cookie) if isinstance(cookie, dict) else []
+            logger.error(
+                "create_pnet_lab_session_common: PNET returned %s for path=%s pnet_login=%s "
+                "cookies_sent_names=%s response=%s",
+                create_session_response.status_code,
+                lab_path,
+                user_pnet_login,
+                cookie_names,
+                (create_session_response.text or "")[:400],
+            )
+            return False, f"Failed to create lab session: {create_session_response.text}", pnet_code
 
-        return True, "Lab session created successfully"
+        return True, "Lab session created successfully", None
 
     except requests.exceptions.Timeout:
         logger.error("PNET request timeout")
-        return False, "PNET request timeout"
+        return False, "PNET request timeout", None
     except requests.exceptions.ConnectionError:
         logger.error("Failed to connect to PNET")
-        return False, "Failed to connect to PNET"
+        return False, "Failed to connect to PNET", None
     except Exception as e:
         logger.error(f"Session creation error: {str(e)}")
-        return False, f"Session creation error: {str(e)}"
+        return False, f"Session creation error: {str(e)}", None
 
 
 def turn_on_node(url, node_id, cookie):

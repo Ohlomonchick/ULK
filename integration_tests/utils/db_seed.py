@@ -243,6 +243,65 @@ def build_complex_topology_data() -> tuple[list[dict], list[dict], list[dict], l
     return nodes_data, connectors_data, connectors2cloud_data, networks_data
 
 
+def build_team_shared_session_nodes_data() -> list[dict]:
+    """
+    Топология для теста командной общей сессии: docker (Ubuntu) + vpcs.
+    Нода с name='node-a' — docker, чтобы реально запускалась в PNET без образа Astra.
+    """
+    return [
+        {
+            "template": "docker",
+            "type": "docker",
+            "image": "pnetlab/ubuntu_sv:latest",
+            "name": "node-a",
+            "description": "Docker node for team shared session",
+            "icon": "Server.png",
+            "cpu": 1,
+            "ram": 256,
+            "delay": 0,
+            "ethernet": 2,
+            "eth1_dhcp": 0,
+            "eth1_ip": "",
+            "eth2_dhcp": 0,
+            "eth2_ip": "",
+            "eth3_dhcp": 0,
+            "eth3_ip": "",
+            "default_route": "",
+            "DNS": "",
+            "console": "ssh",
+            "map_port": "",
+            "console_2nd": "",
+            "map_port_2nd": "",
+            "username": "",
+            "password": "",
+            "config_script": "config_docker.py",
+            "config": 0,
+            "docker_options": "--privileged",
+            "size": "",
+            "left": 277,
+            "top": 238,
+            "count": "1",
+            "postfix": 0,
+        },
+        {
+            "template": "vpcs",
+            "type": "vpcs",
+            "name": "VPC",
+            "icon": "Desktop.png",
+            "ethernet": 1,
+            "mtu": 9000,
+            "ram": 128,
+            "config": 0,
+            "delay": 0,
+            "size": "",
+            "left": 447,
+            "top": 266,
+            "count": "1",
+            "postfix": 0,
+        },
+    ]
+
+
 def create_lab_with_level_and_tasks(prefix: str, *, lab_type: str = LabType.COMPETITION) -> tuple[Lab, LabLevel, list[LabTask]]:
     return create_lab_with_level_and_tasks_overrides(prefix, lab_type=lab_type)
 
@@ -330,6 +389,7 @@ def seed_competition_scenario(
     *,
     lab_type: str = LabType.COMPETITION,
     platform: str = "PN",
+    make_first_user_superuser: bool = False,
     nodes_data_override: list[dict] | None = None,
     connectors_data_override: list[dict] | None = None,
     connectors2cloud_data_override: list[dict] | None = None,
@@ -348,6 +408,10 @@ def seed_competition_scenario(
         networks_data_override=networks_data_override,
     )
     platoon, users = create_platoon_with_users(prefix, users_count=users_count)
+
+    if make_first_user_superuser and users:
+        User.objects.filter(pk=users[0].pk).update(is_superuser=True, is_staff=True)
+        users[0].refresh_from_db(fields=["is_superuser", "is_staff", "pnet_login"])
 
     form = CompetitionForm(
         data={
@@ -375,11 +439,21 @@ class TeamCompetitionScenario:
     lab: Lab
 
 
-def seed_team_competition_scenario(prefix: str, team_size: int = 2) -> TeamCompetitionScenario:
+def seed_team_competition_scenario(
+    prefix: str,
+    team_size: int = 2,
+    *,
+    nodes_data_override: list[dict] | None = None,
+) -> TeamCompetitionScenario:
     from interface.pnet_session_manager import reset_admin_pnet_session
 
     reset_admin_pnet_session()
-    lab, level, tasks = create_lab_with_level_and_tasks(prefix, lab_type=LabType.COMPETITION)
+    if nodes_data_override is not None:
+        lab, level, tasks = create_lab_with_level_and_tasks_overrides(
+            prefix, lab_type=LabType.COMPETITION, nodes_data_override=nodes_data_override
+        )
+    else:
+        lab, level, tasks = create_lab_with_level_and_tasks(prefix, lab_type=LabType.COMPETITION)
     team = Team.objects.create(name=f"{prefix}-team", slug=f"{prefix}-team")
     _, team_users = create_platoon_with_users(f"{prefix}-team", users_count=team_size)
     team.users.set(team_users)

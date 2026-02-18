@@ -61,6 +61,7 @@ services:
     working_dir: /app
     command: >
       bash -lc "python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput &&
       gunicorn Cyberpolygon.wsgi:application --bind 0.0.0.0:8002 --workers 2 --timeout 60"
     environment:
       PROD: "True"
@@ -77,6 +78,7 @@ services:
       STUDENT_WORKSPACE: "${STUDENT_WORKSPACE}"
     volumes:
       - ../../:/app
+      - cyberpolygon_it_static_data:/static
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,9 +97,11 @@ services:
       - "18080:80"
     volumes:
       - ./nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+      - cyberpolygon_it_static_data:/static:ro
     depends_on:
       - web
 
 volumes:
   cyberpolygon_it_postgres_data:
   cyberpolygon_it_elasticsearch_data:
+  cyberpolygon_it_static_data:

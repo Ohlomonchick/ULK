@@ -321,9 +321,12 @@ def pytest_runtest_setup(item):
     file_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
+    _prev_level = root_logger.level
+    root_logger.setLevel(logging.DEBUG)
     root_logger.addHandler(file_handler)
     item._integration_log_handler = file_handler
     item._integration_log_path = str(log_path)
+    item._integration_log_prev_level = _prev_level
     root_logger.info("Started test log file: %s", log_path)
 
 
@@ -340,6 +343,8 @@ def pytest_runtest_teardown(item, nextitem):
         root_logger.info("Finished test log file: %s", log_path)
         root_logger.removeHandler(file_handler)
         file_handler.close()
+        prev_level = getattr(item, "_integration_log_prev_level", logging.WARNING)
+        root_logger.setLevel(prev_level)
 
     # Safety net: append explicit finish marker even if logging pipeline was interrupted.
     if log_path != "unknown":
