@@ -235,9 +235,31 @@ def build_complex_topology_data() -> tuple[list[dict], list[dict], list[dict], l
             "postfix": 0,
         },
     ]
-    # Для стабильности прогона в текущем тестовом контуре используем "мягкие" заготовки:
-    # PNET корректно обрабатывает их, а фактические связи проверяются по topology API.
-    connectors_data = [{}]
+    # Порядок нод: 0=sender, 1=attacker, 2=receiver, 3=vpc-router → в PNET id 1,2,3,4.
+    # Коннекторы: vpc-router (id 4) — порты 0,1,2 к sender, attacker, receiver (по одному порту).
+    connectors_data = [
+        {
+            "name": "vpc-router-iface_0",
+            "src_id": "4",
+            "src_if": "0",
+            "dest_id": "1",
+            "dest_if": "0",
+        },
+        {
+            "name": "vpc-router-iface_1",
+            "src_id": "4",
+            "src_if": "1",
+            "dest_id": "2",
+            "dest_if": "0",
+        },
+        {
+            "name": "vpc-router-iface_2",
+            "src_id": "4",
+            "src_if": "2",
+            "dest_id": "3",
+            "dest_if": "0",
+        },
+    ]
     connectors2cloud_data = [{}]
     networks_data = [{}]
     return nodes_data, connectors_data, connectors2cloud_data, networks_data

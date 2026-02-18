@@ -679,11 +679,6 @@ def delete_lab(url, cookie, lab_path):
 def get_session_id(url, cookie):
         # Получаем session_id через /api/auth
     auth_response = get_auth_info(url, cookie)
-    logger.info(
-        "get_session_id: /api/auth response status=%s body_len=%s",
-        auth_response.status_code,
-        len(auth_response.text or ""),
-    )
     if auth_response.status_code != 200:
         logger.error(
             "get_session_id: Failed to get auth info: %s - %s",

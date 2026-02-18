@@ -466,6 +466,20 @@ def django_ready(integration_env, integration_stack):
 
 
 @pytest.fixture
+def reattach_integration_log_file(request, django_ready):
+    """
+    Re-attach the per-test file handler to the root logger after Django has applied
+    LOGGING config (which replaces root handlers with console only). Ensures
+    all test-phase logs appear in the test log file.
+    """
+    root_logger = logging.getLogger()
+    handler = getattr(request.node, "_integration_log_handler", None)
+    if handler is not None and handler not in root_logger.handlers:
+        root_logger.addHandler(handler)
+        root_logger.setLevel(logging.DEBUG)
+
+
+@pytest.fixture
 def pnet_admin_session(integration_env, django_ready):
     """Административная сессия PNET для проверок и cleanup."""
     os.environ.update(integration_env)
@@ -478,7 +492,7 @@ def pnet_admin_session(integration_env, django_ready):
 
 
 @pytest.fixture
-def cleanup_context(request, integration_env, pnet_admin_session):
+def cleanup_context(request, integration_env, pnet_admin_session, reattach_integration_log_file):
     """
     Сборщик side-effects для теста.
 
