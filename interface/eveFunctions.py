@@ -253,6 +253,21 @@ def logout(url):
     logger.debug(r.text)
 
 
+def logout_session(url, cookies):
+    """Разлогинивает конкретную сессию пользователя (с передачей cookies)."""
+    try:
+        r = requests.get(
+            url + '/api/auth/logout',
+            headers={'content-type': 'application/json'},
+            cookies=cookies,
+            verify=False,
+            timeout=5,
+        )
+        logger.debug("logout_session: %s", r.text)
+    except Exception as e:
+        logger.warning("logout_session failed (non-critical): %s", e)
+
+
 def create_lab(url, lab_name, lab_description, lab_path, cookie, xsrf, username):
     username = slugify(username)
     lab_parameters = {
@@ -978,17 +993,21 @@ CREATE_SESSION_DUPLICATE_RETRIES = 2
 CREATE_SESSION_DUPLICATE_DELAY_RANGE = (0.05, 0.25)
 
 
-def _post_create_session_request(url, lab_path, cookie):
-    """Один HTTP POST на создание сессии PNET. Возвращает response."""
+def _post_create_session_request(url, lab_path, cookie, xsrf=None):
+    """Один HTTP POST на создание сессии PNET. Возвращает response.
+    xsrf: опционально XSRF-TOKEN для заголовка X-XSRF-TOKEN (требуется PNET для авторизованных запросов)."""
+    headers = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": f"{url}/store/public/admin/main/view",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    if xsrf:
+        headers["X-XSRF-TOKEN"] = xsrf
     full_url = f"{url}/api/labs/session/factory/create"
     return requests.post(
         full_url,
-        headers={
-            "Content-Type": "application/json;charset=UTF-8",
-            "Accept": "application/json, text/plain, */*",
-            "Referer": f"{url}/store/public/admin/main/view",
-            "X-Requested-With": "XMLHttpRequest",
-        },
+        headers=headers,
         json={"path": lab_path},
         cookies=cookie,
         timeout=10,
@@ -1024,11 +1043,12 @@ def _create_session_failure_response(create_session_response, cookie, lab_path, 
     return False, f"Failed to create lab session: {create_session_response.text}", pnet_code
 
 
-def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
-    """Общая логика создания сессии лаборатории в PNET. При Duplicate entry — до 2 ретраев с рандомной задержкой."""
+def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie, xsrf=None):
+    """Общая логика создания сессии лаборатории в PNET. При Duplicate entry — до 2 ретраев с рандомной задержкой.
+    xsrf: опционально XSRF-TOKEN (для запросов от имени залогиненного пользователя PNET)."""
     try:
         for attempt in range(1 + CREATE_SESSION_DUPLICATE_RETRIES):
-            create_session_response = _post_create_session_request(url, lab_path, cookie)
+            create_session_response = _post_create_session_request(url, lab_path, cookie, xsrf=xsrf)
 
             if create_session_response.status_code == 200:
                 return True, "Lab session created successfully", None

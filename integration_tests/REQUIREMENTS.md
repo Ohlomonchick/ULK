@@ -1,80 +1,58 @@
-# Рекомендуемые библиотеки для интеграционных тестов
+# Библиотеки, используемые в интеграционных тестах
 
-## Обязательные (уже установлены)
+Все перечисленные пакеты реально импортируются или вызываются в коде `integration_tests/`. Продакшен-зависимости подключаются через `-r requirements.txt` в корневом `requirements-test.txt`.
 
-- `pytest==8.3.5` - фреймворк для тестирования
-- `pytest-cov==6.1.1` - покрытие кода
-- `requests==2.31.0` - HTTP-клиент
-
-## Рекомендуемые для улучшения
-
-### 1. Управление процессами
+## Установка
 
 ```bash
-# Более удобная работа с процессами
-pip install psutil>=5.9.0
-
-# Автоматическое управление внешними процессами в pytest
-pip install pytest-xprocess>=0.24.0
+pip install -r requirements-test.txt
 ```
 
-**Преимущества:**
-- `psutil`: более надежное управление процессами, поиск дочерних процессов
-- `pytest-xprocess`: автоматическая очистка процессов, переиспользование между тестами
-
-### 2. Таймауты
+Для e2e-тестов с браузером после установки выполните:
 
 ```bash
-# Автоматические таймауты для тестов
-pip install pytest-timeout>=2.1.0
+playwright install chromium
 ```
 
-**Использование:**
-```python
-@pytest.mark.timeout(60)  # Таймаут 60 секунд
-def test_something():
-    pass
-```
+---
 
-### 3. HTTP-тестирование (опционально)
+## Список библиотек
 
-```bash
-# Современная альтернатива requests с async поддержкой
-pip install httpx>=0.24.0
+### Pytest и плагины
 
-# Мокирование HTTP-запросов
-pip install responses>=0.23.0
-```
+| Пакет       | Версия (prod) | Где используется |
+|------------|----------------|------------------|
+| pytest     | 8.3.5          | Все тесты, `conftest.py` (фикстуры, хуки `pytest_addoption`, `pytest_runtest_makereport`, `pytest_runtest_setup`/`teardown`), маркеры `@pytest.mark.integration`, `pytest.skip`/`fail`, `playwright_utils` (`importorskip`) |
+| pytest-cov | 6.1.1          | Покрытие кода при запуске с `--cov` |
+| coverage   | 7.8.0          | Движок отчётов покрытия |
 
-### 4. Docker/контейнеры (для будущего)
+### HTTP и сеть
 
-```bash
-# Управление Docker-контейнерами в тестах
-pip install pytest-docker>=2.0.0
+| Пакет    | Версия (prod) | Где используется |
+|----------|----------------|------------------|
+| requests | 2.31.0        | `conftest.py` (ожидание готовности стека, логи), `utils/http_client.py` (логин, сессии), `utils/pnet_dirs.py` (создание папок в PNET), `gunicorn/test_gunicorn_conf.py` (запросы к воркерам) |
+| urllib3  | 2.2.1         | `gunicorn/test_gunicorn_conf.py` — `urllib3.util.retry.Retry` для повторных запросов |
 
-# Или более мощная библиотека
-pip install testcontainers>=3.7.0
-```
+### Django
 
-## Пример добавления в requirements.txt
+| Пакет  | Версия (prod) | Где используется |
+|--------|----------------|------------------|
+| Django | 5.0.3         | `conftest.py` (`django.setup()`), `utils/db_seed.py` (`django.utils.timezone`, формы, модели), `utils/playwright_utils.py` (`django.utils.timezone`), `test_concurrent_two_competitions_form_e2e.py`, `test_concurrent_lab_sessions_e2e.py` (`django.core.management.call_command`), `test_pnet_lab_cleanup_after_competition_end_e2e.py` (`django.utils.timezone`) |
 
-```txt
-# Интеграционные тесты
-psutil>=5.9.0
-pytest-xprocess>=0.24.0
-pytest-timeout>=2.1.0
-```
+### E2E (браузер)
 
-## Приоритет установки
+| Пакет     | Версия      | Где используется |
+|-----------|-------------|------------------|
+| playwright | ≥1.49.0,<3 | `utils/playwright_utils.py` (`playwright.sync_api`), `test_frontend_iframe_playwright_e2e.py`, `test_competition_detail_credited_tasks_e2e.py`. Тесты помечают отсутствие пакета через `importorskip` и пропускают запуск. |
 
-1. **Высокий приоритет:**
-   - `psutil` - значительно упрощает управление процессами
-   - `pytest-timeout` - предотвращает зависшие тесты
+---
 
-2. **Средний приоритет:**
-   - `pytest-xprocess` - полезно для сложных интеграционных тестов
+## Зависимости из requirements.txt (уже включены через -r)
 
-3. **Низкий приоритет:**
-   - `httpx`, `responses` - только если нужны специфические возможности
-   - Docker библиотеки - только если планируется тестирование с контейнерами
+Указанные выше пакеты тянют за собой (из prod): `attrs`, `iniconfig`, `pluggy` (pytest), `certifi`, `charset-normalizer`, `idna` (requests), `asgiref`, `sqlparse` (Django) и остальные зависимости приложения, нужные для импорта `interface.*` и `dynamic_config.*` в тестах.
 
+## Опциональные (в requirements-test.txt не входят)
+
+- **pytest-timeout** — таймауты на тест (`@pytest.mark.timeout(60)`).
+- **pytest-xdist** — параллельный запуск (`-n auto`).
+- **psutil** / **pytest-xprocess** — управление процессами (в текущих тестах не используются).

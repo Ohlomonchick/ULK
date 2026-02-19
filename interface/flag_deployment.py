@@ -205,7 +205,7 @@ def _pnet_session_context(pnet_url, pnet_login, pnet_password, lab_path):
         yield None, None
         return
     
-    success, _, _ = create_pnet_lab_session_common(pnet_url, pnet_login, lab_path, session.cookies)
+    success, _, _ = create_pnet_lab_session_common(pnet_url, pnet_login, lab_path, session.cookies, xsrf)
     if not success:
         yield None, None
         return

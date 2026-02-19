@@ -22,6 +22,8 @@
 
 Единственный обязательный внешний параметр для compose: `PNET_IP`.
 
+Для сценария развёртывания флагов на SSH-ноду в лабе используется образ **pnetlab/ubuntu_sv:latest** (Ubuntu Server). Его можно скачать в PNET в один клик (Docker-ноды в топологии лабы).
+
 ## Ключевые пути
 
 - `integration_tests/conftest.py` — orchestration Docker стека, env, cleanup context
@@ -109,7 +111,8 @@ playwright install chromium
 - конкурентные POST `/api/create_pnet_lab_session/` с проверкой распределения по gunicorn воркерам;
 - team shared-session: включение ноды одним участником и видимость состояния у другого;
 - отображение засчитанных по API заданий: студент видит зачёт в списке заданий и счётчике на competition_detail, админ — в таблице решений (с ожиданием анимации);
-- тесты Gunicorn (`integration_tests/gunicorn/`): нумерация воркеров, стабильность после перезапусков — выполняются **внутри контейнера** при полном прогоне `run_e2e.ps1` (без skip на Windows).
+- тесты Gunicorn (`integration_tests/gunicorn/`): нумерация воркеров, стабильность после перезапусков — выполняются **внутри контейнера** при полном прогоне `run_e2e.ps1` (без skip на Windows);
+- раскатка флагов на SSH-ноду лабы (конфигурация SSHNodes) и проверка наличия файла с флагами на ноде: для соревнования по взводам (несколько случайных пользователей) и для командного соревнования (участники команды); лаба с Docker-нодой pnetlab/ubuntu_sv:latest.
 
 ## Очистка побочных эффектов
 
@@ -133,6 +136,9 @@ pytest -m integration integration_tests/test_*_e2e.py -v --keep-pnet-on-fail
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "test_team_shared_session_e2e.py::test_team_shared_session_propagates_node_state_between_users" -KeepPnetOnFail
 # Удаление лаб PNET через час после окончания соревнования (management-скрипт):
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "test_pnet_lab_cleanup_after_competition_end_e2e.py::test_pnet_labs_removed_by_management_job_one_hour_after_competition_end"
+# Раскатка флагов на SSH-ноду (взвод и команда):
+.\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "test_flag_deployment_e2e.py::test_flag_file_present_on_ssh_node_for_random_users"
+.\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "test_flag_deployment_e2e.py::test_flag_file_present_on_ssh_node_for_team_members"
 # Только тесты Gunicorn (так же через -Test):
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "gunicorn/test_gunicorn_conf.py"
 .\integration_tests\run_e2e.ps1 -PnetIp 192.168.1.11 -Test "gunicorn/test_gunicorn_conf.py::test_worker_numbering"

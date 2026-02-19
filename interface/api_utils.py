@@ -192,6 +192,7 @@ def create_lab_session_for_issue(competition, user, issue, pnet_url, cookies, xs
         pnet_url, 
         user.pnet_login, 
         lab_path, 
-        cookies
+        cookies,
+        xsrf=xsrf_token
     )
     return success, message, lab_path, pnet_code

@@ -14,6 +14,7 @@ from interface.models import (
     Competition2User,
     Lab,
     LabLevel,
+    LabNode,
     LabTask,
     LabType,
     Platoon,
@@ -262,6 +263,49 @@ def build_complex_topology_data() -> tuple[list[dict], list[dict], list[dict], l
     connectors2cloud_data = [{}]
     networks_data = [{}]
     return nodes_data, connectors_data, connectors2cloud_data, networks_data
+
+
+# Учётные данные по умолчанию для SSH-ноды образа pnetlab/ubuntu_sv (для тестов развёртывания флагов).
+# Образ pnetlab/ubuntu_sv:latest использует логин/пароль admin/admin.
+FLAG_DEPLOYMENT_SSH_NODE_NAME = "node-a"
+FLAG_DEPLOYMENT_SSH_LOGIN = "admin"
+FLAG_DEPLOYMENT_SSH_PASSWORD = "admin"
+
+
+def build_flag_deployment_topology_data() -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    """
+    Топология для e2e-теста развёртывания флагов: одна Docker-нода с SSH (pnetlab/ubuntu_sv:latest).
+    Образ можно скачать в PNET в один клик. Для ноды создаётся LabNode с учётом FLAG_DEPLOYMENT_SSH_*.
+    """
+    nodes_data = [
+        {
+            "template": "docker",
+            "type": "docker",
+            "image": "pnetlab/ubuntu_sv:latest",
+            "name": FLAG_DEPLOYMENT_SSH_NODE_NAME,
+            "description": "SSH node for flag deployment e2e",
+            "icon": "Server.png",
+            "cpu": 1,
+            "ram": 256,
+            "delay": 0,
+            "ethernet": 1,
+            "console": "ssh",
+            "map_port": "",
+            "console_2nd": "",
+            "map_port_2nd": "",
+            "username": "",
+            "password": "",
+            "config_script": "config_docker.py",
+            "config": 0,
+            "docker_options": "--privileged",
+            "size": "",
+            "left": 277,
+            "top": 238,
+            "count": "1",
+            "postfix": 0,
+        },
+    ]
+    return nodes_data, [], [], []
 
 
 def build_team_shared_session_nodes_data() -> list[dict]:
@@ -525,6 +569,111 @@ def seed_competition_scenario(
         raise AssertionError(f"SimpleCompetitionForm is invalid: {form.errors}")
     competition = form.create_competition()
     return CompetitionScenario(competition=competition, users=users, lab=lab, tasks=tasks)
+
+
+def seed_competition_scenario_with_ssh_flags(
+    prefix: str,
+    users_count: int = 4,
+    *,
+    make_first_user_superuser: bool = False,
+) -> CompetitionScenario:
+    """
+    Создаёт сценарий соревнования по взводам с лабой, содержащей одну SSH-ноду (pnetlab/ubuntu_sv:latest).
+    LabNode создаётся до вызова формы, чтобы при create_competition() задачи развёртывания флагов
+    могли получить lab.nodes. Форма ожидает завершения развёртывания флагов перед возвратом.
+    """
+    from interface.pnet_session_manager import reset_admin_pnet_session
+
+    reset_admin_pnet_session()
+    nodes_data, conn, conn2cloud, nets = build_flag_deployment_topology_data()
+    lab, level, tasks = create_lab_with_level_and_tasks_overrides(
+        prefix,
+        lab_type=LabType.EXAM,
+        platform="PN",
+        nodes_data_override=nodes_data,
+        connectors_data_override=conn,
+        connectors2cloud_data_override=conn2cloud,
+        networks_data_override=nets,
+    )
+    LabNode.objects.create(
+        lab=lab,
+        node_name=FLAG_DEPLOYMENT_SSH_NODE_NAME,
+        login=FLAG_DEPLOYMENT_SSH_LOGIN,
+        password=FLAG_DEPLOYMENT_SSH_PASSWORD,
+    )
+    platoon, users = create_platoon_with_users(prefix, users_count=users_count)
+    if make_first_user_superuser and users:
+        User.objects.filter(pk=users[0].pk).update(is_superuser=True, is_staff=True)
+        users[0].refresh_from_db(fields=["is_superuser", "is_staff", "pnet_login"])
+
+    form = SimpleCompetitionForm(
+        data={
+            "duration_0": "0",
+            "duration_1": "2",
+            "duration_2": "0",
+            "duration_3": "0",
+            "level": str(level.pk),
+            "tasks": [str(task.pk) for task in tasks],
+        },
+        lab=lab,
+    )
+    if not form.is_valid():
+        raise AssertionError(f"SimpleCompetitionForm is invalid: {form.errors}")
+    competition = form.create_competition()
+    return CompetitionScenario(competition=competition, users=users, lab=lab, tasks=tasks)
+
+
+def seed_team_competition_scenario_with_ssh_flags(
+    prefix: str,
+    team_size: int = 3,
+) -> TeamCompetitionScenario:
+    """
+    Создаёт сценарий командного соревнования с лабой, содержащей одну SSH-ноду (pnetlab/ubuntu_sv:latest).
+    LabNode создаётся до вызова формы для корректной постановки задач развёртывания флагов на команду.
+    Форма ожидает завершения развёртывания флагов перед возвратом.
+    """
+    from interface.pnet_session_manager import reset_admin_pnet_session
+
+    reset_admin_pnet_session()
+    nodes_data, conn, conn2cloud, nets = build_flag_deployment_topology_data()
+    lab, level, tasks = create_lab_with_level_and_tasks_overrides(
+        prefix,
+        lab_type=LabType.COMPETITION,
+        platform="PN",
+        nodes_data_override=nodes_data,
+        connectors_data_override=conn,
+        connectors2cloud_data_override=conn2cloud,
+        networks_data_override=nets,
+    )
+    LabNode.objects.create(
+        lab=lab,
+        node_name=FLAG_DEPLOYMENT_SSH_NODE_NAME,
+        login=FLAG_DEPLOYMENT_SSH_LOGIN,
+        password=FLAG_DEPLOYMENT_SSH_PASSWORD,
+    )
+    team = Team.objects.create(name=f"{prefix}-team", slug=f"{prefix}-team")
+    _, team_users = create_platoon_with_users(f"{prefix}-team", users_count=team_size)
+    team.users.set(team_users)
+    _ensure_participant_dirs([team.slug])
+
+    form = SimpleCompetitionForm(
+        data={
+            "duration_0": "0",
+            "duration_1": "2",
+            "duration_2": "0",
+            "duration_3": "0",
+            "level": str(level.pk),
+            "tasks": [str(task.pk) for task in tasks],
+            "teams": [str(team.pk)],
+        },
+        lab=lab,
+    )
+    if not form.is_valid():
+        raise AssertionError(f"SimpleCompetitionForm is invalid: {form.errors}")
+    competition = form.create_competition()
+    return TeamCompetitionScenario(
+        competition=competition, team=team, team_users=team_users, lab=lab
+    )
 
 
 @dataclass

@@ -53,14 +53,31 @@ def _docker_compose(*args: str, stream: bool = False) -> subprocess.CompletedPro
     return subprocess.run(command, cwd=PROJECT_ROOT, capture_output=True, text=True, check=False)
 
 
+# Файл логов Gunicorn внутри контейнера (sre/gunicorn.conf.py: errorlog)
+WEB_CONTAINER_ERRORLOG_PATH = "/var/log/cyberpolygon.log"
+
+
 def _get_web_container_logs(tail: int = 500) -> str:
-    """Возвращает последние строки логов контейнера web (при падении теста)."""
+    """Возвращает последние строки логов контейнера web (при падении теста).
+    Сначала читает /var/log/cyberpolygon.log (errorlog Gunicorn/Django), при неудаче — stdout/stderr контейнера."""
+    proc = _docker_compose(
+        "exec", "-T", "web", "tail", "-n", str(tail), WEB_CONTAINER_ERRORLOG_PATH
+    )
+    if proc.returncode == 0 and (proc.stdout or "").strip():
+        return (proc.stdout or "").strip()
+    # Fallback: stdout/stderr контейнера (миграции, collectstatic и т.д.)
     proc = _docker_compose("logs", "web", "--no-color", "--tail", str(tail))
     out = (proc.stdout or "").strip()
     err = (proc.stderr or "").strip()
     if err and out:
         return f"{out}\n\n--- stderr ---\n{err}"
     return out or err or "(no output)"
+
+
+@pytest.fixture
+def get_web_container_logs():
+    """Возвращает callable (tail=500) -> str для захвата логов контейнера web (например при 500 от API)."""
+    return lambda tail=500: _get_web_container_logs(tail=tail)
 
 
 def _ensure_pnet_base_dir(pnet_url: str, cookie, base_dir: str) -> None:
@@ -577,6 +594,15 @@ def cleanup_context(request, integration_env, pnet_admin_session, reattach_integ
         "prefixes_for_db": set(),
     }
     yield context
+
+    # Сброс глобальной админ-сессии PNET в процессе pytest. Тесты запускаются вне контейнера;
+    # при HTTP-запросах в контейнер контейнер может инвалидировать сессию pnet_scripts (один IP).
+    # Чтобы следующий тест не использовал устаревшую сессию, сбрасываем её в teardown.
+    try:
+        from interface.pnet_session_manager import reset_admin_pnet_session
+        reset_admin_pnet_session()
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).debug("reset_admin_pnet_session in teardown: %s", exc)
 
     keep_on_fail = request.config.getoption("keep_pnet_on_fail", default=False)
     test_outcome = getattr(request.node, "_test_outcome", "passed")

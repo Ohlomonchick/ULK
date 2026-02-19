@@ -1079,7 +1079,7 @@ def _create_master_session(pnet_url, master_user, lab_path, cookie, xsrf):
         return None, "Failed to login as master user"
 
     success, message, _ = create_pnet_lab_session_common(
-        pnet_url, master_user.pnet_login, lab_path, session.cookies
+        pnet_url, master_user.pnet_login, lab_path, session.cookies, xsrf=xsrf_master
     )
     if not success:
         return None, message
@@ -1109,6 +1109,18 @@ def _ensure_team_session(competition, user, pnet_url, cookies, xsrf):
         return False, 'Master user not configured for team', None
 
     lab_path = get_lab_path(competition, user)
+
+    # Если текущий пользователь — мастер, не логиним его заново (инвалидировали бы его же сессию).
+    # Создаём сессию лабы его же cookies из запроса.
+    if user == master_user:
+        from .eveFunctions import create_pnet_lab_session_common
+        success, message, _ = create_pnet_lab_session_common(
+            pnet_url, user.pnet_login, lab_path, cookies, xsrf=xsrf
+        )
+        if not success:
+            return False, message, None
+        TeamCompetition2Team.objects.filter(pk=team_issue.pk).update(master_session_created=True)
+        return True, None, lab_path
 
     if not latest_issue.master_session_created:
         master_session_id, error_message = _create_master_session(pnet_url, master_user, lab_path, cookies, xsrf)
