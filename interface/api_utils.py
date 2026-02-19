@@ -176,21 +176,23 @@ def create_lab_session_for_issue(competition, user, issue, pnet_url, cookies, xs
         xsrf_token: XSRF токен
         
     Returns:
-        tuple: (success, message, lab_path)
+        tuple: (success, message, lab_path, pnet_code)
     """
     from .api import _ensure_team_session, get_lab_path
     from .eveFunctions import create_pnet_lab_session_common
     
     if isinstance(issue, TeamCompetition2Team):
         # Командная сессия с мастером
-        return _ensure_team_session(competition, user, pnet_url, cookies, xsrf_token)
+        success, message, lab_path = _ensure_team_session(competition, user, pnet_url, cookies, xsrf_token)
+        return success, message, lab_path, None
     
     # Индивидуальная сессия
     lab_path = get_lab_path(competition, user)
-    success, message = create_pnet_lab_session_common(
+    success, message, pnet_code = create_pnet_lab_session_common(
         pnet_url, 
         user.pnet_login, 
         lab_path, 
-        cookies
+        cookies,
+        xsrf=xsrf_token
     )
-    return success, message, lab_path
+    return success, message, lab_path, pnet_code

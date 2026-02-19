@@ -1,0 +1,11 @@
+```mermaid
+flowchart LR
+    pytestRunner[PytestRunner] --> testFixtures[TestFixtures]
+    testFixtures --> dockerCompose[DockerComposeStack]
+    dockerCompose --> djangoApp[DjangoAppContainer]
+    dockerCompose --> nginxProxy[NginxContainer]
+    dockerCompose --> postgresDb[PostgresContainer]
+    djangoApp -->|HTTP via /pnetlab| pnetVm[PNET_VM]
+    testFixtures --> pnetCleanup[PnetCleanupManager]
+    testFixtures --> dbSeed[DbSeedUtils]
+```

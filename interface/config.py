@@ -37,9 +37,16 @@ def cache_for_minutes(minutes):
     return decorator
 
 
+def _get_config_or_env(key, default):
+    env_value = os.environ.get(key)
+    if env_value not in (None, ""):
+        return env_value
+    return get_config(key, default)
+
+
 @cache_for_minutes(1)
 def get_pnet_url():
-    config = get_config('PNET_URL', 'http://172.18.4.160')
+    config = _get_config_or_env('PNET_URL', 'http://172.18.4.160')
     if 'http' not in config:
         return None
     return config
@@ -48,19 +55,17 @@ def get_pnet_url():
 @cache_for_minutes(1)
 def get_pnet_base_dir():
     if settings.DEBUG:
-        return get_config('PNET_BASE_DIR', '/Practice work/Test_Labs/api_test_dir')
-    else:
-        return get_config(
-            'PNET_BASE_DIR', os.environ.get('PNET_BASE_DIR', '/Practice work/Test_Labs/api_test_dir')
-        )
+        return _get_config_or_env('PNET_BASE_DIR', '/Practice work/Test_Labs/api_test_dir')
+    return _get_config_or_env('PNET_BASE_DIR', '/Practice work/Test_Labs/api_test_dir')
 
 
 @cache_for_minutes(1)
 def get_student_workspace():
     """Возвращает путь к рабочему пространству студента"""
-    return get_config('STUDENT_WORKSPACE', 'Practice work/Test_Labs')
+    return _get_config_or_env('STUDENT_WORKSPACE', 'Practice work/Test_Labs')
 
 
+@cache_for_minutes(1)
 def get_web_url():
     """Возвращает URL для внутренних запросов к nginx/веб-серверу"""
-    return get_config('WEB_URL', 'http://127.0.0.1:80')
+    return _get_config_or_env('WEB_URL', 'http://127.0.0.1:80')

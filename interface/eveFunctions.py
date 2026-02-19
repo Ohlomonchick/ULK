@@ -1,8 +1,11 @@
+import logging
+import random
+import time
+from functools import wraps
+
 import requests
 from slugify import slugify
-import logging
 import json
-from functools import wraps
 
 from .config import *
 
@@ -141,6 +144,7 @@ def pf_login(url, name, password):
 
 def create_user(url, username, password, user_role='1', cookie=None):
     relative_path = get_user_workspace_relative_path()
+    user_workspace = f"{relative_path}/{username}"
     user_params = {
         "data": [
             {
@@ -150,7 +154,7 @@ def create_user(url, username, password, user_role='1', cookie=None):
                 "user_status": "1",
                 "active_time": "",
                 "expired_time": "",
-                "user_workspace": f'{relative_path}/{username}',
+                "user_workspace": user_workspace,
                 "note": "",
                 "max_node": "",
                 "max_node_lab": ""
@@ -165,7 +169,7 @@ def create_user(url, username, password, user_role='1', cookie=None):
             verify=False
         )
         logger.debug("User {} created\npasswd: {}\nworkspace: {}\nServer response\t{}".format(
-            username, password, f'{relative_path}/{username}', r.text)
+            username, password, user_workspace, r.text)
         )
     except Exception as e:
         logger.debug("Error with creating user\n{}\n".format(e))
@@ -186,12 +190,82 @@ def create_directory(url, path, dir_name, cookie):
     logger.debug(r.text)
 
 
+def delete_folder(url, path, cookie):
+    """
+    Удаляет директорию или файл в Pnet.
+
+    API: POST /api/folders/delete
+    Body: {"path": "/Practice Work/Test_Labs/api_test_dir/New Folder 2"}
+    Response: {"code":200,"status":"success","message":"Folder has been deleted (60012)."}
+
+    Args:
+        url: URL PNET сервера
+        path: Полный путь к папке или файлу (например, "/Practice Work/Test_Labs/api_test_dir/New Folder 2")
+        cookie: Cookie для аутентификации
+
+    Returns:
+        requests.Response: ответ сервера
+    """
+    payload = {"path": path}
+    r = requests.post(
+        url + '/api/folders/delete',
+        json=payload,
+        headers={'content-type': 'application/json'},
+        cookies=cookie,
+        verify=False
+    )
+    logger.debug("delete_folder %s: %s", path, r.text)
+    return r
+
+
+def get_folders(url, path, cookie):
+    """
+    Получает список директорий и файлов в указанной папке Pnet.
+
+    API: GET /api/folders?path=/Practice%20Work/Test_Labs/api_test_dir
+    Response: {"code":200,"status":"success","message":"...","data":{"folders":[...],"files":[...]}}
+
+    Args:
+        url: URL PNET сервера
+        path: Путь к папке (например, "/Practice Work/Test_Labs/api_test_dir")
+        cookie: Cookie для аутентификации
+
+    Returns:
+        requests.Response: ответ сервера; в response.json()["data"] — словарь с ключами
+            "folders" (список {"name", "path"}) и при наличии "files"
+    """
+    r = requests.get(
+        url + '/api/folders',
+        params={'path': path},
+        headers={'content-type': 'application/json'},
+        cookies=cookie,
+        verify=False
+    )
+    logger.debug("get_folders %s: %s", path, r.text[:200] if r.text else "")
+    return r
+
+
 def logout(url):
     header = {
         'content-type': 'application/json'
     }
     r = requests.get(url + '/api/auth/logout', headers=header, verify=False)
     logger.debug(r.text)
+
+
+def logout_session(url, cookies):
+    """Разлогинивает конкретную сессию пользователя (с передачей cookies)."""
+    try:
+        r = requests.get(
+            url + '/api/auth/logout',
+            headers={'content-type': 'application/json'},
+            cookies=cookies,
+            verify=False,
+            timeout=5,
+        )
+        logger.debug("logout_session: %s", r.text)
+    except Exception as e:
+        logger.warning("logout_session failed (non-critical): %s", e)
 
 
 def create_lab(url, lab_name, lab_description, lab_path, cookie, xsrf, username):
@@ -306,6 +380,75 @@ def change_user_workspace(url, cookie, xsrf, pnet_login, new_workspace):
         user_params["user_workspace"] = new_workspace
         return change_user_params(url, cookie, xsrf, user_params)
     return None
+
+
+def delete_user(url, cookie, xsrf, pnet_login):
+    """
+    Удаляет аккаунт пользователя в Pnet по логину.
+
+    API: POST /store/public/admin/users/offDrop
+    Body: {"data":{"17":{"pod":17}}} — pod берётся из ответа offFilter (filter_user).
+
+    Args:
+        url: URL PNET сервера
+        cookie: Cookie для аутентификации
+        xsrf: XSRF токен
+        pnet_login: Логин пользователя для удаления
+
+    Returns:
+        requests.Response: ответ сервера при успехе, иначе None если пользователь не найден
+    """
+    user_params = get_user_params(url, cookie, xsrf, pnet_login)
+    if not user_params:
+        logger.warning("delete_user: user %s not found", pnet_login)
+        return None
+    pod = user_params["pod"]
+    payload = {"data": {str(pod): {"pod": pod}}}
+    header = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "X-XSRF-TOKEN": xsrf
+    }
+    r = requests.post(
+        url + '/store/public/admin/users/offDrop',
+        headers=header,
+        json=payload,
+        cookies=cookie,
+        verify=False
+    )
+    logger.debug("delete_user %s (pod=%s): %s", pnet_login, pod, r.text)
+    return r
+
+
+def delete_user_by_pod(url, cookie, xsrf, pod):
+    """
+    Удаляет аккаунт пользователя в Pnet по pod (id пользователя).
+
+    API: POST /store/public/admin/users/offDrop
+    Body: {"data":{"17":{"pod":17}}}
+
+    Args:
+        url: URL PNET сервера
+        cookie: Cookie для аутентификации
+        xsrf: XSRF токен
+        pod: Pod (id) пользователя (можно получить из offFilter / filter_user)
+
+    Returns:
+        requests.Response: ответ сервера
+    """
+    payload = {"data": {str(pod): {"pod": pod}}}
+    header = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "X-XSRF-TOKEN": xsrf
+    }
+    r = requests.post(
+        url + '/store/public/admin/users/offDrop',
+        headers=header,
+        json=payload,
+        cookies=cookie,
+        verify=False
+    )
+    logger.debug("delete_user_by_pod pod=%s: %s", pod, r.text)
+    return r
 
 
 def get_sessions_count(url, cookie):
@@ -555,21 +698,34 @@ def get_session_id(url, cookie):
         # Получаем session_id через /api/auth
     auth_response = get_auth_info(url, cookie)
     if auth_response.status_code != 200:
-        logger.error(f"Failed to get auth info: {auth_response.status_code} - {auth_response.text}")
+        logger.error(
+            "get_session_id: Failed to get auth info: %s - %s",
+            auth_response.status_code,
+            (auth_response.text or "")[:500],
+        )
         raise Exception(f"Failed to get auth info: {auth_response.status_code}")
-    
-    auth_data = auth_response.json()
+    try:
+        auth_data = auth_response.json()
+    except Exception as e:
+        logger.error("get_session_id: /api/auth response is not JSON: %s", e)
+        raise
     if auth_data.get("code") != 200 or "data" not in auth_data:
-        logger.error(f"Invalid auth response: {auth_data}")
+        logger.error(
+            "get_session_id: Invalid auth response code=%s data_keys=%s full_data=%s",
+            auth_data.get("code"),
+            list(auth_data.get("data", {}).keys()) if isinstance(auth_data.get("data"), dict) else None,
+            auth_data,
+        )
         raise Exception(f"Invalid auth response: {auth_data}")
-    
     sess_id = auth_data["data"].get("lab")
     if not sess_id:
-        logger.error(f"Session ID not found in auth response: {auth_data}")
-        raise Exception(f"Session ID not found in auth response")
-    
-    logger.debug(f"Session ID obtained from /api/auth: {sess_id}")
-
+        logger.error(
+            "get_session_id: Session ID not found in auth response. data.lab=%s data_keys=%s",
+            auth_data.get("data"),
+            list(auth_data["data"].keys()) if isinstance(auth_data.get("data"), dict) else None,
+        )
+        raise Exception("Session ID not found in auth response")
+    logger.debug("get_session_id: Session ID obtained from /api/auth: %s", sess_id)
     return sess_id
 
 
@@ -832,42 +988,100 @@ def login_user_to_pnet(url, username, password):
         return None, None
 
 
-def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
-    """Общая логика создания сессии лаборатории в PNET"""
+# Retry при Duplicate entry от PNET (конкурентное создание сессий)
+CREATE_SESSION_DUPLICATE_RETRIES = 2
+CREATE_SESSION_DUPLICATE_DELAY_RANGE = (0.05, 0.25)
+
+
+def _post_create_session_request(url, lab_path, cookie, xsrf=None):
+    """Один HTTP POST на создание сессии PNET. Возвращает response.
+    xsrf: опционально XSRF-TOKEN для заголовка X-XSRF-TOKEN (требуется PNET для авторизованных запросов)."""
+    headers = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": f"{url}/store/public/admin/main/view",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    if xsrf:
+        headers["X-XSRF-TOKEN"] = xsrf
+    full_url = f"{url}/api/labs/session/factory/create"
+    return requests.post(
+        full_url,
+        headers=headers,
+        json={"path": lab_path},
+        cookies=cookie,
+        timeout=10,
+        verify=False,
+    )
+
+
+def _create_session_failure_response(create_session_response, cookie, lab_path, user_pnet_login):
+    """Формирует кортеж (False, message, pnet_code) из ответа PNET."""
+    pnet_code = None
     try:
-        # Создаем сессию лабы
-        full_url = f"{url}/api/labs/session/factory/create"
-        payload = {'path': lab_path}
+        payload = create_session_response.json()
+        if isinstance(payload, dict):
+            pnet_code = payload.get("code")
+    except ValueError:
+        pass
+    cookie_names = (
+        list(cookie.keys())
+        if hasattr(cookie, "keys")
+        else list(cookie)
+        if isinstance(cookie, dict)
+        else []
+    )
+    logger.error(
+        "create_pnet_lab_session_common: PNET returned %s for path=%s pnet_login=%s "
+        "cookies_sent_names=%s response=%s",
+        create_session_response.status_code,
+        lab_path,
+        user_pnet_login,
+        cookie_names,
+        (create_session_response.text or "")[:400],
+    )
+    return False, f"Failed to create lab session: {create_session_response.text}", pnet_code
 
-        create_session_response = requests.post(
-            full_url,
-            headers={
-                'Content-Type': 'application/json;charset=UTF-8',
-                'Accept': 'application/json, text/plain, */*',
-                'Referer': f"{url}/store/public/admin/main/view",
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            json=payload,
-            cookies=cookie,
-            timeout=10,
-            verify=False
-        )
 
-        if create_session_response.status_code != 200:
-            logger.error(f"Failed to create lab session: {create_session_response.text}")
-            return False, f"Failed to create lab session: {create_session_response.text}"
+def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie, xsrf=None):
+    """Общая логика создания сессии лаборатории в PNET. При Duplicate entry — до 2 ретраев с рандомной задержкой.
+    xsrf: опционально XSRF-TOKEN (для запросов от имени залогиненного пользователя PNET)."""
+    try:
+        for attempt in range(1 + CREATE_SESSION_DUPLICATE_RETRIES):
+            create_session_response = _post_create_session_request(url, lab_path, cookie, xsrf=xsrf)
 
-        return True, "Lab session created successfully"
+            if create_session_response.status_code == 200:
+                return True, "Lab session created successfully", None
+
+            is_duplicate = (
+                create_session_response.status_code == 400
+                and "Duplicate entry" in (create_session_response.text or "")
+            )
+            if not is_duplicate or attempt >= CREATE_SESSION_DUPLICATE_RETRIES:
+                return _create_session_failure_response(
+                    create_session_response, cookie, lab_path, user_pnet_login
+                )
+
+            delay = random.uniform(*CREATE_SESSION_DUPLICATE_DELAY_RANGE)
+            logger.warning(
+                "create_pnet_lab_session_common: Duplicate entry, retry %s/%s in %.2fs path=%s pnet_login=%s",
+                attempt + 1,
+                CREATE_SESSION_DUPLICATE_RETRIES,
+                delay,
+                lab_path,
+                user_pnet_login,
+            )
+            time.sleep(delay)
 
     except requests.exceptions.Timeout:
         logger.error("PNET request timeout")
-        return False, "PNET request timeout"
+        return False, "PNET request timeout", None
     except requests.exceptions.ConnectionError:
         logger.error("Failed to connect to PNET")
-        return False, "Failed to connect to PNET"
+        return False, "Failed to connect to PNET", None
     except Exception as e:
-        logger.error(f"Session creation error: {str(e)}")
-        return False, f"Session creation error: {str(e)}"
+        logger.error("Session creation error: %s", e)
+        return False, f"Session creation error: {str(e)}", None
 
 
 def turn_on_node(url, node_id, cookie):

@@ -1,0 +1,13 @@
+venv/
+.venv/
+.git/
+.idea/
+.cursor/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+media/
+static/
+logs/
+polygon_linux/**

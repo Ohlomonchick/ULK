@@ -67,7 +67,7 @@ http {
     }
 
     server {
-        listen       {{ ip }};
+        listen       {{ ip }}:8080;
         server_name  localhost;
         client_max_body_size 300M;
 

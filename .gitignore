@@ -179,3 +179,5 @@ nginx-1.29.0/
 
 sre/compose/elk-configs/certs/
 media/
+integration_tests/logs/
+integration_tests/docker/certs/
