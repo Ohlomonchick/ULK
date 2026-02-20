@@ -480,6 +480,10 @@ class Competition(models.Model):
     non_platoon_users = models.ManyToManyField(User, verbose_name="Студенты", blank=True)
     created_at = models.DateTimeField(default=timezone.now, blank=True)
 
+    def get_tasks_for_assignment(self):
+        """Задания для выдачи участникам: либо выбранные в соревновании, либо все задания лабы."""
+        return list(self.tasks.all() or self.lab.options.all())
+
     def clean(self):
         if not self.start or not self.finish:
             raise ValidationError("Нет даты!")

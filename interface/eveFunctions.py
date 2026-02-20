@@ -562,12 +562,17 @@ def get_session_id(url, cookie):
     if auth_data.get("code") != 200 or "data" not in auth_data:
         logger.error(f"Invalid auth response: {auth_data}")
         raise Exception(f"Invalid auth response: {auth_data}")
-    
-    sess_id = auth_data["data"].get("lab")
-    if not sess_id:
-        logger.error(f"Session ID not found in auth response: {auth_data}")
-        raise Exception(f"Session ID not found in auth response")
-    
+
+    data = auth_data["data"]
+    sess_id = data.get("lab")
+    if isinstance(sess_id, dict):
+        sess_id = sess_id.get("id")
+    if sess_id is None or sess_id == "":
+        sess_id = data.get("session_id") or data.get("sessionId") or data.get("id") or data.get("pod")
+    if sess_id is None or sess_id == "":
+        keys = list(data.keys()) if isinstance(data, dict) else "not a dict"
+        logger.error(f"Session ID not found in auth response. data keys: {keys}, full: {auth_data}")
+        raise Exception(f"Session ID not found in PNET /api/auth response (data keys: {keys}).")
     logger.debug(f"Session ID obtained from /api/auth: {sess_id}")
 
     return sess_id
@@ -651,7 +656,10 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
             return func(*updated_args, **updated_kwargs)
 
     create_session(url, lab, cookie)
-    sess_id = get_session_id(url, cookie)
+    # Сначала получаем session id по пути к лабе, иначе — из /api/auth
+    sess_id, err = get_session_id_by_filter(url, cookie, xsrf, lab)
+    if sess_id is None:
+        sess_id = get_session_id(url, cookie)
 
     # Модифицируем NodesData с USB device IDs, если они предоставлены
     nodes_data = lab_object.NodesData
