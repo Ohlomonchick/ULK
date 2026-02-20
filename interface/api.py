@@ -28,7 +28,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
+from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, TeamCompetition2TeamsAndUsers, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
@@ -1100,27 +1100,30 @@ def get_kibana_auth(request):
         return JsonResponse({'error': f'Kibana authentication error: {str(e)}'}, status=500)
 
 
-def get_lab_path(competition, user):
+def get_lab_path(competition, user, session_issue=None):
     """
     Возвращает путь к лабе для пользователя.
-    
+
+    Для сессии по сегментам (session_issue задан): лаба в воркспейсе master_user.
     Для командных участников: /base_path/{team.slug}/lab.unl
     Для одиночных участников: /base_path/{user.pnet_login}/lab.unl
     """
     base_path = get_pnet_base_dir().strip('/')
     lab_file_name = f"{get_pnet_lab_name(competition)}.unl"
-    
-    # Определяем директорию пользователя
-    user_dir = user.pnet_login  # По умолчанию - индивидуальная директория
-    
-    if isinstance(competition, TeamCompetition):
-        # Для командных соревнований пытаемся получить slug команды
-        try:
-            team = get_user_team(competition, user)
-            user_dir = team.slug
-        except TeamCompetition2Team.DoesNotExist:
-            pass  # Используем индивидуальную директорию
-    
+
+    if session_issue is not None and getattr(session_issue, 'master_user', None):
+        user_dir = session_issue.master_user.pnet_login
+    else:
+        # Определяем директорию пользователя
+        user_dir = user.pnet_login  # По умолчанию - индивидуальная директория
+        if isinstance(competition, TeamCompetition):
+            # Для командных соревнований пытаемся получить slug команды
+            try:
+                team = get_user_team(competition, user)
+                user_dir = team.slug
+            except TeamCompetition2Team.DoesNotExist:
+                pass  # Используем индивидуальную директорию
+
     return f"/{base_path}/{user_dir}/{lab_file_name}"
 
 
@@ -1224,6 +1227,27 @@ def _ensure_team_session(competition, user, pnet_url, cookies, xsrf):
         if not master_session_id:
             return False, error_message, None
         
+    success, message = _join_master_session(pnet_url, cookies, xsrf, lab_path, master_session_id=master_session_id)
+    if not success:
+        return False, message, None
+
+    return True, None, lab_path
+
+
+def _ensure_segment_session(competition, user, session_issue, pnet_url, cookies, xsrf):
+    """
+    Подключает пользователя к мастер-сессии.
+    Лаба уже создана в воркспейсе master_user; получаем session_id по пути и делаем join.
+    """
+    master_user = session_issue.master_user
+    if not master_user:
+        return False, 'Master user not configured for session', None
+
+    lab_path = get_lab_path(competition, master_user, session_issue=session_issue)
+    master_session_id, error_message = _get_master_session_id(pnet_url, cookies, xsrf, lab_path)
+    if not master_session_id:
+        return False, error_message or 'Session not found', None
+
     success, message = _join_master_session(pnet_url, cookies, xsrf, lab_path, master_session_id=master_session_id)
     if not success:
         return False, message, None
@@ -1682,24 +1706,23 @@ def get_team_or_user_issue(competition, user):
     """
     Получает issue для пользователя в соревновании.
     
-    Важно: Competition2User может быть как в Competition, так и в TeamCompetition.
-    TeamCompetition2Team только в TeamCompetition.
-    
-    Приоритет поиска:
-    1. Сначала ищем TeamCompetition2Team (если это командное соревнование)
-    2. Затем ищем Competition2User (может быть в любом типе соревнования)
+    Приоритет: TeamCompetition2Team → TeamCompetition2TeamsAndUsers (сегменты) → Competition2User.
     """
     issue = None
     
-    # Сначала пытаемся найти командный issue (если это TeamCompetition)
     if isinstance(competition, TeamCompetition):
         try:
             issue = TeamCompetition2Team.objects.get(competition=competition, team__users=user)
             return issue
         except TeamCompetition2Team.DoesNotExist:
             pass
-    
-    # Затем ищем индивидуальный issue (работает для любого типа соревнования)
+
+        issue = TeamCompetition2TeamsAndUsers.objects.filter(
+            team_competition=competition
+        ).filter(Q(teams__users=user) | Q(users=user)).select_related('master_user').first()
+        if issue:
+            return issue
+
     try:
         issue = Competition2User.objects.get(competition=competition, user=user)
     except Competition2User.DoesNotExist:

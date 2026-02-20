@@ -1,5 +1,5 @@
 from django.db.models import Q, Case, When, IntegerField
-from .models import User, Competition2User, TeamCompetition2Team, TeamCompetition
+from .models import User, Competition2User, TeamCompetition2Team, TeamCompetition2TeamsAndUsers, TeamCompetition
 from django.http import JsonResponse
 from rest_framework import status
 from slugify import slugify
@@ -145,7 +145,13 @@ def get_issue_for_user(competition, user):
             competition=competition,
             team__users=user
         ).first()
-        
+        if issue:
+            return issue, None
+
+        # Участник сессии по сегментам 
+        issue = TeamCompetition2TeamsAndUsers.objects.filter(
+            team_competition=competition
+        ).filter(Q(teams__users=user) | Q(users=user)).select_related('master_user').first()
         if issue:
             return issue, None
     
@@ -178,14 +184,17 @@ def create_lab_session_for_issue(competition, user, issue, pnet_url, cookies, xs
     Returns:
         tuple: (success, message, lab_path)
     """
-    from .api import _ensure_team_session, get_lab_path
+    from .api import _ensure_team_session, _ensure_segment_session, get_lab_path
     from .eveFunctions import create_pnet_lab_session_common
     
     if isinstance(issue, TeamCompetition2Team):
         # Командная сессия с мастером
         return _ensure_team_session(competition, user, pnet_url, cookies, xsrf_token)
-    
-    # Индивидуальная сессия
+
+    if isinstance(issue, TeamCompetition2TeamsAndUsers):
+        return _ensure_segment_session(competition, user, issue, pnet_url, cookies, xsrf_token)
+
+    # Индивидуальная сессия 
     lab_path = get_lab_path(competition, user)
     success, message = create_pnet_lab_session_common(
         pnet_url, 
