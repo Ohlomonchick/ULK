@@ -116,6 +116,12 @@ class Lab(models.Model):
         'Облачные коннекторы', default=default_json, validators=[validate_top_level_array]
     )
     NetworksData = models.JSONField('Сети', default=default_json, validators=[validate_top_level_array])
+    TopologySegmentsData = models.JSONField(
+        'Сегменты топологии',
+        default=list,
+        validators=[validate_top_level_array],
+        help_text='Сегменты: [{"name": "Сегмент 1", "vm_names": ["vm1", "vm2"]}, ...]',
+    )
 
     PnetSSHNodeName = models.CharField('Имя ноды в Pnet для открытия консоли', max_length=255, blank=True, null=True)
 
@@ -141,6 +147,30 @@ class Lab(models.Model):
 
     def get_platform(self):
         return self.platform
+
+
+class TopologySegment(models.Model):
+    """Сегмент сетевой топологии лабы"""
+    name = models.CharField('Название сегмента', max_length=255)
+    lab = models.ForeignKey(
+        Lab,
+        on_delete=models.CASCADE,
+        related_name='topology_segments',
+        verbose_name='Лабораторная работа'
+    )
+    vm_names = models.JSONField(
+        'Имена VM',
+        default=list,
+        help_text='Список имён VM в формате JSON, например: ["vm1", "vm2"]'
+    )
+
+    class Meta:
+        verbose_name = 'Сегмент топологии'
+        verbose_name_plural = 'Сегменты топологии'
+        ordering = ['lab', 'name']
+
+    def __str__(self):
+        return f"{self.lab.name} — {self.name}"
 
 
 class LabSerializer(serializers.ModelSerializer):
@@ -766,6 +796,232 @@ class TeamCompetition2Team(models.Model):
         instance.delete_from_platform(final=True)
 
 
+class TeamCompetition2TeamsAndUsers(models.Model):
+    """
+    Группа команд/пользователей в одной сессии в воркспейсе master_user.
+    одна запись = одна сессия по числу сегментов лабы.
+    """
+    team_competition = models.ForeignKey(
+        TeamCompetition,
+        on_delete=models.CASCADE,
+        related_name='competition_sessions'
+    )
+    teams = models.ManyToManyField(
+        Team,
+        related_name='team_competition_sessions',
+        verbose_name='Команды',
+        blank=True
+    )
+    users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='team_competition_sessions',
+        verbose_name='Одиночные пользователи',
+        blank=True
+    )
+    master_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='master_segment_sessions',
+        verbose_name='Пользователь мастер-сессии',
+        null=True,
+        blank=True
+    )
+    master_session_created = models.BooleanField(
+        'Мастер-сессия создана',
+        default=False
+    )
+    tasks = models.ManyToManyField(
+        LabTask,
+        blank=True,
+        verbose_name='Задания'
+    )
+    generated_flags = models.JSONField(
+        'Сгенерированные флаги',
+        blank=True,
+        null=True,
+        default=list,
+        validators=[validate_top_level_array]
+    )
+    deploy_meta = models.JSONField(
+        'Метаданные развертывания',
+        blank=True,
+        null=True,
+        default=dict
+    )
+    failed_tasks = models.JSONField(
+        'Задания с неверным ответом',
+        blank=True,
+        null=True,
+        default=list,
+        help_text='Список ID заданий, на которые участники сессии больше не могут отвечать'
+    )
+    joined = models.BooleanField(
+        'Подключились к лабе',
+        default=False
+    )
+    grade = models.PositiveSmallIntegerField(
+        'Оценка',
+        null=True,
+        blank=True
+    )
+    deleted = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Сессия соревнования'
+        verbose_name_plural = 'Сессии соревнований'
+
+    def __str__(self):
+        parts = [f"Соревнование {self.team_competition_id}"]
+        if self.master_user_id:
+            parts.append(f"master={self.master_user.username}")
+        return " — ".join(parts)
+
+    def get_all_participant_users(self):
+        """Все пользователи сессии: участники команд + одиночные пользователи."""
+        team_user_ids = User.objects.filter(team__in=self.teams.all()).values_list('id', flat=True)
+        solo_ids = self.users.values_list('id', flat=True)
+        return list(User.objects.filter(Q(id__in=team_user_ids) | Q(id__in=solo_ids)).distinct())
+
+    def _ensure_master_user(self):
+        if self.master_user_id:
+            return
+        participants = self.get_all_participant_users()
+        if participants:
+            self.master_user = random.choice(participants)
+            self.master_session_created = False
+            self.save(update_fields=['master_user', 'master_session_created'])
+
+    @classmethod
+    def ensure_session_in_pnet(cls, instance, added_team_ids=None, added_user_ids=None):
+        """
+        Создаёт лабу в воркспейсе master_user и переводит туда участников.
+        Если сессия уже создана — только меняет воркспейс для добавленных.
+        """
+        lab = instance.team_competition.lab
+        participants = instance.get_all_participant_users()
+        if not participants:
+            return
+        instance._ensure_master_user()
+        instance.refresh_from_db()
+
+        def _create_operation(session_manager):
+            lab_name = get_pnet_lab_name(instance.team_competition)
+            master_login = instance.master_user.pnet_login
+            usb_device_ids = instance.deploy_meta.get('usb_device_ids', []) if instance.deploy_meta else []
+            relative_path = f'{get_user_workspace_relative_path()}/{master_login}'
+
+            if not instance.master_session_created:
+                session_manager.create_lab_for_user(lab_name, master_login)
+                session_manager.create_lab_nodes_and_connectors(
+                    lab, lab_name, master_login, usb_device_ids=usb_device_ids
+                )
+                for user in instance.get_all_participant_users():
+                    logger.debug('change workspace for %s to %s', user.pnet_login, relative_path)
+                    session_manager.change_user_workspace(user.pnet_login, relative_path)
+                instance.master_session_created = True
+                instance.save(update_fields=['master_session_created'])
+            else:
+                users_to_change = set()
+                if added_team_ids:
+                    users_to_change.update(
+                        User.objects.filter(team__pk__in=added_team_ids).values_list('id', flat=True)
+                    )
+                if added_user_ids:
+                    users_to_change.update(added_user_ids)
+                for user in User.objects.filter(id__in=users_to_change):
+                    session_manager.change_user_workspace(user.pnet_login, relative_path)
+
+        execute_pnet_operation_if_needed(lab, _create_operation)
+
+    def delete_from_platform(self, final=False):
+        if self.deleted and not final:
+            return
+        if not self.master_user_id:
+            self.deleted = True
+            if not final:
+                self.save()
+            return
+
+        def _delete_operation(session_manager):
+            lab_name = get_pnet_lab_name(self.team_competition)
+            session_manager.delete_lab_for_user(lab_name, self.master_user.pnet_login)
+            base_path = get_user_workspace_relative_path()
+            for user in self.get_all_participant_users():
+                session_manager.change_user_workspace(
+                    user.pnet_login, f'{base_path}/{user.pnet_login}'
+                )
+
+        execute_pnet_operation_if_needed(self.team_competition.lab, _delete_operation)
+        self.deleted = True
+        if not final:
+            self.save()
+
+    @classmethod
+    def on_delete(cls, sender, instance, **kwargs):
+        instance.delete_from_platform(final=True)
+
+    @classmethod
+    def teams_m2m_changed(cls, sender, instance, action, pk_set, **kwargs):
+        if action != 'post_add' or not pk_set:
+            return
+        cls.ensure_session_in_pnet(instance, added_team_ids=pk_set)
+
+    @classmethod
+    def users_m2m_changed(cls, sender, instance, action, pk_set, **kwargs):
+        if action != 'post_add' or not pk_set:
+            return
+        cls.ensure_session_in_pnet(instance, added_user_ids=pk_set)
+
+
+class TeamOrUser2Segment(models.Model):
+    """Соответствие команды или пользователя сегменту сети в рамках соревнования."""
+    team_competition = models.ForeignKey(
+        TeamCompetition,
+        on_delete=models.CASCADE,
+        related_name='segment_assignments'
+    )
+    segment = models.ForeignKey(
+        TopologySegment,
+        on_delete=models.CASCADE,
+        related_name='segment_assignments'
+    )
+    team = models.ForeignKey(
+        Team,
+        on_delete=models.CASCADE,
+        related_name='segment_assignments',
+        null=True,
+        blank=True
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='segment_assignments',
+        null=True,
+        blank=True
+    )
+
+    class Meta:
+        verbose_name = 'Привязка команды/пользователя к сегменту'
+        verbose_name_plural = 'Привязки команд/пользователей к сегментам'
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    Q(team__isnull=False, user__isnull=True) |
+                    Q(team__isnull=True, user__isnull=False)
+                ),
+                name='%(app_label)s_%(class)s_exclusive_team_user'
+            )
+        ]
+
+    def clean(self):
+        if bool(self.team_id) == bool(self.user_id):
+            raise ValidationError('Укажите команду или пользователя.')
+
+    def __str__(self):
+        subject = self.team.name if self.team_id else (self.user.username if self.user_id else '?')
+        return f"{self.team_competition} / {self.segment.name} — {subject}"
+
+
 class CompetitionTaskTypeCount(models.Model):
     """Количество заданий каждого типа для соревнования"""
     competition = models.ForeignKey(
@@ -805,4 +1061,7 @@ post_save.connect(TeamCompetition2Team.post_create, sender=TeamCompetition2Team)
 m2m_changed.connect(Competition2User.tasks_changed, sender=Competition2User.tasks.through)
 m2m_changed.connect(TeamCompetition2Team.tasks_changed, sender=TeamCompetition2Team.tasks.through)
 post_delete.connect(TeamCompetition2Team.on_through_delete, sender=TeamCompetition2Team)
+post_delete.connect(TeamCompetition2TeamsAndUsers.on_delete, sender=TeamCompetition2TeamsAndUsers)
+m2m_changed.connect(TeamCompetition2TeamsAndUsers.teams_m2m_changed, sender=TeamCompetition2TeamsAndUsers.teams.through)
+m2m_changed.connect(TeamCompetition2TeamsAndUsers.users_m2m_changed, sender=TeamCompetition2TeamsAndUsers.users.through)
 post_delete.connect(User.delete_from_elasticsearch, sender=User)
