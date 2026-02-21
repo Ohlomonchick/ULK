@@ -3,7 +3,7 @@
 skinparam direction top to bottom
 skinparam classAttributeIconSize 0
 skinparam linetype ortho
-skinparam ranksep 90
+skinparam ranksep 40
 skinparam nodesep 25
 
 title Application Layer - Class Diagram
