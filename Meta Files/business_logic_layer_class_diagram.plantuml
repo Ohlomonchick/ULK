@@ -1,0 +1,130 @@
+@startuml business_logic_layer_class_diagram
+!theme plain
+skinparam direction top to bottom
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+title Business Logic Layer - Class Diagram
+
+package "Forms Orchestration" #LightGreen {
+  class CompetitionForm
+  class TeamCompetitionForm
+  class SimpleCompetitionForm
+  class KkzForm
+  class SimpleKkzForm
+  class CustomUserCreationForm
+  class KkzCompetitionBuilder <<module function>>
+}
+
+package "PNET Session" #HoneyDew {
+  interface ISessionManager
+
+  class AdminPNetSessionRegistry <<module>> {
+    +get_admin_pnet_session()
+    +ensure_admin_pnet_session()
+    +reset_admin_pnet_session()
+    +with_pnet_session_if_needed()
+  }
+
+  class PNetSessionManager {
+    +login()
+    +logout()
+    +create_lab_for_user()
+    +create_lab_nodes_and_connectors()
+    +delete_lab_for_user()
+    +delete_lab_for_team()
+    +change_user_workspace()
+    +change_user_password()
+  }
+}
+
+package "Flag Deployment" #PaleGreen {
+  enum TaskStatus {
+    PENDING
+    RUNNING
+    SUCCESS
+    FAILED
+  }
+
+  class FlagDeploymentTask <<dataclass>> {
+    +task_id
+    +status
+    +lab_path
+    +generated_flags
+  }
+
+  class FlagDeploymentQueue {
+    +submit_task(task)
+    +wait_for_tasks(task_ids, timeout)
+    +get_tasks_by_competition(slug)
+    +cleanup_old_tasks(max_age_seconds)
+  }
+
+  class FlagDeploymentService <<module>> {
+    +create_flag_deployment_task()
+    +generate_and_save_flags()
+    +deploy_flags()
+    +wait_for_node_ready()
+  }
+}
+
+package "Topology + SSH" #MintCream {
+  interface ISSHExecutable
+
+  class LabTopology {
+    +get_ssh_nodes()
+    +get_node_by_name()
+    +get_ssh_port_for_node()
+  }
+
+  class SSHConnectionTask {
+    +execute()
+  }
+
+  class SSHTaskFactory <<module>> {
+    +create_ssh_tasks_for_lab_nodes()
+  }
+
+  class SSHTaskProcessor <<module>> {
+    +process_ssh_tasks()
+  }
+}
+
+package "External Integrations" #White {
+  interface IWorkerCredentialsProvider
+
+  class PNetApiGateway <<external eveFunctions>>
+  class WorkerCredentialsStore <<dynamic_config>>
+}
+
+TeamCompetitionForm --|> CompetitionForm
+ISessionManager <|.. PNetSessionManager
+ISSHExecutable <|.. SSHConnectionTask
+IWorkerCredentialsProvider <|.. WorkerCredentialsStore
+
+SimpleCompetitionForm --> CompetitionForm : create (default labs)
+SimpleCompetitionForm --> TeamCompetitionForm : create (LabType.COMPETITION)
+KkzForm --> KkzCompetitionBuilder : _create_kkz_competitions()
+SimpleKkzForm --> KkzCompetitionBuilder : _create_kkz_competitions()
+CustomUserCreationForm --> AdminPNetSessionRegistry : ensure_admin_pnet_session()
+
+CompetitionForm --> AdminPNetSessionRegistry : with_pnet_session_if_needed()
+CompetitionForm --> FlagDeploymentQueue : _wait_for_flag_deployment()
+
+AdminPNetSessionRegistry o-- PNetSessionManager : singleton session
+PNetSessionManager --> PNetApiGateway : pf_login/create_lab/.../logout
+PNetSessionManager --> WorkerCredentialsStore : get_worker_credentials()
+
+FlagDeploymentQueue *-- FlagDeploymentTask
+FlagDeploymentTask --> TaskStatus
+FlagDeploymentQueue --> FlagDeploymentService : _execute_task()
+
+FlagDeploymentService --> LabTopology : parse topology
+FlagDeploymentService --> SSHTaskFactory : build SSH tasks
+FlagDeploymentService --> SSHTaskProcessor : parallel execution
+FlagDeploymentService --> PNetApiGateway : topology/session/node control
+
+SSHTaskFactory --> SSHConnectionTask : create
+SSHTaskProcessor --> SSHConnectionTask : execute
+
+@enduml

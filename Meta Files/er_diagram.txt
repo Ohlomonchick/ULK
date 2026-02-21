@@ -5,22 +5,27 @@ skinparam linetype ortho
 
 entity "Answers" as Answers
 entity "Competition" as Competition
-entity "User2Competition" as User2Competition <<Associative>>
-entity "IssuedLabs" as IssuedLabs
+entity "Competition2User" as Competition2User <<Associative>>
+entity "CompetitionTaskTypeCount" as CompetitionTaskTypeCount <<Associative>>
+entity "ConfigEntry" as ConfigEntry
 entity "Kkz" as Kkz
 entity "KkzLab" as KkzLab
+entity "KkzPreview" as KkzPreview <<Associative>>
 entity "Lab" as Lab
 entity "LabLevel" as LabLevel
+entity "LabNode" as LabNode
 entity "LabTask" as LabTask
+entity "LabTaskType" as LabTaskType
 entity "Platoon" as Platoon
 entity "Team" as Team
 entity "TeamCompetition" as TeamCompetition
-entity "Team2TeamCompetition" as Team2TeamCompetition <<Associative>>
+entity "TeamCompetition2Team" as TeamCompetition2Team <<Associative>>
 entity "User" as User
 
 Lab        ||--o{ Answers
 LabTask    ||--o{ Answers
 Team       ||--o{ Answers
+User       ||--o{ Answers
 
 Kkz        ||--o{ Competition
 Lab        ||--o{ Competition
@@ -29,14 +34,13 @@ Competition }o..o{ LabTask
 Competition }o..o{ Platoon
 Competition }o..o{ User
 
-Competition ||--o{ User2Competition
-User        ||--o{ User2Competition
-LabLevel    ||--o{ User2Competition
-User2Competition }o..o{ LabTask
+Competition ||--o{ Competition2User
+User        ||--o{ Competition2User
+LabLevel    ||--o{ Competition2User
+Competition2User }o..o{ LabTask
 
-Lab        ||--o{ IssuedLabs
-LabLevel   ||--o{ IssuedLabs
-IssuedLabs }o..o{ LabTask
+Competition ||--o{ CompetitionTaskTypeCount
+LabTaskType ||--o{ CompetitionTaskTypeCount
 
 Kkz        }o..o{ Platoon
 Kkz        }o..o{ User
@@ -45,8 +49,16 @@ Kkz        ||--o{ KkzLab
 Lab        ||--o{ KkzLab
 KkzLab     }o..o{ LabTask
 
+Kkz        ||--o{ KkzPreview
+Lab        ||--o{ KkzPreview
+User       ||--o{ KkzPreview
+KkzPreview }o..o{ LabTask
+
 Lab        ||--o{ LabLevel
 Lab        ||--o{ LabTask
+Lab        ||--o{ LabTaskType
+LabTaskType ||--o{ LabTask
+Lab        ||--o{ LabNode
 
 Team       }o..o{ User
 Platoon    ||--o{ User
@@ -59,7 +71,8 @@ TeamCompetition }o..o{ LabTask
 TeamCompetition }o..o{ Platoon
 TeamCompetition }o..o{ User
 
-TeamCompetition   ||--o{ Team2TeamCompetition
-Team              ||--o{ Team2TeamCompetition
-Team2TeamCompetition }o..o{ LabTask
+TeamCompetition      ||--o{ TeamCompetition2Team
+Team                 ||--o{ TeamCompetition2Team
+User                 ||--o{ TeamCompetition2Team
+TeamCompetition2Team }o..o{ LabTask
 @enduml

@@ -1,0 +1,107 @@
+@startuml data_management_layer_class_diagram
+!theme plain
+skinparam direction top to bottom
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+title Data Management Layer - Class Diagram
+
+package "Dynamic Config" #LightBlue {
+  class ConfigEntry {
+    +key: CharField <<unique>>
+    +value: TextField
+  }
+}
+
+package "Lab Domain" #AliceBlue {
+  class Lab
+  class LabLevel
+  class LabTaskType
+  class LabTask
+  class LabNode
+  class CompetitionTaskTypeCount
+}
+
+package "Participants" #Azure {
+  class Platoon
+  class User
+  class Team
+}
+
+package "Competition Domain" #Lavender {
+  class Kkz
+  class KkzLab
+  class KkzPreview
+  class Competition
+  class TeamCompetition
+  class Competition2User
+  class TeamCompetition2Team
+  class Answers
+}
+
+package "Business Services" #White {
+  interface IWorkerCredentialsProvider
+
+  class PNetSessionManager <<service>>
+  class FlagDeploymentService <<service>>
+  class WorkerCredentialsProvider <<dynamic_config.utils>>
+}
+
+IWorkerCredentialsProvider <|.. WorkerCredentialsProvider
+
+Lab *-- LabLevel : levels
+Lab *-- LabTaskType : task_types
+Lab *-- LabTask : options
+Lab *-- LabNode : nodes
+LabTaskType o-- LabTask : typed tasks
+
+TeamCompetition --|> Competition
+
+Competition --> Lab : lab
+Competition --> LabLevel : level
+Competition -- LabTask : tasks
+Competition o-- Platoon : platoons
+Competition o-- User : non_platoon_users
+Competition --> Kkz : kkz
+Competition *-- Competition2User
+
+Competition2User --> User
+Competition2User --> LabLevel
+Competition2User -- LabTask : assigned tasks
+
+TeamCompetition *-- TeamCompetition2Team
+TeamCompetition2Team --> Team
+TeamCompetition2Team --> User : master_session_user
+TeamCompetition2Team -- LabTask : assigned tasks
+
+Team o-- User : users
+User --> Platoon
+
+Kkz *-- KkzLab : kkz_labs
+Kkz *-- KkzPreview : previews
+Kkz o-- Platoon : platoons
+Kkz o-- User : non_platoon_users
+KkzLab --> Lab
+KkzLab -- LabTask
+KkzPreview --> Lab
+KkzPreview --> User
+KkzPreview -- LabTask
+
+Answers --> Lab
+Answers --> User
+Answers --> Team
+Answers --> LabTask
+
+Competition *-- CompetitionTaskTypeCount
+CompetitionTaskTypeCount --> LabTaskType
+
+Team ..> PNetSessionManager : post_create()
+Competition ..> PNetSessionManager : delete()
+Competition2User ..> PNetSessionManager : post_create()/delete_from_platform()
+TeamCompetition2Team ..> PNetSessionManager : post_create()/delete_from_platform()
+
+Competition2User ..> FlagDeploymentService : tasks_changed()
+TeamCompetition2Team ..> FlagDeploymentService : tasks_changed()
+WorkerCredentialsProvider --> ConfigEntry : get/set worker creds
+
+@enduml

@@ -1,0 +1,89 @@
+@startuml application_layer_class_diagram
+!theme plain
+skinparam direction top to bottom
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam ranksep 90
+skinparam nodesep 25
+
+title Application Layer - Class Diagram
+
+package "Django Views" as ViewsPkg #LightYellow {
+  class LabDetailView
+  class LabListView
+  class CompetitionListView
+  class CompetitionHistoryListView
+  class TeamCompetitionListView
+  class CompetitionDetailView
+  class KkzDetailView
+  class TeamCompetitionDetailView
+  class CreateKkzView
+  class CreateKkzFromLabView
+  class PlatoonDetailView
+  class PlatoonListView
+  class UserDetailView
+  class AnswerAPIView
+  class CustomSummernoteUploadAttachment
+
+  CompetitionListView -[hidden]down-> CompetitionDetailView
+  CompetitionDetailView -[hidden]down-> KkzDetailView
+  KkzDetailView -[hidden]down-> UserDetailView
+}
+
+package "Frontend JS" as FrontPkg #Moccasin {
+  interface IConsoleModeController
+
+  class PnetController <<module>> {
+    +initializePNETFrame()
+  }
+
+  class CmdController <<module>> {
+    +initializeCMDIframe()
+    +refreshConsoleSession()
+  }
+
+  class IframeController <<module>> {
+    +initializeIframeControls()
+    +setupIframeLocationControl(iframe)
+  }
+
+  class CountdownTimer
+  class TasksController
+  class ControlButtons
+  class SolutionsTable
+  class ExportRating
+
+  IframeController -[hidden]down-> CountdownTimer
+  CountdownTimer -[hidden]down-> TasksController
+  TasksController -[hidden]down-> ControlButtons
+  ControlButtons -[hidden]down-> SolutionsTable
+  SolutionsTable -[hidden]down-> ExportRating
+}
+
+ViewsPkg -[hidden]down-> FrontPkg
+
+CompetitionHistoryListView --|> CompetitionListView
+TeamCompetitionListView --|> CompetitionListView
+TeamCompetitionDetailView --|> CompetitionDetailView
+
+IConsoleModeController <|.. PnetController
+IConsoleModeController <|.. CmdController
+
+PnetController --> IframeController
+CmdController --> IframeController
+
+CompetitionDetailView --> CountdownTimer
+CompetitionDetailView --> SolutionsTable
+CompetitionDetailView --> TasksController
+CompetitionDetailView --> ControlButtons
+CompetitionDetailView --> ExportRating
+CompetitionDetailView --> PnetController
+CompetitionDetailView --> CmdController
+CompetitionDetailView --> IframeController
+
+KkzDetailView --> CountdownTimer
+KkzDetailView --> SolutionsTable
+KkzDetailView --> ControlButtons
+KkzDetailView --> ExportRating
+
+@enduml
