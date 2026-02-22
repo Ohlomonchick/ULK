@@ -1,7 +1,6 @@
 #!/bin/bash
 export PROD=True
 export USE_POSTGRES=yes
-export DB_HOST=localhost
 
 #source /mnt/c/Users/Dmitry/PycharmProjects/Cyberpolygon/polygon_linux/bin/activate
 
