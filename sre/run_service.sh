@@ -12,13 +12,11 @@ cd "$SCRIPT_DIR"
 
 export PROD=True
 export USE_POSTGRES=yes
-export DB_HOST=localhost
-export DB_NAME=cyberpolygon
-export DB_PORT=5431
-export NGINX_IP=127.0.0.1
+export DB_HOST=192.168.100.5
+export NGINX_IP=192.168.100.10
 # export NGINX_IP=127.0.0.1
 # export PNET_IP=192.168.1.10
-export PNET_IP=192.168.0.108
+export PNET_IP=172.18.4.160
 export KIBANA_IP=192.168.100.11
 export WORKDIR="$PROJECT_ROOT"
 python3 deploy.py
