@@ -1,0 +1,57 @@
+@startuml
+title 3.10.4 Интеграция с СПО по аттестации через API
+
+hide footbox
+skinparam Shadowing false
+skinparam BackgroundColor white
+skinparam SequenceMessageAlign center
+
+actor "Преподаватель" as Teacher
+actor "Студент" as Student
+participant "СПО по аттестации" as SPO
+participant "UI" as UI
+participant "Бэкенд Веб-сервиса" as BE
+participant "Reverse-proxy (Nginx)" as Nginx
+participant "PNETLab" as PNET
+
+Student -> SPO: Начинает сессию в игре по аттестации
+SPO -> BE: Аутентификация в API Django\n(администраторская учетная запись)
+BE --> SPO: Сеанс авторизован
+
+SPO -> BE: POST /labs/<slug>/<lab_type>/\n(создание мероприятия)
+BE -> PNET: Создание лабораторных работ\nи окружений для участников
+PNET --> BE: Лабораторные работы созданы
+BE --> SPO: Мероприятие создано (slug, время, участники)
+
+SPO -> BE: GET /api/answers?lab_slug=...&username=...
+BE -> BE: AnswerAPIView.list()\nпоиск пользователя и ЛР
+BE --> SPO: completed_task_ids
+
+SPO -> BE: POST /api/answers\n{lab_slug, user/pnet_login, task}
+BE -> BE: AnswerSerializer.validate/create
+BE --> SPO: 200/201 (задание зачтено)
+
+SPO -> BE: POST /api/press_button/end/\n{slug}
+BE -> BE: update_instance_time(action=end)
+BE --> SPO: Мероприятие завершено
+
+SPO -> BE: GET /utils/console/<slug>/<node_name>/?username=...
+BE --> SPO: HTML-страница инициализации консоли
+
+SPO -> UI: Открывает полученную страницу консоли
+UI -> BE: POST /api/create_pnet_lab_session_with_console/
+BE -> Nginx: Логин в PNET + получение guacamole URL
+Nginx -> PNET: API топологии/консоли
+PNET --> Nginx: guacamole_url
+Nginx --> BE: guacamole_url
+BE --> UI: guacamole_url
+UI -> Nginx: GET guacamole_url
+Nginx -> PNET: Прокси-консоль
+PNET --> Nginx: Поток консоли
+Nginx --> UI: Окно терминала
+
+Student -> SPO: Переходит к выполнению заданий
+SPO -> UI: Открывает интерфейс выполнения мероприятия
+Teacher -> UI: Контролирует ход и результаты
+
+@enduml

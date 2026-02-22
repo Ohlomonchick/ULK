@@ -1,0 +1,36 @@
+@startuml
+
+skinparam Shadowing false
+skinparam BackgroundColor white
+skinparam state {
+  BackgroundColor #f8f8f8
+  BorderColor #2f4f4f
+  ArrowColor #2f4f4f
+}
+
+[*] --> Created : Преподаватель создает мероприятие\n(UI -> Бэкенд Веб-сервиса)
+
+state "Создано" as Created
+state "Запущено" as Running
+state "Продлено" as Extended
+state "Завершено" as Finished
+state "Удалено с платформы" as Deleted
+
+Created --> Running : start\nPOST /api/press_button/start/
+Running --> Extended : resume\nPOST /api/press_button/resume/
+Extended --> Running : Применено новое время окончания
+Running --> Finished : end или истечение времени\nPOST /api/press_button/end/
+Extended --> Finished : end\nPOST /api/press_button/end/
+Finished --> Deleted : delete\nPOST /api/press_button/delete/
+Finished --> Deleted : cron-обработчик\n(через 1 час после finish)
+Deleted --> [*]
+
+state Running {
+  [*] --> InProgress
+  state "Выполнение заданий" as InProgress
+  InProgress : Студент работает через UI
+  InProgress : Проверка:\n/api/check_task_answers/
+  InProgress : Статусы:\n/api/get_user_tasks_status/
+}
+
+@enduml

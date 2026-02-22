@@ -1,0 +1,67 @@
+@startuml
+title 3.6 Открытие студентом сессии: режим топологии и прямой доступ к ВМ
+
+hide footbox
+skinparam Shadowing false
+skinparam BackgroundColor white
+skinparam SequenceMessageAlign center
+
+actor "Студент" as Student
+actor "Преподаватель" as Teacher
+participant "UI" as UI
+participant "Бэкенд Веб-сервиса" as BE
+participant "Reverse-proxy (Nginx)" as Nginx
+participant "PNETLab" as PNET
+
+Student -> UI: Открывает страницу мероприятия
+UI -> BE: GET /competitions/<slug>/
+BE --> UI: Страница с режимом платформы (PN или CMD)
+
+alt Режим топологии (PN)
+  UI -> BE: POST /api/get_pnet_auth/
+  BE -> Nginx: POST /pnetlab/store/public/auth/login/login
+  Nginx -> PNET: Аутентификация пользователя в PNET
+  PNET --> Nginx: Cookies + XSRF
+  Nginx --> BE: Результат аутентификации
+  BE --> UI: success + Set-Cookie
+
+  UI -> BE: POST /api/create_pnet_lab_session/\n{slug}
+  BE -> BE: create_lab_session_for_issue()\n(индивидуально или через мастер-сессию)
+  BE -> Nginx: create_pnet_lab_session_common(...)
+  Nginx -> PNET: Создание пользовательской сессии лабы
+  PNET --> Nginx: session created
+  Nginx --> BE: success
+  BE --> UI: {redirect_url: /legacy/topology}
+
+  UI -> Nginx: GET /pnetlab/ (iframe)
+  Nginx -> PNET: GET /
+  PNET --> Nginx: HTML интерфейса
+  Nginx --> UI: iframe loaded
+
+  UI -> Nginx: GET /legacy/topology
+  Nginx -> PNET: GET /legacy/topology
+  PNET --> Nginx: Экран топологии
+  Nginx --> UI: Отрисована топология
+
+else Режим прямого доступа к ВМ (CMD)
+  UI -> BE: POST /api/create_pnet_lab_session_with_console/\n{slug, node_name}
+  BE -> Nginx: pf_login + create session
+  Nginx -> PNET: Логин и создание сессии
+  PNET --> Nginx: success
+  Nginx --> BE: success
+
+  BE -> Nginx: get_lab_topology + turn_on_node + get_guacamole_url
+  Nginx -> PNET: Топология, запуск нод, URL консоли
+  PNET --> Nginx: guacamole_url
+  Nginx --> BE: guacamole_url + метаданные запуска
+  BE --> UI: {guacamole_url, all_nodes_started}
+
+  UI -> Nginx: GET <guacamole_url> (iframe)
+  Nginx -> PNET: Подключение к консоли ноды
+  PNET --> Nginx: Поток консоли
+  Nginx --> UI: Терминал в браузере
+end
+
+Teacher -> UI: Наблюдает прогресс через таблицу лидеров
+
+@enduml

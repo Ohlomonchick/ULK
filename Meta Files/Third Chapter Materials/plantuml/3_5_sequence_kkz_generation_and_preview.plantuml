@@ -1,0 +1,47 @@
+@startuml
+title 3.5 Формирование ККЗ: генерация, предпросмотр и ручная корректировка
+
+hide footbox
+skinparam Shadowing false
+skinparam BackgroundColor white
+skinparam SequenceMessageAlign center
+
+actor "Преподаватель" as Teacher
+actor "Студент" as Student
+participant "UI" as UI
+participant "Бэкенд Веб-сервиса" as BE
+participant "PNETLab" as PNET
+
+Teacher -> UI: Открывает конструктор ККЗ
+UI -> BE: GET /api/get_labs_for_platoon/?platoon_id=...
+BE --> UI: Список лабораторных работ и заданий
+
+loop Для каждой включенной ЛР
+  UI -> BE: GET /api/kkz_preview_random/\n(lab_id, num_tasks, unified, users)
+  BE -> BE: sample_tasks_with_dependencies(...)\n+ проверка зависимостей
+  BE --> UI: Предпросмотр билетов по студентам
+end
+
+Teacher -> UI: Корректирует наборы заданий вручную
+UI -> BE: POST /api/kkz_save_preview/\n{kkz_id, lab_id, assignments}
+BE --> UI: status=ok
+
+Teacher -> UI: Нажимает "Создать ККЗ"
+UI -> BE: POST /kkz/create/ (SimpleKkzForm)
+BE -> BE: create_kkz()\n_create_kkz_competitions()
+BE -> BE: _assign_tasks_to_users()\nKkzPreview + Competition2User.tasks
+
+opt ЛР на платформе PN/CMD
+  BE -> PNET: Подготовка инфраструктуры для выдачи\n(API PNET: создание/обновление окружения)
+  PNET --> BE: OK / ошибка
+end
+
+BE --> UI: Redirect -> /kkz_detail/<id>/
+
+loop Для каждого студента
+  Student -> UI: Открывает назначенную работу из ККЗ
+  UI -> BE: GET /competitions/<slug>/
+  BE --> UI: Индивидуальный набор заданий
+end
+
+@enduml

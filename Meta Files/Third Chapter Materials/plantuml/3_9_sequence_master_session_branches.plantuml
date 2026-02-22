@@ -1,0 +1,54 @@
+@startuml
+title 3.8 Мастер-сессия команды: ветки для мастера и обычного участника
+
+hide footbox
+skinparam Shadowing false
+skinparam BackgroundColor white
+skinparam SequenceMessageAlign center
+
+actor "Преподаватель" as Teacher
+actor "Студент" as Student
+participant "UI" as UI
+participant "Бэкенд Веб-сервиса" as BE
+participant "Reverse-proxy (Nginx)" as Nginx
+participant "PNETLab" as PNET
+
+Teacher -> UI: Запускает командное соревнование
+UI -> BE: POST /labs/<slug>/<lab_type>/\n(выдача мероприятия)
+BE -> BE: Для каждой команды назначает master_session_user
+
+Student -> UI: Открывает страницу соревнования
+UI -> BE: POST /api/create_pnet_lab_session/\n{slug}
+BE -> BE: get_issue_for_user() -> TeamCompetition2Team
+
+alt Текущий пользователь = master_session_user
+  BE -> Nginx: create_pnet_lab_session_common(...)\nпо cookie мастера
+  Nginx -> PNET: Создание сессии мастер-пользователя
+  PNET --> Nginx: session created
+  Nginx --> BE: success
+  BE -> BE: master_session_created = true
+  BE --> UI: success + /legacy/topology
+else Текущий пользователь != master_session_user
+  alt master_session_created = false
+    BE -> Nginx: login_user_to_pnet(master)\n+ create_pnet_lab_session_common()
+    Nginx -> PNET: Создание мастер-сессии
+    PNET --> Nginx: master_session_id
+    Nginx --> BE: master_session_id
+    BE -> BE: master_session_created = true
+  else master_session_created = true
+    BE -> Nginx: get_session_id_by_filter(lab_path)
+    Nginx -> PNET: Поиск активной мастер-сессии
+    PNET --> Nginx: master_session_id
+    Nginx --> BE: master_session_id
+  end
+
+  BE -> Nginx: join_session(master_session_id)
+  Nginx -> PNET: Подключение к мастер-сессии
+  PNET --> Nginx: joined
+  Nginx --> BE: success
+  BE --> UI: success + /legacy/topology
+end
+
+Teacher -> UI: Контролирует синхронную работу команды
+
+@enduml

@@ -1,0 +1,48 @@
+@startuml
+
+hide footbox
+skinparam Shadowing false
+skinparam BackgroundColor white
+skinparam SequenceMessageAlign center
+
+actor "Преподаватель" as Teacher
+actor "Студент" as Student
+participant "UI" as UI
+participant "Бэкенд Веб-сервиса" as BE
+participant "PNETLab" as PNET
+
+Teacher -> UI: Выдает мероприятие с набором заданий
+UI -> BE: POST /labs/<slug>/<lab_type>/
+BE -> BE: CompetitionForm.save()\n+ handle_competition_users()
+
+BE -> BE: m2m signal tasks_changed(post_add)
+BE -> BE: generate_and_save_flags(instance, tasks)
+BE -> BE: create_flag_deployment_task(...)
+BE -> BE: queue.submit_task(task)\n(ThreadPoolExecutor)
+
+BE -> PNET: login_user_to_pnet + create_pnet_lab_session_common
+PNET --> BE: success, session ready
+
+BE -> PNET: get_lab_topology
+PNET --> BE: topology data (SSH-ноды)
+
+loop Для каждой SSH-ноды из конфигурации
+  BE -> PNET: turn_on_node(node_id)
+  PNET --> BE: ack
+
+  BE -> PNET: get_node_status(node_id)\n(до готовности)
+  PNET --> BE: status
+end
+
+BE -> BE: create_ssh_tasks_for_lab_nodes()
+BE -> BE: process_ssh_tasks()\n(доставка флагов по SSH)
+BE -> BE: task.status = SUCCESS/FAILED
+
+BE --> UI: Результат выдачи\n(_wait_for_flag_deployment)
+
+Student -> UI: Отправляет ответ на задание
+UI -> BE: POST /api/check_task_answers/
+BE -> BE: Сверяет answer и generated_flags
+BE --> UI: correct / incorrect
+
+@enduml
