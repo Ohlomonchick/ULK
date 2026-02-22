@@ -3,7 +3,7 @@ export PROD=True
 export USE_POSTGRES={{ use_postgres }}
 export DB_HOST={{ db_host }}
 export DB_NAME=cyberpolygon
-export DB_PORT=5431
+export DB_PORT=5432
 
 # Initialize pyenv
 export PYENV_ROOT="$HOME/.pyenv"
