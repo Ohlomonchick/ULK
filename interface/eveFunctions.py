@@ -383,18 +383,25 @@ def create_session(url, lab, cookie):
     logger.debug(r)
 
 
-def join_session(url, lab_session_id, cookie):
+def join_session(url, lab_session_id, cookie, xsrf=None):
+    """Подключение к существующей сессии лабы. xsrf обязателен для многих PNET API (иначе 412)."""
     lab_session_id = '{"lab_session":"' + str(lab_session_id) + '"}'
+    headers = {'content-type': 'application/json'}
+    if xsrf:
+        headers['X-XSRF-TOKEN'] = xsrf
     r = requests.post(
         url + '/api/labs/session/factory/join',
         data=lab_session_id,
-        headers={'content-type': 'application/json'},
+        headers=headers,
         cookies=cookie,
         verify=False,
-        timeout=4  # 4 секунды таймаут для подключения к сессии
+        timeout=10
     )
     logger.debug(r)
-    logger.debug(r.json())
+    try:
+        logger.debug(r.json())
+    except Exception:
+        pass
     return r
 
 
@@ -725,29 +732,47 @@ def delete_lab_with_session_destroy(url: object, lab_name: object, lab_path: obj
     logger.debug(r)
 
 
-def get_lab_topology(url, cookie):
-    """Получает топологию лаборатории из PNET"""
-    try:
-        response = requests.get(
-            f"{url}/api/labs/session/topology",
-            cookies=cookie,
-            verify=False,
-            timeout=10
-        )
-
-        if response.status_code == 200:
-            return response.json()
-        else:
+def get_lab_topology(url, cookie, xsrf=None, retry_on_412=True):
+    """Получает топологию лаборатории из PNET..
+    При 412 (session not authenticated) один повтор через 2 с"""
+    import time
+    headers = {}
+    if xsrf:
+        headers['X-XSRF-TOKEN'] = xsrf
+    for attempt in range(2 if retry_on_412 else 1):
+        try:
+            if attempt > 0:
+                time.sleep(2)
+            response = requests.get(
+                f"{url}/api/labs/session/topology",
+                headers=headers,
+                cookies=cookie,
+                verify=False,
+                timeout=20
+            )
+            if response.status_code == 200:
+                return response.json()
+            if response.status_code == 412 and retry_on_412 and attempt == 0:
+                logger.warning("get_lab_topology 412, retrying once in 2s")
+                continue
             logger.error(f"Failed to get lab topology: {response.status_code} - {response.text}")
             return None
-    except Exception as e:
-        logger.error(f"Error getting lab topology: {str(e)}")
-        return None
+        except Exception as e:
+            logger.error(f"Error getting lab topology: {str(e)}")
+            return None
+    return None
 
 
-def get_guacamole_url(url, node_id, cookie):
+def get_guacamole_url(url, node_id, cookie, xsrf=None):
     """Получает ссылку на Guacamole консоль для указанной ноды"""
     try:
+        headers = {
+            'Content-Type': 'application/json;charset=UTF-8',
+            'Accept': 'application/json, text/plain, */*',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        if xsrf:
+            headers['X-XSRF-TOKEN'] = xsrf
         response = requests.get(
             f"{url}/api/labs/session/console_guac_link?&node_id={node_id}",
             cookies=cookie,
@@ -840,21 +865,23 @@ def login_user_to_pnet(url, username, password):
         return None, None
 
 
-def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
+def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie, xsrf=None):
     """Общая логика создания сессии лаборатории в PNET"""
     try:
-        # Создаем сессию лабы
         full_url = f"{url}/api/labs/session/factory/create"
         payload = {'path': lab_path}
+        headers = {
+            'Content-Type': 'application/json;charset=UTF-8',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': f"{url}/store/public/admin/main/view",
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+        if xsrf:
+            headers['X-XSRF-TOKEN'] = xsrf
 
         create_session_response = requests.post(
             full_url,
-            headers={
-                'Content-Type': 'application/json;charset=UTF-8',
-                'Accept': 'application/json, text/plain, */*',
-                'Referer': f"{url}/store/public/admin/main/view",
-                'X-Requested-With': 'XMLHttpRequest'
-            },
+            headers=headers,
             json=payload,
             cookies=cookie,
             timeout=10,
@@ -878,20 +905,23 @@ def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie):
         return False, f"Session creation error: {str(e)}"
 
 
-def turn_on_node(url, node_id, cookie):
+def turn_on_node(url, node_id, cookie, xsrf=None):
     """Включает ноду в PNET"""
     try:
+        headers = {
+            'Content-Type': 'application/json;charset=UTF-8',
+            'Accept': 'application/json, text/plain, */*',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        if xsrf:
+            headers['X-XSRF-TOKEN'] = xsrf
         response = requests.post(
             f"{url}/api/labs/session/nodes/start",
-            headers={
-                'Content-Type': 'application/json;charset=UTF-8',
-                'Accept': 'application/json, text/plain, */*',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
+            headers=headers,
             json={'id': str(node_id)},
             cookies=cookie,
             verify=False,
-            timeout=10
+            timeout=20
         )
 
         if response.status_code == 200:

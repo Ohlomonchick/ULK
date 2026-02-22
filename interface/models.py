@@ -834,6 +834,18 @@ class TeamCompetition2TeamsAndUsers(models.Model):
         'Мастер-сессия создана',
         default=False
     )
+    segment_pnet_session_id = models.CharField(
+        'PNET session_id сегмента',
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text='Кто первый открыл лабу — в его сессии создана; остальные джойнятся по этому id',
+    )
+    segment_pnet_session_owner_id = models.PositiveIntegerField(
+        'user_id владельца PNET-сессии сегмента',
+        null=True,
+        blank=True,
+    )
     tasks = models.ManyToManyField(
         LabTask,
         blank=True,
@@ -947,15 +959,19 @@ class TeamCompetition2TeamsAndUsers(models.Model):
             return
 
         def _delete_operation(session_manager):
-            lab_name = get_pnet_lab_name(self.team_competition)
-            session_manager.delete_lab_for_user(lab_name, self.master_user.pnet_login)
             base_path = get_user_workspace_relative_path()
+            # Сначала возвращаем участников в свои воркспейсы 
             for user in self.get_all_participant_users():
                 session_manager.change_user_workspace(
                     user.pnet_login, f'{base_path}/{user.pnet_login}'
                 )
+            lab_name = get_pnet_lab_name(self.team_competition)
+            session_manager.delete_lab_for_user(lab_name, self.master_user.pnet_login)
 
-        execute_pnet_operation_if_needed(self.team_competition.lab, _delete_operation)
+        try:
+            execute_pnet_operation_if_needed(self.team_competition.lab, _delete_operation)
+        except Exception as e:
+            logger.warning('TeamCompetition2TeamsAndUsers delete_from_platform PNET error (session %s): %s', self.pk, e)
         self.deleted = True
         if not final:
             self.save()

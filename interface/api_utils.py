@@ -194,12 +194,13 @@ def create_lab_session_for_issue(competition, user, issue, pnet_url, cookies, xs
     if isinstance(issue, TeamCompetition2TeamsAndUsers):
         return _ensure_segment_session(competition, user, issue, pnet_url, cookies, xsrf_token)
 
-    # Индивидуальная сессия 
+    # Индивидуальная сессия
     lab_path = get_lab_path(competition, user)
     success, message = create_pnet_lab_session_common(
-        pnet_url, 
-        user.pnet_login, 
-        lab_path, 
-        cookies
+        pnet_url,
+        user.pnet_login,
+        lab_path,
+        cookies,
+        xsrf_token,
     )
     return success, message, lab_path

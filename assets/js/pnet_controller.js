@@ -17,14 +17,17 @@ async function createLabSession(slug) {
     const result = await makeAPIRequest('/api/create_pnet_lab_session/', {
         body: JSON.stringify({ slug: slug })
     });
-    
-    return result.success ? result.data : null;
+    if (result.success) return result.data;
+    return { error: result.error || 'Не удалось создать сессию' };
 }
+
+// URL редиректа на топологию: по умолчанию /legacy/topology (как в ответе API), подменяется redirect_url из create_pnet_lab_session
+let pnetRedirectUrl = '/legacy/topology';
 
 // Функция перенаправления iframe на топологию
 function redirectToTopology(iframe) {
     if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.location.href = '/legacy/topology';
+        iframe.contentWindow.location.href = pnetRedirectUrl;
     }
 }
 
@@ -68,52 +71,42 @@ async function initializePNETFrame() {
         // Создаем сессию лабы
         updateLoaderText(PNET_LOADER_ID, 'Создание сессии...', 'Инициализация лаборатории');
         const sessionData = await createLabSession(competitionSlug);
-        if (!sessionData) {
-            console.error('Lab session creation failed');
-            updateLoaderText(PNET_LOADER_ID, 'Ошибка создания сессии', 'Не удалось создать сессию лаборатории');
+        if (!sessionData || sessionData.error) {
+            const errMsg = sessionData && sessionData.error ? sessionData.error : 'Не удалось создать сессию лаборатории';
+            console.error('Lab session creation failed:', errMsg);
+            updateLoaderText(PNET_LOADER_ID, 'Ошибка создания сессии', errMsg);
             setTimeout(() => {
                 hideConsoleLoader(PNET_LOADER_ID);
             }, 3000);
             return;
         }
+        if (sessionData.redirect_url) {
+            pnetRedirectUrl = sessionData.redirect_url;
+        }
 
         // Устанавливаем контроль location для PNET iframe
         setupIframeLocationControl(iframe);
 
-        // Загружаем iframe с базовым URL PNET
+        // Сразу открываем топологию с path
         updateLoaderText(PNET_LOADER_ID, 'Загрузка интерфейса...', 'Подключение к топологии');
-        const targetSrc = iframe.getAttribute('data-src');
-        if (targetSrc) {
+        if (pnetRedirectUrl) {
             // Устанавливаем обработчик только один раз при первой инициализации
             if (!pnetFrameInitialized) {
-                const initialLoadHandler = function() {
+                iframe.onload = function() {
                     // Удаляем обработчик сразу, чтобы он не срабатывал при последующих загрузках
                     iframe.onload = null;
                     pnetFrameInitialized = true;
-                    
-                    log('PNET iframe loaded, redirecting to topology');
-                    setTimeout(() => {
-                        redirectToTopology(iframe);
-                        // Скрываем загрузчик после успешной загрузки
-                        setTimeout(() => {
-                            hideConsoleLoader(PNET_LOADER_ID);
-                        }, 500);
-                    }, 1000);
+                    log('PNET topology loaded');
+                    setTimeout(function() { hideConsoleLoader(PNET_LOADER_ID); }, 500);
                 };
-                
-                iframe.onload = initialLoadHandler;
-                
                 iframe.onerror = function() {
                     iframe.onerror = null; // Удаляем обработчик ошибок тоже
                     console.error('Failed to load PNET iframe');
                     updateLoaderText(PNET_LOADER_ID, 'Ошибка загрузки', 'Не удалось загрузить интерфейс');
-                    setTimeout(() => {
-                        hideConsoleLoader(PNET_LOADER_ID);
-                    }, 3000);
+                    setTimeout(function() { hideConsoleLoader(PNET_LOADER_ID); }, 3000);
                 };
             }
-            
-            iframe.src = targetSrc + '?t=' + Date.now();
+            iframe.src = pnetRedirectUrl + (pnetRedirectUrl.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
         } else {
             hideConsoleLoader(PNET_LOADER_ID);
         }
@@ -139,7 +132,7 @@ function setupIframeLocationControl(iframeElement) {
             const script = doc.createElement('script');
             script.textContent = `
                 (function() {
-                    const allowed = ['/store/', '/legacy/'];
+                    const allowed = ['/store/', '/legacy/', '/pnetlab/'];
                     function check() {
                         const path = location.pathname;
                         if (!allowed.some(p => path.startsWith(p))) {
