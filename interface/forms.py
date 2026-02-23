@@ -927,11 +927,11 @@ class TeamCompetitionForm(CompetitionForm):
         """
         n = len(segments)
         teams = list(self.cleaned_data.get('teams') or [])
-        solo_users = list(self.get_all_users(instance)) 
+        solo_users = list(self.get_all_users(instance))
         random.shuffle(teams)
         random.shuffle(solo_users)
         total = len(teams) + len(solo_users)
-        if total == 0:
+        if n == 0 or total == 0:
             return []
         assert total % n == 0, f'Количество участников ({total}) не кратно количеству сегментов ({n})'
         num_sessions = total // n

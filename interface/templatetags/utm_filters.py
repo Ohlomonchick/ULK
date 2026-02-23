@@ -5,6 +5,15 @@ import re
 
 register = template.Library()
 
+
+@register.filter
+def mul(value, arg):
+    """Умножает value на arg (для вычислений в шаблонах)."""
+    try:
+        return int(value) * int(arg)
+    except (ValueError, TypeError):
+        return 0
+
 @register.filter
 def get_utm_source(competition, is_team_list):
     """

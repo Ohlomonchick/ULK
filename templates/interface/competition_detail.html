@@ -41,6 +41,7 @@
                                     <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
                                 </div>
                             {% endif %}
+                            {% include 'interface/_segment_vm_buttons.html' %}
                             <iframe
                                 id="pnetFrame"
                                 style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
@@ -86,6 +87,7 @@
                                     <p class="cmd-console-loader-subtext">Создание сессии лаборатории</p>
                                 </div>
                             {% endif %}
+                            {% include 'interface/_segment_vm_buttons.html' %}
                             <iframe
                                 id="pnetFrame"
                                 style="box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1); border-radius: 13px; border: 1px solid #e0e0e0; aspect-ratio: 16/9;"
@@ -199,6 +201,9 @@
             <script src="{% static 'js/common_utils.js' %}"></script>
             <script src="{% static 'js/console_loader.js' %}"></script>
             <script src="{% static 'js/pnet_iframe_controller.js' %}"></script>
+            {% if segment_vm_names %}
+                <script src="{% static 'js/segment_vm_controller.js' %}"></script>
+            {% endif %}
             {% if object.lab.platform == "PN" %}
                 <script src="{% static 'js/pnet_controller.js' %}"></script>
             {% elif object.lab.platform == "CMD" %}

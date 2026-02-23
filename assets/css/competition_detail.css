@@ -122,6 +122,62 @@
     overflow: visible; /* Позволяем кнопкам выходить за границы контейнера */
 }
 
+/* ---- Кнопки VM сегмента топологии ---- */
+.vm-segment-slider {
+    position: absolute;
+    right: 0;
+    background: linear-gradient(135deg, #7a7a7a, #555);
+    color: white;
+    border: none;
+    border-radius: 0 20px 20px 0;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    opacity: 0.8;
+    width: 40px;
+    overflow: hidden;
+    white-space: nowrap;
+    transform: translateX(100%);
+    margin-right: 0;
+    will-change: transform;
+}
+
+/* Позиция VM-кнопок задаётся inline-стилем через шаблон (top = 90 + index * 40 px) */
+
+/* Активная VM — зелёная */
+.vm-segment-slider--active {
+    background: linear-gradient(135deg, #23d160, #1aaa50);
+    box-shadow: 0 4px 12px rgba(35, 209, 96, 0.35);
+    opacity: 1;
+}
+
+.vm-segment-slider:hover {
+    opacity: 1;
+    width: auto;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.vm-segment-slider--active:hover {
+    box-shadow: 0 6px 16px rgba(35, 209, 96, 0.5);
+}
+
+.vm-segment-slider:active {
+    transform: translateX(100%) scale(0.95);
+}
+
+.vm-segment-slider .slider-text {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.vm-segment-slider:hover .slider-text {
+    opacity: 1;
+}
+
 /* Улучшаем захват фокуса iframe */
 #pnetFrame {
     outline: none;
