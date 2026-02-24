@@ -91,6 +91,15 @@ function initializeIframeControls() {
             return;
         }
         
+        // Сохраняем значения полей ввода перед очисткой
+        const savedInputValues = {};
+        sidebarPanelContent.find('.task-answer-input').each(function() {
+            const taskId = $(this).data('task-id');
+            if (taskId) {
+                savedInputValues[taskId] = $(this).val();
+            }
+        });
+
         // Очищаем предыдущее содержимое
         sidebarPanelContent.empty();
         
@@ -112,7 +121,15 @@ function initializeIframeControls() {
         
         // Добавляем клонированное содержимое в панель
         sidebarPanelContent.append(clonedContent);
-        
+
+        // Восстанавливаем значения полей ввода после клонирования
+        sidebarPanelContent.find('.task-answer-input').each(function() {
+            const taskId = $(this).data('task-id');
+            if (taskId && savedInputValues[taskId] !== undefined) {
+                $(this).val(savedInputValues[taskId]);
+            }
+        });
+
         // Восстанавливаем обработчики событий для динамически созданных элементов
         // Это важно для элементов, которые были созданы после загрузки страницы
         restoreEventHandlers();
@@ -154,6 +171,15 @@ function initializeIframeControls() {
         
         // Восстанавливаем обработчики для кнопок проверки заданий
         sidebarPanel.off('click', '#check-tasks-btn-clone').on('click', '#check-tasks-btn-clone', function() {
+            // Перед проверкой принудительно синхронизируем все значения клона в оригинал
+            sidebarPanel.find('.task-answer-input').each(function() {
+                const taskId = $(this).data('task-id');
+                const val = $(this).val();
+                const originalInput = $(`.column.is-one-quarter .task-answer-input[data-task-id="${taskId}"]`);
+                if (originalInput.length) {
+                    originalInput.val(val);
+                }
+            });
             const originalBtn = $('.column.is-one-quarter #check-tasks-btn');
             if (originalBtn.length) {
                 originalBtn.trigger('click');
@@ -203,20 +229,54 @@ function initializeIframeControls() {
         const clonedTasksContainer = $('#sidebarPanel #tasks-container-clone');
         
         if (originalTasksContainer.length && clonedTasksContainer.length) {
+            let isUpdating = false;
             const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.type === 'childList' || mutation.type === 'attributes') {
-                        // Клонируем обновленное содержимое
-                        const updatedContent = originalTasksContainer.clone(true, true);
-                        updatedContent.find('[id]').each(function() {
-                            const originalId = $(this).attr('id');
-                            if (originalId) {
-                                $(this).attr('id', originalId + '-clone');
-                            }
-                        });
-                        clonedTasksContainer.html(updatedContent.html());
-                    }
+                if (isUpdating) return;
+
+                const hasRelevantMutation = mutations.some(function(mutation) {
+                    return mutation.type === 'childList' || mutation.type === 'attributes';
                 });
+                if (!hasRelevantMutation) return;
+
+                isUpdating = true;
+                observer.disconnect();
+
+                try {
+                    // Сохраняем значения полей ввода перед обновлением
+                    const savedValues = {};
+                    clonedTasksContainer.find('.task-answer-input').each(function() {
+                        const taskId = $(this).data('task-id');
+                        if (taskId) {
+                            savedValues[taskId] = $(this).val();
+                        }
+                    });
+
+                    // Клонируем обновленное содержимое
+                    const updatedContent = originalTasksContainer.clone(true, true);
+                    updatedContent.find('[id]').each(function() {
+                        const originalId = $(this).attr('id');
+                        if (originalId) {
+                            $(this).attr('id', originalId + '-clone');
+                        }
+                    });
+                    clonedTasksContainer.html(updatedContent.html());
+
+                    // Восстанавливаем значения полей ввода после обновления
+                    clonedTasksContainer.find('.task-answer-input').each(function() {
+                        const taskId = $(this).data('task-id');
+                        if (taskId && savedValues[taskId] !== undefined) {
+                            $(this).val(savedValues[taskId]);
+                        }
+                    });
+                } finally {
+                    isUpdating = false;
+                    observer.observe(originalTasksContainer[0], {
+                        childList: true,
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['class']
+                    });
+                }
             });
             
             observer.observe(originalTasksContainer[0], {
@@ -226,10 +286,11 @@ function initializeIframeControls() {
                 attributeFilter: ['class']
             });
             
-            // Сохраняем наблюдатель
-            if (!window.tasksObserver) {
-                window.tasksObserver = observer;
+            // Сохраняем наблюдатель, предварительно отключив старый
+            if (window.tasksObserver) {
+                window.tasksObserver.disconnect();
             }
+            window.tasksObserver = observer;
         }
     }
     
