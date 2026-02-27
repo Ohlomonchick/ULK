@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from interface.utils import get_pnet_password, generate_usb_device_ids, show_iframe_for_admin, sample_tasks_with_dependencies
 from interface.elastic_utils import create_elastic_user
+from interface.task_answer_parsing import parse_answer_choices, AnswerChoiceParseError
 from .models import (
     LabType,
     User,
@@ -191,6 +192,11 @@ class LabTaskInlineForm(forms.ModelForm):
             ]
         else:
             self.fields['task_type'].widget.choices = [('', '---------')]
+        if 'answer' in self.fields:
+            self.fields['answer'].help_text = (
+                'Правильный ответ, regex для проверки ввода или варианты выбора: '
+                'каждая строка с "-" (вариант), "*" (правильный при множественном выборе), "#" (единственный правильный).'
+            )
 
     def clean_task_type(self):
         data = self.cleaned_data.get('task_type')
@@ -262,6 +268,17 @@ class LabTaskInlineForm(forms.ModelForm):
                     f'не существуют в данной лабораторной работе.'
                 )
         
+        return data
+
+    def clean_answer(self):
+        """Валидация поля answer: при формате выбора (-, *, #) проверяем синтаксис."""
+        data = self.cleaned_data.get('answer', '')
+        if not data or not data.strip():
+            return data
+        try:
+            parse_answer_choices(data)
+        except AnswerChoiceParseError as e:
+            raise forms.ValidationError(str(e))
         return data
 
     def _post_clean(self):

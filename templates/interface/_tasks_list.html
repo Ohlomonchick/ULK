@@ -55,7 +55,7 @@
                                 </div>
                                 
                                 {% if not is_superuser and task.question and task.question != '' %}
-                                    <div class="mt-3" style="background-color: #fff4e6; padding: 1rem; border-radius: 6px; border-left: 4px solid #ffb03b;">
+                                    <div class="mt-3 task-question-block" style="background-color: #fff4e6; padding: 1rem; border-radius: 6px; border-left: 4px solid #ffb03b;">
                                         <p class="has-text-weight-semibold mb-2" style="color: #ad6800;">
                                             <span class="icon">
                                                 <i class="fas fa-question-circle"></i>
@@ -63,16 +63,41 @@
                                             Вопрос:
                                         </p>
                                         <p class="mb-3" style="color: #5c5c5c;">{{ task.question|linebreaksbr }}</p>
-                                        
                                         {% if not task.done %}
-                                            <div class="field">
-                                                <div class="control">
-                                                    <input type="text" 
-                                                           class="input task-answer-input" 
-                                                           placeholder="Введите ваш ответ" 
-                                                           data-task-id="{{ task.id }}">
+                                            {% with choices=task.get_display_choices %}
+                                            {% if choices %}
+                                                <div class="field task-answer-choices-wrapper" data-task-id="{{ task.id }}" data-choice-type="{{ choices.mode }}">
+                                                    {% if choices.mode == 'single' %}
+                                                        {% for opt in choices.options %}
+                                                        <div class="mb-2">
+                                                            <label class="radio">
+                                                                <input type="radio" name="task-choice-{{ task.id }}" class="task-answer-choice" data-task-id="{{ task.id }}" value="{{ opt.index }}" data-choice-type="single">
+                                                                {{ opt.text }}
+                                                            </label>
+                                                        </div>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        {% for opt in choices.options %}
+                                                        <div class="mb-2">
+                                                            <label class="checkbox">
+                                                                <input type="checkbox" class="task-answer-choice" data-task-id="{{ task.id }}" value="{{ opt.index }}" data-choice-type="multiple">
+                                                                {{ opt.text }}
+                                                            </label>
+                                                        </div>
+                                                        {% endfor %}
+                                                    {% endif %}
                                                 </div>
-                                            </div>
+                                            {% else %}
+                                                <div class="field">
+                                                    <div class="control">
+                                                        <input type="text"
+                                                               class="input task-answer-input"
+                                                               placeholder="Введите ваш ответ"
+                                                               data-task-id="{{ task.id }}">
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                            {% endwith %}
                                         {% endif %}
                                     </div>
                                 {% endif %}

@@ -31,6 +31,7 @@ from django.views.decorators.http import require_GET, require_POST
 from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
+from .task_answer_parsing import parse_answer_choices
 from .config import get_pnet_base_dir, get_pnet_url, get_web_url
 from .utils import get_pnet_lab_name
 from .eveFunctions import create_pnet_lab_session_common
@@ -1832,21 +1833,33 @@ def check_task_answers(request):
             
             # Получаем флаг для этого задания (если есть)
             task_flag = flags_dict.get(task.task_id) if task.task_id else None
-            
-            # Проверяем ответ: сначала обычный ответ, затем флаг
-            correct_answer = task.answer.strip() if task.answer else ''
+
             is_correct = False
-            
-            # Проверяем обычный ответ
-            if correct_answer:
-                try:
-                    is_correct = bool(re.fullmatch(correct_answer, user_answer, re.IGNORECASE))
-                except re.error:
-                    is_correct = user_answer.lower() == correct_answer.lower()
-            
-            # Если обычный ответ не подошел, проверяем флаг
-            if not is_correct and task_flag:
-                is_correct = user_answer.strip().lower() == task_flag.strip().lower()
+            parsed_choices = None
+            try:
+                parsed_choices = parse_answer_choices(task.answer) if task.answer else None
+            except Exception:
+                pass
+
+            if parsed_choices is not None:
+                # Задание с выбором ответа: проверяем по индексам
+                correct_indices = {opt['index'] for opt in parsed_choices['options'] if opt['correct']}
+                user_indices = set()
+                for part in user_answer.split(','):
+                    part = part.strip()
+                    if part.isdigit():
+                        user_indices.add(int(part))
+                is_correct = user_indices == correct_indices
+            else:
+                # Свободный ввод: regex/строка и флаг
+                correct_answer = task.answer.strip() if task.answer else ''
+                if correct_answer:
+                    try:
+                        is_correct = bool(re.fullmatch(correct_answer, user_answer, re.IGNORECASE))
+                    except re.error:
+                        is_correct = user_answer.lower() == correct_answer.lower()
+                if not is_correct and task_flag:
+                    is_correct = user_answer.strip().lower() == task_flag.strip().lower()
             
             results[task_id] = {
                 'status': 'correct' if is_correct else 'incorrect',
@@ -1938,11 +1951,11 @@ def get_user_tasks_status(request):
             is_completed = task.id in completed_task_ids
             has_question = bool(task.question and task.question.strip())
             is_failed = task.id in failed_tasks_set
-            
+
             if has_question:
                 has_questions = True
-            
-            tasks_data.append({
+
+            task_payload = {
                 'id': task.id,
                 'number': idx,
                 'description': task.description or '',
@@ -1950,7 +1963,12 @@ def get_user_tasks_status(request):
                 'has_question': has_question,
                 'done': is_completed,
                 'failed': is_failed
-            })
+            }
+            display_choices = task.get_display_choices()
+            if display_choices:
+                task_payload['answer_type'] = 'single_choice' if display_choices['mode'] == 'single' else 'multiple_choice'
+                task_payload['choices'] = [{'id': opt['index'], 'text': opt['text']} for opt in display_choices['options']]
+            tasks_data.append(task_payload)
         
         return JsonResponse({
             'success': True,

@@ -129,28 +129,47 @@ class TasksController {
     }
 
     /**
-     * Собирает ответы пользователя из полей ввода
+     * Собирает ответы пользователя из полей ввода и выбора (radio/checkbox)
      */
     collectAnswers() {
         const answers = {};
-        
+
         $('.task-answer-input').each(function() {
             const taskId = $(this).data('task-id');
             const answer = $(this).val().trim();
-            
             if (answer) {
                 answers[taskId] = answer;
             }
         });
-        
+
+        $('.task-answer-choices-wrapper').each(function() {
+            const $wrapper = $(this);
+            const taskId = $wrapper.data('task-id');
+            const choiceType = $wrapper.data('choice-type');
+            if (choiceType === 'single') {
+                const $checked = $wrapper.find('input.task-answer-choice:radio:checked');
+                if ($checked.length) {
+                    answers[taskId] = String($checked.val());
+                }
+            } else if (choiceType === 'multiple') {
+                const values = $wrapper.find('input.task-answer-choice:checkbox:checked')
+                    .map(function() { return $(this).val(); })
+                    .get()
+                    .sort((a, b) => Number(a) - Number(b));
+                if (values.length) {
+                    answers[taskId] = values.join(',');
+                }
+            }
+        });
+
         return answers;
     }
 
     /**
-     * Проверяет, есть ли вопросы в заданиях
+     * Проверяет, есть ли вопросы в заданиях (ввод текста или выбор варианта)
      */
     hasQuestions() {
-        return $('.task-answer-input').length > 0;
+        return $('.task-answer-input').length > 0 || $('.task-answer-choice').length > 0;
     }
 
     /**
@@ -224,11 +243,11 @@ class TasksController {
                         <span>Выполнено</span>
                     </span>
                 `);
-                
-                // Убираем поле ввода для выполненного задания
-                $taskElement.find('.field').remove();
+                // Убираем только поле ввода; для выбора — отключаем инпуты, оставляем отмеченные варианты видимыми
+                $taskElement.find('.task-answer-input').closest('.field').remove();
+                $taskElement.find('.task-answer-choices-wrapper').find('input').prop('disabled', true);
             } else if (task.failed) {
-                // Задание с неверным ответом (failed_tasks)
+                // Задание с неверным ответом (failed_tasks): блок не скрываем, убираем только поле ввода или отключаем выбор
                 if (!hasIncorrectTag) {
                     $statusTag.html(`
                         <span class="tag is-danger has-text-white title is-6">
@@ -239,9 +258,8 @@ class TasksController {
                         </span>
                     `);
                 }
-                
-                // Скрываем поле ввода полностью
-                $taskElement.find('.field').hide();
+                $taskElement.find('.task-answer-input').closest('.field').remove();
+                $taskElement.find('.task-answer-choices-wrapper').find('input').prop('disabled', true);
             } else if (!hasIncorrectTag) {
                 // Очищаем только если нет тега "Неверно"
                 $statusTag.empty();
@@ -280,9 +298,8 @@ class TasksController {
                         <span>Выполнено</span>
                     </span>
                 `);
-                
-                // Убираем поле ввода для выполненного задания
-                $taskElement.find('.field').remove();
+                $taskElement.find('.task-answer-input').closest('.field').remove();
+                $taskElement.find('.task-answer-choices-wrapper').find('input').prop('disabled', true);
             } else if (result.status === 'incorrect') {
                 $statusTag.html(`
                     <span class="tag is-danger has-text-white title is-6">
@@ -292,11 +309,10 @@ class TasksController {
                         <span>Неверно</span>
                     </span>
                 `);
-                
-                // Подсвечиваем поле ввода красным
-                $taskElement.find('.task-answer-input')
+                $taskElement.find('.task-answer-input, .task-answer-choices-wrapper')
                     .removeClass('is-success')
                     .addClass('is-danger');
+                // Блок не удаляем: поле ввода или отмеченные варианты остаются видимыми
             }
         });
     }

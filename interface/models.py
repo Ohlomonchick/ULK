@@ -29,6 +29,7 @@ from interface.utils import get_pnet_lab_name, get_database_type
 from .elastic_utils import delete_elastic_user
 from .pnet_session_manager import ensure_admin_pnet_session, execute_pnet_operation_if_needed
 from .validators import validate_top_level_array, validate_lab_task_json_config
+from .task_answer_parsing import parse_answer_choices, get_display_choices_from_parsed
 logger = logging.getLogger(__name__)
 
 
@@ -245,6 +246,19 @@ class LabTask(models.Model):
 
     def __str__(self):
         return self.description
+
+    def get_display_choices(self):
+        """
+        Возвращает варианты выбора для отображения (без признака правильности)
+        или None, если задание с свободным ответом.
+        """
+        if not self.answer or not self.answer.strip():
+            return None
+        try:
+            parsed = parse_answer_choices(self.answer)
+            return get_display_choices_from_parsed(parsed) if parsed else None
+        except Exception:
+            return None
 
 
 class Platoon(models.Model):

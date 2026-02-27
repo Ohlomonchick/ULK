@@ -340,6 +340,76 @@ class CheckTaskAnswersAPITestCase(BaseTaskAnswersTestCase):
         self._assert_answer_exists(task, should_exist=True)
         self.assertEqual(self._count_answers(), 1)
 
+    def test_check_answers_single_choice_correct(self):
+        """Тест: задание с одним правильным ответом (#), отправка правильного индекса."""
+        task = self._create_task(
+            'task_1',
+            question='Выберите столицу Франции',
+            answer='- Берлин\n- Мадрид\n# Париж\n- Рим'
+        )
+        self._add_tasks_to_user(task)
+        response = self._post_answers({str(task.id): '2'})  # индекс варианта "Париж"
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+        self._assert_answer_exists(task, should_exist=True)
+
+    def test_check_answers_single_choice_incorrect(self):
+        """Тест: задание с одним правильным ответом, отправка неправильного индекса."""
+        task = self._create_task(
+            'task_1',
+            question='Выберите столицу',
+            answer='- A\n# B\n- C'
+        )
+        self._add_tasks_to_user(task)
+        response = self._post_answers({str(task.id): '0'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'incorrect')
+        self.assertEqual(self._count_answers(), 0)
+
+    def test_check_answers_multiple_choice_correct(self):
+        """Тест: задание с несколькими правильными (*), отправка всех правильных индексов."""
+        task = self._create_task(
+            'task_1',
+            question='Выберите чётные числа',
+            answer='* 2\n- 3\n* 4\n- 5'
+        )
+        self._add_tasks_to_user(task)
+        response = self._post_answers({str(task.id): '0,2'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+        self._assert_answer_exists(task, should_exist=True)
+
+    def test_check_answers_multiple_choice_incorrect(self):
+        """Тест: multiple choice — неполный или лишний выбор считается неверным."""
+        task = self._create_task(
+            'task_1',
+            question='Выберите чётные',
+            answer='* 2\n- 3\n* 4'
+        )
+        self._add_tasks_to_user(task)
+        response = self._post_answers({str(task.id): '0'})  # только один из двух правильных
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'incorrect')
+        self.assertEqual(self._count_answers(), 0)
+
+    def test_check_answers_choice_not_regex(self):
+        """Тест: при формате выбора ответ не проверяется как regex."""
+        task = self._create_task(
+            'task_1',
+            question='Выберите один',
+            answer='- Вариант A\n# Вариант B'
+        )
+        self._add_tasks_to_user(task)
+        # Индекс 1 — правильный. Строка "1" не должна интерпретироваться как regex
+        response = self._post_answers({str(task.id): '1'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['results'][str(task.id)]['status'], 'correct')
+
     def test_check_answers_with_flag_case_insensitive(self):
         """
         Тест: Проверка флага регистронезависимо

@@ -91,12 +91,30 @@ function initializeIframeControls() {
             return;
         }
         
-        // Сохраняем значения полей ввода перед очисткой
+        // Сохраняем значения полей ввода и выбора перед очисткой
         const savedInputValues = {};
         sidebarPanelContent.find('.task-answer-input').each(function() {
             const taskId = $(this).data('task-id');
             if (taskId) {
                 savedInputValues[taskId] = $(this).val();
+            }
+        });
+        const savedChoiceValues = {};
+        sidebarPanelContent.find('.task-answer-choices-wrapper').each(function() {
+            const $wrapper = $(this);
+            const taskId = $wrapper.data('task-id');
+            const choiceType = $wrapper.data('choice-type');
+            if (choiceType === 'single') {
+                const $checked = $wrapper.find('input.task-answer-choice:radio:checked');
+                if ($checked.length) {
+                    savedChoiceValues[taskId] = $checked.val();
+                }
+            } else if (choiceType === 'multiple') {
+                const values = $wrapper.find('input.task-answer-choice:checkbox:checked')
+                    .map(function() { return $(this).val(); }).get();
+                if (values.length) {
+                    savedChoiceValues[taskId] = values;
+                }
             }
         });
 
@@ -127,6 +145,20 @@ function initializeIframeControls() {
             const taskId = $(this).data('task-id');
             if (taskId && savedInputValues[taskId] !== undefined) {
                 $(this).val(savedInputValues[taskId]);
+            }
+        });
+        // Восстанавливаем выбор (radio/checkbox)
+        sidebarPanelContent.find('.task-answer-choices-wrapper').each(function() {
+            const $wrapper = $(this);
+            const taskId = $wrapper.data('task-id');
+            const saved = savedChoiceValues[taskId];
+            if (saved === undefined) return;
+            if (Array.isArray(saved)) {
+                $wrapper.find('input.task-answer-choice:checkbox').each(function() {
+                    $(this).prop('checked', saved.indexOf($(this).val()) !== -1);
+                });
+            } else {
+                $wrapper.find(`input.task-answer-choice:radio[value="${saved}"]`).prop('checked', true);
             }
         });
 
@@ -180,12 +212,33 @@ function initializeIframeControls() {
                     originalInput.val(val);
                 }
             });
+            sidebarPanel.find('.task-answer-choices-wrapper').each(function() {
+                const $wrapper = $(this);
+                const taskId = $wrapper.data('task-id');
+                const choiceType = $wrapper.data('choice-type');
+                const originalWrapper = $(`.column.is-one-quarter .task-answer-choices-wrapper[data-task-id="${taskId}"]`);
+                if (!originalWrapper.length) return;
+                if (choiceType === 'single') {
+                    const $checked = $wrapper.find('input.task-answer-choice:radio:checked');
+                    const val = $checked.length ? $checked.val() : null;
+                    originalWrapper.find('input.task-answer-choice:radio').prop('checked', false);
+                    if (val != null) {
+                        originalWrapper.find(`input.task-answer-choice:radio[value="${val}"]`).prop('checked', true);
+                    }
+                } else if (choiceType === 'multiple') {
+                    const values = $wrapper.find('input.task-answer-choice:checkbox:checked')
+                        .map(function() { return $(this).val(); }).get();
+                    originalWrapper.find('input.task-answer-choice:checkbox').each(function() {
+                        $(this).prop('checked', values.indexOf($(this).val()) !== -1);
+                    });
+                }
+            });
             const originalBtn = $('.column.is-one-quarter #check-tasks-btn');
             if (originalBtn.length) {
                 originalBtn.trigger('click');
             }
         });
-        
+
         // Восстанавливаем обработчики для полей ввода ответов на задания
         sidebarPanel.off('input change', '.task-answer-input').on('input change', '.task-answer-input', function() {
             const taskId = $(this).data('task-id');
@@ -193,6 +246,26 @@ function initializeIframeControls() {
             if (originalInput.length) {
                 originalInput.val($(this).val());
                 originalInput.trigger('input');
+            }
+        });
+        // Синхронизация выбора (radio/checkbox) из клона в оригинал
+        sidebarPanel.off('change', '.task-answer-choice').on('change', '.task-answer-choice', function() {
+            const $input = $(this);
+            const taskId = $input.data('task-id');
+            const choiceType = $input.data('choice-type');
+            const originalWrapper = $(`.column.is-one-quarter .task-answer-choices-wrapper[data-task-id="${taskId}"]`);
+            if (!originalWrapper.length) return;
+            if (choiceType === 'single') {
+                const val = $input.val();
+                originalWrapper.find('input.task-answer-choice:radio').prop('checked', false);
+                originalWrapper.find(`input.task-answer-choice:radio[value="${val}"]`).prop('checked', true);
+            } else {
+                const $wrapper = $input.closest('.task-answer-choices-wrapper');
+                const values = $wrapper.find('input.task-answer-choice:checkbox:checked')
+                    .map(function() { return $(this).val(); }).get();
+                originalWrapper.find('input.task-answer-choice:checkbox').each(function() {
+                    $(this).prop('checked', values.indexOf($(this).val()) !== -1);
+                });
             }
         });
         
@@ -242,7 +315,6 @@ function initializeIframeControls() {
                 observer.disconnect();
 
                 try {
-                    // Сохраняем значения полей ввода перед обновлением
                     const savedValues = {};
                     clonedTasksContainer.find('.task-answer-input').each(function() {
                         const taskId = $(this).data('task-id');
@@ -250,8 +322,25 @@ function initializeIframeControls() {
                             savedValues[taskId] = $(this).val();
                         }
                     });
+                    const savedChoiceValues = {};
+                    clonedTasksContainer.find('.task-answer-choices-wrapper').each(function() {
+                        const $wrapper = $(this);
+                        const taskId = $wrapper.data('task-id');
+                        const choiceType = $wrapper.data('choice-type');
+                        if (choiceType === 'single') {
+                            const $checked = $wrapper.find('input.task-answer-choice:radio:checked');
+                            if ($checked.length) {
+                                savedChoiceValues[taskId] = $checked.val();
+                            }
+                        } else if (choiceType === 'multiple') {
+                            const values = $wrapper.find('input.task-answer-choice:checkbox:checked')
+                                .map(function() { return $(this).val(); }).get();
+                            if (values.length) {
+                                savedChoiceValues[taskId] = values;
+                            }
+                        }
+                    });
 
-                    // Клонируем обновленное содержимое
                     const updatedContent = originalTasksContainer.clone(true, true);
                     updatedContent.find('[id]').each(function() {
                         const originalId = $(this).attr('id');
@@ -261,11 +350,23 @@ function initializeIframeControls() {
                     });
                     clonedTasksContainer.html(updatedContent.html());
 
-                    // Восстанавливаем значения полей ввода после обновления
                     clonedTasksContainer.find('.task-answer-input').each(function() {
                         const taskId = $(this).data('task-id');
                         if (taskId && savedValues[taskId] !== undefined) {
                             $(this).val(savedValues[taskId]);
+                        }
+                    });
+                    clonedTasksContainer.find('.task-answer-choices-wrapper').each(function() {
+                        const $wrapper = $(this);
+                        const taskId = $wrapper.data('task-id');
+                        const saved = savedChoiceValues[taskId];
+                        if (saved === undefined) return;
+                        if (Array.isArray(saved)) {
+                            $wrapper.find('input.task-answer-choice:checkbox').each(function() {
+                                $(this).prop('checked', saved.indexOf($(this).val()) !== -1);
+                            });
+                        } else {
+                            $wrapper.find(`input.task-answer-choice:radio[value="${saved}"]`).prop('checked', true);
                         }
                     });
                 } finally {
