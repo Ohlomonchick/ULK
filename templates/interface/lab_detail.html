@@ -344,11 +344,12 @@
                 {% endif %}
             {% endif %}
             <div class="field mt-5">
-                <div class="control" style="display: flex; align-items: center;">
-                    <button id="create-lab-button" class="button is-info is-medium is-size-5 has-text-weight-semibold px-5" type="submit">
-                        <span>Создать</span>
-                    </button>
-                    <div id="loading-container" class="hidden" style="margin-left: 1rem;">
+                <div class="control">
+                    <div style="display: flex; align-items: center;">
+                        <button id="create-lab-button" class="button is-info is-medium is-size-5 has-text-weight-semibold px-5" type="submit">
+                            <span>Создать</span>
+                        </button>
+                        <div id="loading-container" class="hidden" style="margin-left: 1rem;">
                         <div id="loading-text" class="has-text-info is-size-5 has-text-weight-semibold"></div>
                     </div>
                     <div id="lab-video-container" class="hidden" style="margin-left: 1rem;">
@@ -356,6 +357,8 @@
                             <source src="{% static 'videos/rocket_no_back.mp4' %}" type="video/mp4"></source>
                         </video>
                     </div>
+                    </div>
+                    <p id="create-lab-wait-message" class="help is-info is-size-6 mt-2 hidden">Работа уже создаётся. Ожидайте.</p>
                 </div>
             </div>
         </div>
