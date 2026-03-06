@@ -886,6 +886,7 @@ function setupVideoForm() {
     const loadingText = document.getElementById('loading-text');
     const videoContainer = document.getElementById('lab-video-container');
     const video = document.getElementById('lab-video');
+    const waitMessage = document.getElementById('create-lab-wait-message');
     
     if (!form || !submitButton || !loadingContainer || !loadingText || !videoContainer || !video) {
         return;
@@ -895,6 +896,7 @@ function setupVideoForm() {
     let responseReceived = false;
     let videoFinished = false;
     let loadingInterval = null;
+    let isCreatingInProgress = false;
     
     // Ускоряем видео как в competition_detail
     video.playbackRate = 1.5;
@@ -921,6 +923,17 @@ function setupVideoForm() {
     });
     
     function showLoadingAndSubmitForm() {
+        if (isCreatingInProgress) {
+            if (waitMessage) {
+                waitMessage.classList.remove('hidden');
+            }
+            return;
+        }
+        
+        isCreatingInProgress = true;
+        submitButton.disabled = true;
+        if (waitMessage) waitMessage.classList.add('hidden');
+        
         // Показываем анимацию загрузки
         loadingContainer.classList.remove('hidden');
         startLoadingAnimation();
@@ -947,11 +960,13 @@ function setupVideoForm() {
                 return response.text().then(html => {
                     document.documentElement.innerHTML = html;
                     stopLoadingAnimation();
+                    resetCreateState();
                 });
             }
         })
         .catch(() => {
             stopLoadingAnimation();
+            resetCreateState();
         });
     }
     
@@ -1012,6 +1027,12 @@ function setupVideoForm() {
     function getCsrfToken() {
         const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
         return csrfInput?.value || '';
+    }
+    
+    function resetCreateState() {
+        isCreatingInProgress = false;
+        submitButton.disabled = false;
+        if (waitMessage) waitMessage.classList.add('hidden');
     }
 }
 
