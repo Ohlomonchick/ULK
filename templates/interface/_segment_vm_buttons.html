@@ -1,0 +1,16 @@
+{% load utm_filters %}
+{% if segment_vm_names %}
+    {% for vm_name in segment_vm_names %}
+        <button
+            class="vm-segment-slider{% if forloop.first %} vm-segment-slider--active{% endif %}"
+            style="top: {{ forloop.counter0|mul:40|add:90 }}px"
+            data-vm-name="{{ vm_name }}"
+            data-competition-slug="{{ object.slug }}"
+            title="{{ vm_name }}"
+            onclick="switchSegmentVM(this, '{{ vm_name }}', '{{ object.slug }}')"
+        >
+            <i class="fas fa-desktop"></i><span class="slider-text"> {{ vm_name }}</span>
+        </button>
+    {% endfor %}
+{% endif %}
+

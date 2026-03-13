@@ -547,21 +547,35 @@ class TeamCompetitionDetailView(CompetitionDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         competition = self.object
+        user = self.request.user
 
         # Try to find a team record in which the user is a member.
-        self.team_relation = competition.competition_teams.filter(team__users=self.request.user).first()
+        self.team_relation = competition.competition_teams.filter(team__users=user).first()
         if self.team_relation:
             # Отмечаем команду как подключившуюся к лабе
             TeamCompetition2Team.objects.filter(pk=self.team_relation.pk).update(joined=True)
-            answer_filters = {'team':self.team_relation.team}
+            answer_filters = {'team': self.team_relation.team}
         else:
-            answer_filters = {'user':self.request.user}
+            answer_filters = {'user': user}
 
         context = self.set_submitted(context, answer_filters)
         if context.get("assigned_tasks", []) == [] and self.team_relation:
             context["assigned_tasks"] = self.team_relation.tasks.all()
         context["is_team_competition"] = True
-        context["show_console_iframe"] = not self.request.user.is_superuser
+        context["show_console_iframe"] = not user.is_superuser
+
+        # Передаём VM сегмента пользователя/команды (для кнопок переключения VM)
+        segment_vm_names = []
+        if not user.is_superuser:
+            segment_assignment = TeamOrUser2Segment.objects.filter(
+                team_competition=competition
+            ).filter(
+                Q(team__users=user) | Q(user=user)
+            ).select_related('segment').first()
+            if segment_assignment and segment_assignment.segment:
+                segment_vm_names = segment_assignment.segment.vm_names or []
+                context["segment_name"] = segment_assignment.segment.name
+        context["segment_vm_names"] = segment_vm_names
 
         return context
 

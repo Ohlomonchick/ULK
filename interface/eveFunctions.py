@@ -5,7 +5,9 @@ from functools import wraps
 
 import requests
 from slugify import slugify
+import logging
 import json
+from functools import wraps
 
 from .config import *
 
@@ -126,6 +128,7 @@ def pf_login(url, name, password):
         'Content-Type': 'application/json;charset=UTF-8'
     }
     session = requests.Session()
+    session.verify = False
     r1 = session.get(url, headers=header1, verify=False)
     header2 = {
         'Content-Type': 'application/json;charset=UTF-8',
@@ -138,8 +141,8 @@ def pf_login(url, name, password):
             'html': '0', 'captcha': ''
         }
     )
-    r2 = requests.post(url2, headers=header2, data=payload2, verify=False)
-    return r2.cookies, session.cookies.get_dict()["_session"]
+    r2 = session.post(url2, headers=header2, data=payload2, verify=False)
+    return session.cookies, session.cookies.get_dict()["_session"]
 
 
 def create_user(url, username, password, user_role='1', cookie=None):
@@ -526,18 +529,25 @@ def create_session(url, lab, cookie):
     logger.debug(r)
 
 
-def join_session(url, lab_session_id, cookie):
+def join_session(url, lab_session_id, cookie, xsrf=None):
+    """Подключение к существующей сессии лабы. xsrf обязателен для многих PNET API (иначе 412)."""
     lab_session_id = '{"lab_session":"' + str(lab_session_id) + '"}'
+    headers = {'content-type': 'application/json'}
+    if xsrf:
+        headers['X-XSRF-TOKEN'] = xsrf
     r = requests.post(
         url + '/api/labs/session/factory/join',
         data=lab_session_id,
-        headers={'content-type': 'application/json'},
+        headers=headers,
         cookies=cookie,
         verify=False,
-        timeout=4  # 4 секунды таймаут для подключения к сессии
+        timeout=10
     )
     logger.debug(r)
-    logger.debug(r.json())
+    try:
+        logger.debug(r.json())
+    except Exception:
+        pass
     return r
 
 
@@ -604,6 +614,11 @@ def create_node(url, node_params, cookie, xsrf):
     if r.status_code in range(200, 400):
         logger.debug(
             "Node {} has been created\nServer response\t{}".format(node_params["template"], r.json()["message"]))
+    else:
+        logger.error(
+            "Failed to create node '{}' (template={}): HTTP {} — {}".format(
+                node_params.get("name"), node_params.get("template"), r.status_code, r.text
+            ))
     return r
 
 
@@ -717,15 +732,19 @@ def get_session_id(url, cookie):
             auth_data,
         )
         raise Exception(f"Invalid auth response: {auth_data}")
-    sess_id = auth_data["data"].get("lab")
-    if not sess_id:
-        logger.error(
-            "get_session_id: Session ID not found in auth response. data.lab=%s data_keys=%s",
-            auth_data.get("data"),
-            list(auth_data["data"].keys()) if isinstance(auth_data.get("data"), dict) else None,
-        )
-        raise Exception("Session ID not found in auth response")
-    logger.debug("get_session_id: Session ID obtained from /api/auth: %s", sess_id)
+
+    data = auth_data["data"]
+    sess_id = data.get("lab")
+    if isinstance(sess_id, dict):
+        sess_id = sess_id.get("id")
+    if sess_id is None or sess_id == "":
+        sess_id = data.get("session_id") or data.get("sessionId") or data.get("id") or data.get("pod")
+    if sess_id is None or sess_id == "":
+        keys = list(data.keys()) if isinstance(data, dict) else "not a dict"
+        logger.error(f"Session ID not found in auth response. data keys: {keys}, full: {auth_data}")
+        raise Exception(f"Session ID not found in PNET /api/auth response (data keys: {keys}).")
+    logger.debug(f"Session ID obtained from /api/auth: {sess_id}")
+
     return sess_id
 
 
@@ -807,7 +826,10 @@ def create_all_lab_nodes_and_connectors(url, lab_object, lab_path, lab_name, coo
             return func(*updated_args, **updated_kwargs)
 
     create_session(url, lab, cookie)
-    sess_id = get_session_id(url, cookie)
+    # Сначала получаем session id по пути к лабе, иначе — из /api/auth
+    sess_id, err = get_session_id_by_filter(url, cookie, xsrf, lab)
+    if sess_id is None:
+        sess_id = get_session_id(url, cookie)
 
     # Модифицируем NodesData с USB device IDs, если они предоставлены
     nodes_data = lab_object.NodesData
@@ -873,29 +895,47 @@ def delete_lab_with_session_destroy(url: object, lab_name: object, lab_path: obj
     logger.debug(r)
 
 
-def get_lab_topology(url, cookie):
-    """Получает топологию лаборатории из PNET"""
-    try:
-        response = requests.get(
-            f"{url}/api/labs/session/topology",
-            cookies=cookie,
-            verify=False,
-            timeout=10
-        )
-
-        if response.status_code == 200:
-            return response.json()
-        else:
+def get_lab_topology(url, cookie, xsrf=None, retry_on_412=True):
+    """Получает топологию лаборатории из PNET..
+    При 412 (session not authenticated) один повтор через 2 с"""
+    import time
+    headers = {}
+    if xsrf:
+        headers['X-XSRF-TOKEN'] = xsrf
+    for attempt in range(2 if retry_on_412 else 1):
+        try:
+            if attempt > 0:
+                time.sleep(2)
+            response = requests.get(
+                f"{url}/api/labs/session/topology",
+                headers=headers,
+                cookies=cookie,
+                verify=False,
+                timeout=20
+            )
+            if response.status_code == 200:
+                return response.json()
+            if response.status_code == 412 and retry_on_412 and attempt == 0:
+                logger.warning("get_lab_topology 412, retrying once in 2s")
+                continue
             logger.error(f"Failed to get lab topology: {response.status_code} - {response.text}")
             return None
-    except Exception as e:
-        logger.error(f"Error getting lab topology: {str(e)}")
-        return None
+        except Exception as e:
+            logger.error(f"Error getting lab topology: {str(e)}")
+            return None
+    return None
 
 
-def get_guacamole_url(url, node_id, cookie):
+def get_guacamole_url(url, node_id, cookie, xsrf=None):
     """Получает ссылку на Guacamole консоль для указанной ноды"""
     try:
+        headers = {
+            'Content-Type': 'application/json;charset=UTF-8',
+            'Accept': 'application/json, text/plain, */*',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        if xsrf:
+            headers['X-XSRF-TOKEN'] = xsrf
         response = requests.get(
             f"{url}/api/labs/session/console_guac_link?&node_id={node_id}",
             cookies=cookie,
@@ -1084,20 +1124,23 @@ def create_pnet_lab_session_common(url, user_pnet_login, lab_path, cookie, xsrf=
         return False, f"Session creation error: {str(e)}", None
 
 
-def turn_on_node(url, node_id, cookie):
+def turn_on_node(url, node_id, cookie, xsrf=None):
     """Включает ноду в PNET"""
     try:
+        headers = {
+            'Content-Type': 'application/json;charset=UTF-8',
+            'Accept': 'application/json, text/plain, */*',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        if xsrf:
+            headers['X-XSRF-TOKEN'] = xsrf
         response = requests.post(
             f"{url}/api/labs/session/nodes/start",
-            headers={
-                'Content-Type': 'application/json;charset=UTF-8',
-                'Accept': 'application/json, text/plain, */*',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
+            headers=headers,
             json={'id': str(node_id)},
             cookies=cookie,
             verify=False,
-            timeout=10
+            timeout=20
         )
 
         if response.status_code == 200:
@@ -1108,6 +1151,19 @@ def turn_on_node(url, node_id, cookie):
                 logger.info(f"Node {node_id} start response (non-JSON): {response.text[:200]}")
             logger.info(f"Node {node_id} started successfully")
             return True, "Node started successfully"
+        elif response.status_code == 400:
+            try:
+                resp_json = response.json()
+                if resp_json.get('message', '').endswith('(12).'):
+                    logger.info(f"Node {node_id} is already running (code 12), treating as success")
+                    return True, "Node already running"
+            except Exception:
+                pass
+            logger.error(f"Failed to start node {node_id}: {response.status_code} - {response.text}")
+            return False, f"Failed to start node: {response.text}"
+        elif response.status_code == 412:
+            logger.warning(f"Node {node_id} start: 412 Unauthorized (session expired)")
+            return False, "SESSION_EXPIRED"
         else:
             logger.error(f"Failed to start node {node_id}: {response.status_code} - {response.text}")
             return False, f"Failed to start node: {response.text}"

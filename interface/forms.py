@@ -28,6 +28,9 @@ from .models import (
     TeamCompetition,
     Team,
     TeamCompetition2Team,
+    TeamCompetition2TeamsAndUsers,
+    TeamOrUser2Segment,
+    TopologySegment,
     LearningYear,
     MyAttachment,
 )
@@ -364,8 +367,9 @@ class CompetitionForm(forms.ModelForm):
             )
 
     def get_all_users(self, instance):
-        all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
-        return all_users.distinct()
+        platoon_ids = set(User.objects.filter(platoon__in=instance.platoons.all()).values_list('id', flat=True))
+        non_platoon_ids = set(instance.non_platoon_users.values_list('id', flat=True))
+        return User.objects.filter(id__in=platoon_ids | non_platoon_ids)
 
     def _get_new_participants(self, instance):
         all_users = self.get_all_users(instance)
@@ -430,7 +434,7 @@ class CompetitionForm(forms.ModelForm):
             )
 
             if created and not getattr(instance, 'kkz_id', None):
-                tasks = list(instance.tasks.all() or instance.lab.options.all())
+                tasks = instance.get_tasks_for_assignment()
                 num = min(instance.num_tasks, len(tasks))
                 assigned_tasks = sample_tasks_with_dependencies(tasks, num)
                 competition2user.tasks.set(assigned_tasks)
@@ -453,8 +457,9 @@ class CompetitionForm(forms.ModelForm):
 
     def _delete_removed_users(self, instance):
         """Удаляет пользователей, которых больше нет в списке."""
-        all_users = self.get_all_users(instance) | User.objects.filter(is_superuser=True).all().distinct()
-        all_users_ids = set(all_users.values_list('pk', flat=True))
+        all_users_ids = set(self.get_all_users(instance).values_list('pk', flat=True)) | set(
+            User.objects.filter(is_superuser=True).values_list('pk', flat=True)
+        )
         existing_user_ids = instance.competition_users.values_list('user_id', flat=True)
 
         def _delete_operation():
@@ -783,11 +788,51 @@ class TeamCompetitionForm(CompetitionForm):
             'Вы можете добавить студентов к взводам. Или создать соревнование только для отдельных студентов.'
         self.fields['teams'].help_text = \
             'Если пользователь добавлен отдельно от команды, он всё равно будет принимать участие в составе команды.'
+        # При редактировании соревнования с сегментами подставляем текущие команды и участников из сессий,
+        # иначе форма пустая и при сохранении сессии пересоздаются с нуля
+        instance = kwargs.get('instance')
+        if instance and instance.pk and getattr(instance, 'lab', None) and getattr(instance.lab, 'topology_segments', None) and instance.lab.topology_segments.exists():
+            from .models import TeamCompetition2TeamsAndUsers
+            sessions = TeamCompetition2TeamsAndUsers.objects.filter(team_competition=instance).prefetch_related('teams', 'users')
+            all_teams = set()
+            all_direct_users = set()
+            for sess in sessions:
+                all_teams.update(sess.teams.all())
+                all_direct_users.update(sess.users.all())
+            if all_teams or all_direct_users:
+                self.initial['teams'] = list(all_teams)
+                self.initial['non_platoon_users'] = list(all_direct_users)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        lab = cleaned_data.get('lab')
+        if not lab or not getattr(lab, 'topology_segments', None):
+            return cleaned_data
+        segments = list(lab.topology_segments.order_by('id'))
+        if not segments:
+            return cleaned_data
+        n = len(segments)
+        teams = list(cleaned_data.get('teams') or [])
+        platoons = cleaned_data.get('platoons') or []
+        non_platoon = list(cleaned_data.get('non_platoon_users') or [])
+        platoon_user_ids = set(User.objects.filter(platoon__in=platoons).values_list('id', flat=True))
+        non_platoon_ids = {u.id for u in non_platoon}
+        all_user_ids = platoon_user_ids | non_platoon_ids
+        team_user_ids = set(User.objects.filter(team__in=teams).values_list('id', flat=True))
+        solo_users = [uid for uid in all_user_ids if uid not in team_user_ids]
+        total = len(teams) + len(solo_users)
+        if total > 0 and total % n != 0:
+            raise ValidationError(
+                f'При сегментированной топологии число участников (команды + одиночные) должно быть кратно числу сегментов ({n}). Сейчас: {total} участников.'
+            )
+        return cleaned_data
 
     def get_all_users(self, instance):
-        all_users = User.objects.filter(platoon__in=instance.platoons.all()) | instance.non_platoon_users.all()
-        team_user_ids = User.objects.filter(team__in=self.cleaned_data.get("teams", [])).values_list("id", flat=True)
-        return all_users.exclude(id__in=team_user_ids).distinct()
+        platoon_user_ids = set(User.objects.filter(platoon__in=instance.platoons.all()).values_list('id', flat=True))
+        non_platoon_ids = set(instance.non_platoon_users.values_list('id', flat=True))
+        team_user_ids = set(User.objects.filter(team__in=self.cleaned_data.get("teams", [])).values_list("id", flat=True))
+        solo_ids = (platoon_user_ids | non_platoon_ids) - team_user_ids
+        return User.objects.filter(id__in=solo_ids)
 
     def _get_new_teams(self, instance):
         teams = self.cleaned_data.get('teams', [])
@@ -799,7 +844,13 @@ class TeamCompetitionForm(CompetitionForm):
         return len(self._get_new_participants(instance)) + len(self._get_new_teams(instance))
 
     def handle_competition_users(self, instance):
-        """Обрабатывает создание пользователей и команд с общим распределением USB IDs."""
+        """Обрабатывает создание пользователей и команд с общим распределением USB IDs. При сегментах топологии — сессии по сегментам."""
+        lab = instance.lab
+        if lab and lab.topology_segments.exists():
+            segments = list(lab.topology_segments.order_by('id'))
+            self._handle_segment_sessions(instance, segments)
+            return instance
+
         import time
         import logging
 
@@ -865,8 +916,7 @@ class TeamCompetitionForm(CompetitionForm):
             )
 
             if created:
-                tasks = list(instance.tasks.all() or instance.lab.options.all())
-                team_competition2team.tasks.set(tasks)
+                team_competition2team.tasks.set(instance.get_tasks_for_assignment())
             else:
                 if not team_competition2team.deploy_meta:
                     team_competition2team.deploy_meta = {}
@@ -875,8 +925,8 @@ class TeamCompetitionForm(CompetitionForm):
 
     def _delete_removed_teams(self, instance):
         """Удаляет команды, которых больше нет в списке."""
-        teams = self.cleaned_data.get('teams', [])
-        team_ids = set(teams.values_list('id', flat=True))
+        teams = self.cleaned_data.get('teams') or []
+        team_ids = set(teams.values_list('id', flat=True)) if hasattr(teams, 'values_list') else set(getattr(t, 'id', t) for t in teams)
         existing_team_records = TeamCompetition2Team.objects.filter(competition=instance)
 
         def _delete_operation():
@@ -885,6 +935,144 @@ class TeamCompetitionForm(CompetitionForm):
                     team_record.delete()
 
         with_pnet_session_if_needed(instance.lab, _delete_operation)
+
+    def _build_segment_sessions(self, instance, segments):
+        """
+        Распределяет команды и одиночных пользователей по сессиям (по числу сегментов).
+        Сначала команды с командами и пользователей с пользователями, остаток — смешанно.
+        Возвращает список сессий: каждая сессия — список из N пар (segment, team|user), N = len(segments).
+        """
+        n = len(segments)
+        teams = list(self.cleaned_data.get('teams') or [])
+        solo_users = list(self.get_all_users(instance))
+        random.shuffle(teams)
+        random.shuffle(solo_users)
+        total = len(teams) + len(solo_users)
+        if n == 0 or total == 0:
+            return []
+        assert total % n == 0, f'Количество участников ({total}) не кратно количеству сегментов ({n})'
+        num_sessions = total // n
+
+        # Сессии только из команд, только из пользователей, затем смешанные
+        team_sessions_count = len(teams) // n
+        user_sessions_count = len(solo_users) // n
+        mixed_count = num_sessions - team_sessions_count - user_sessions_count
+
+        sessions = [] 
+        t_idx, u_idx = 0, 0
+
+        for _ in range(team_sessions_count):
+            session = []
+            for i in range(n):
+                session.append((segments[i], 'team', teams[t_idx]))
+                t_idx += 1
+            sessions.append(session)
+
+        for _ in range(user_sessions_count):
+            session = []
+            for i in range(n):
+                session.append((segments[i], 'user', solo_users[u_idx]))
+                u_idx += 1
+            sessions.append(session)
+
+        remaining_teams = teams[t_idx:]
+        remaining_users = solo_users[u_idx:]
+        mixed_participants = [('team', x) for x in remaining_teams] + [('user', x) for x in remaining_users]
+        random.shuffle(mixed_participants)
+
+        for _ in range(mixed_count):
+            session = []
+            for i in range(n):
+                kind, obj = mixed_participants.pop(0)
+                session.append((segments[i], kind, obj))
+            sessions.append(session)
+
+        return sessions
+
+    def _handle_segment_sessions(self, instance, segments):
+        """Создаёт сессии по сегментам: удаляет старые, распределяет участников, создаёт TeamCompetition2TeamsAndUsers и TeamOrUser2Segment."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        session_specs = self._build_segment_sessions(instance, segments)
+        existing_sessions = list(TeamCompetition2TeamsAndUsers.objects.filter(team_competition=instance).prefetch_related('teams', 'users'))
+
+        # Если форма не передала teams/non_platoon (админка не биндит multi-select), не затираем сессии — только синхронизируем C2U
+        if not session_specs:
+            if existing_sessions:
+                for session_obj in existing_sessions:
+                    for user in session_obj.get_all_participant_users():
+                        c2u, _ = Competition2User.objects.get_or_create(
+                            competition=instance,
+                            user=user,
+                            defaults={},
+                        )
+                        c2u.tasks.set(session_obj.tasks.all())
+                        c2u.save(update_fields=[])
+                session_user_ids = set()
+                for s in TeamCompetition2TeamsAndUsers.objects.filter(team_competition=instance):
+                    for u in s.get_all_participant_users():
+                        session_user_ids.add(u.id)
+                Competition2User.objects.filter(competition=instance).exclude(user_id__in=session_user_ids).delete()
+            return
+
+        # При сегментах не используем TeamCompetition2Team — удаляем старые записи
+        for rec in TeamCompetition2Team.objects.filter(competition=instance):
+            rec.delete()
+
+        # Удалить все текущие сессии по сегментам (в PNET откат воркспейсов и удаление лаб сделает post_delete)
+        for session in existing_sessions:
+            session.delete()
+
+        n = len(segments)
+        usb_distribution = generate_usb_device_ids(len(session_specs))
+        tasks = instance.get_tasks_for_assignment()
+
+        for idx, session_spec in enumerate(session_specs):
+            deploy_meta = {'usb_device_ids': usb_distribution[idx] if idx < len(usb_distribution) else []}
+            session_obj = TeamCompetition2TeamsAndUsers.objects.create(
+                team_competition=instance,
+                deploy_meta=deploy_meta,
+            )
+            session_obj.tasks.set(tasks)
+
+            team_objs = []
+            user_objs = []
+            for seg, kind, obj in session_spec:
+                if kind == 'team':
+                    team_objs.append(obj)
+                    TeamOrUser2Segment.objects.create(
+                        team_competition=instance,
+                        segment=seg,
+                        team=obj,
+                    )
+                else:
+                    user_objs.append(obj)
+                    TeamOrUser2Segment.objects.create(
+                        team_competition=instance,
+                        segment=seg,
+                        user=obj,
+                    )
+
+            session_obj.teams.set(team_objs)
+            session_obj.users.set(user_objs)
+            logger.info('Created segment session %s: %s teams, %s users', session_obj.pk, len(team_objs), len(user_objs))
+
+            for user in session_obj.get_all_participant_users():
+                c2u, _ = Competition2User.objects.get_or_create(
+                    competition=instance,
+                    user=user,
+                    defaults={},
+                )
+                c2u.tasks.set(session_obj.tasks.all())
+                c2u.save(update_fields=[])
+
+        # Удалить Competition2User для пользователей, которых нет ни в одной сессии
+        session_user_ids = set()
+        for s in TeamCompetition2TeamsAndUsers.objects.filter(team_competition=instance):
+            for u in s.get_all_participant_users():
+                session_user_ids.add(u.id)
+        Competition2User.objects.filter(competition=instance).exclude(user_id__in=session_user_ids).delete()
 
 
 class SimpleCompetitionForm(forms.Form):

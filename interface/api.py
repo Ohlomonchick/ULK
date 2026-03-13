@@ -1,5 +1,6 @@
 import json
 import re
+from urllib.parse import quote
 from collections import defaultdict
 from io import BytesIO
 
@@ -28,7 +29,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
+from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, TeamCompetition2TeamsAndUsers, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .task_answer_parsing import parse_answer_choices
@@ -663,26 +664,41 @@ def update_instance_time(instance, action, minutes=15):
 
 def delete_competition_from_platform(competition):
     """
-    Удаляет соревнование с платформы: удаляет все competition2user и competition2team,
+    Удаляет соревнование с платформы: удаляет competition2user, competition2team,
+    сессии сегментов (TeamCompetition2TeamsAndUsers — возврат воркспейсов участникам),
     затем помечает competition как deleted.
     """
-    import time
     from .pnet_session_manager import with_pnet_session_if_needed
-    
-    # Получаем все competition2user и competition2team
+
     competitions2users = Competition2User.objects.filter(competition=competition, deleted=False)
     competitions2teams = TeamCompetition2Team.objects.filter(competition=competition, deleted=False)
-    
+
+    # Сессии сегментов (лаба в воркспейсе мастера): удалить лабу и вернуть участников в свои воркспейсы
+    try:
+        team_competition = TeamCompetition.objects.get(pk=competition.pk)
+        segment_sessions = TeamCompetition2TeamsAndUsers.objects.filter(
+            team_competition=team_competition, deleted=False
+        )
+    except TeamCompetition.DoesNotExist:
+        segment_sessions = []
+
+    def _delete_segment_sessions_operation():
+        for session in segment_sessions:
+            session.delete_from_platform()
+
+    if segment_sessions:
+        with_pnet_session_if_needed(competition.lab, _delete_segment_sessions_operation)
+
     # Удаляем competition2user
-    if competitions2users.count() > 0:
+    if competitions2users.exists():
         def _delete_competitions2users_operation():
             for competition2user in competitions2users:
                 competition2user.delete_from_platform()
         
         with_pnet_session_if_needed(competition.lab, _delete_competitions2users_operation)
-    
+
     # Удаляем competition2team
-    if competitions2teams.count() > 0:
+    if competitions2teams.exists():
         def _delete_competition2team_operation():
             for competition2team in competitions2teams:
                 competition2team.delete_from_platform()
@@ -893,7 +909,8 @@ def get_pnet_auth(request):
         return JsonResponse({'error': 'User PNET credentials not configured'}, status=400)
 
     try:
-        pnet_url = f"{get_web_url()}/pnetlab"
+        # Тот же URL, что и для create_pnet_lab_session_with_console
+        pnet_url = get_pnet_url() or f"{get_web_url()}/pnetlab"
         session = requests.Session()
         session.verify = False
 
@@ -1107,27 +1124,30 @@ def get_kibana_auth(request):
         return JsonResponse({'error': f'Kibana authentication error: {str(e)}'}, status=500)
 
 
-def get_lab_path(competition, user):
+def get_lab_path(competition, user, session_issue=None):
     """
     Возвращает путь к лабе для пользователя.
-    
+
+    Для сессии по сегментам (session_issue задан): лаба в воркспейсе master_user.
     Для командных участников: /base_path/{team.slug}/lab.unl
     Для одиночных участников: /base_path/{user.pnet_login}/lab.unl
     """
     base_path = get_pnet_base_dir().strip('/')
     lab_file_name = f"{get_pnet_lab_name(competition)}.unl"
-    
-    # Определяем директорию пользователя
-    user_dir = user.pnet_login  # По умолчанию - индивидуальная директория
-    
-    if isinstance(competition, TeamCompetition):
-        # Для командных соревнований пытаемся получить slug команды
-        try:
-            team = get_user_team(competition, user)
-            user_dir = team.slug
-        except TeamCompetition2Team.DoesNotExist:
-            pass  # Используем индивидуальную директорию
-    
+
+    if session_issue is not None and getattr(session_issue, 'master_user', None):
+        user_dir = session_issue.master_user.pnet_login
+    else:
+        # Определяем директорию пользователя
+        user_dir = user.pnet_login  # По умолчанию - индивидуальная директория
+        if isinstance(competition, TeamCompetition):
+            # Для командных соревнований пытаемся получить slug команды
+            try:
+                team = get_user_team(competition, user)
+                user_dir = team.slug
+            except TeamCompetition2Team.DoesNotExist:
+                pass  # Используем индивидуальную директорию
+
     return f"/{base_path}/{user_dir}/{lab_file_name}"
 
 
@@ -1202,8 +1222,14 @@ def _create_master_session(pnet_url, master_user, lab_path, cookie, xsrf):
 def _join_master_session(pnet_url, cookies, xsrf, lab_path, master_session_id):
     from .eveFunctions import join_session
 
-    join_response = join_session(pnet_url, master_session_id, cookies)
+    join_response = join_session(pnet_url, master_session_id, cookies, xsrf=xsrf)
     if join_response.status_code not in range(200, 400):
+        err_preview = (join_response.text or '')[:300]
+        logging.warning(
+            'PNET join_session failed: status=%s body=%s',
+            join_response.status_code,
+            err_preview,
+        )
         return False, f"Failed to join master session: {join_response.text}"
 
     return True, None
@@ -1250,6 +1276,54 @@ def _ensure_team_session(competition, user, pnet_url, cookies, xsrf):
     return True, None, lab_path
 
 
+def _ensure_segment_session(competition, user, session_issue, pnet_url, cookies, xsrf):
+    """
+    Лабу создаёт тот, кто первый открыл. Сохраняем session_id и владельца.
+    Все остальные (включая мастера) джойнятся к этой сессии без 412 у мастера.
+    """
+    from .eveFunctions import create_pnet_lab_session_common
+
+    master_user = session_issue.master_user
+    if not master_user:
+        return False, 'Master user not configured for session', None
+
+    lab_path = get_lab_path(competition, master_user, session_issue=session_issue)
+    session_issue.refresh_from_db()
+    stored_session_id = session_issue.segment_pnet_session_id
+    owner_id = session_issue.segment_pnet_session_owner_id
+
+    if not stored_session_id:
+        # Первый открывший: создаём лабу в его сессии
+        if not user.pnet_login:
+            return False, 'PNET login not configured for user', None
+        create_ok, create_msg = create_pnet_lab_session_common(
+            pnet_url, user.pnet_login, lab_path, cookies, xsrf
+        )
+        if not create_ok:
+            return False, create_msg or 'Failed to create lab session', None
+        master_session_id, err = _get_master_session_id(pnet_url, cookies, xsrf, lab_path)
+        if not master_session_id:
+            return False, err or 'Session not found after create', None
+        session_issue.segment_pnet_session_id = str(master_session_id)
+        session_issue.segment_pnet_session_owner_id = user.id
+        session_issue.master_session_created = True
+        session_issue.save(update_fields=['segment_pnet_session_id', 'segment_pnet_session_owner_id', 'master_session_created'])
+        logging.info('PNET segment: user_id=%s created lab, session_id=%s', user.id, master_session_id)
+        return True, None, lab_path
+
+    if owner_id is not None and user.id == owner_id:
+        logging.info('PNET segment: user_id=%s is session owner, skip join', user.id)
+        return True, None, lab_path
+
+    logging.info('PNET segment: user_id=%s joining session_id=%s', user.id, stored_session_id)
+    success, message = _join_master_session(pnet_url, cookies, xsrf, lab_path, master_session_id=stored_session_id)
+    if not success:
+        logging.warning('PNET segment: user_id=%s join failed: %s', user.id, message)
+        return False, message, None
+    logging.info('PNET segment: user_id=%s join ok', user.id)
+    return True, None, lab_path
+
+
 @csrf_exempt
 @api_view(['POST'])
 def create_pnet_lab_session(request):
@@ -1276,8 +1350,8 @@ def create_pnet_lab_session(request):
         if error_response:
             return error_response
 
-        # Отправляем запрос на создание сессии лабы
-        pnet_url = f"{get_web_url()}/pnetlab"
+        # Тот же URL, что и в get_pnet_auth, иначе cookies от другого хоста не подойдут
+        pnet_url = get_pnet_url() or f"{get_web_url()}/pnetlab"
         session = requests.Session()
         session.verify = False
 
@@ -1300,7 +1374,7 @@ def create_pnet_lab_session(request):
         success, message, lab_path, pnet_code = create_lab_session_for_issue(
             competition, user, issue, pnet_url, session.cookies, xsrf_token
         )
-        
+
         if not success:
             logger.warning(
                 "create_pnet_lab_session: failed user=%s success=False message=%s pnet_code=%s cookies_sent=%s",
@@ -1309,6 +1383,11 @@ def create_pnet_lab_session(request):
                 pnet_code,
                 list(session.cookies.keys()),
             )
+            if '412' in str(message) or 'unauthorized' in str(message).lower() or 'session timed out' in str(message).lower():
+                logging.warning('create_pnet_lab_session: join failed for user %s: %s', request.user.id, message)
+                return JsonResponse({
+                    'error': 'Сессия PNET не готова или истекла. Обновите страницу и откройте лабу снова.'
+                }, status=503)
             if message == 'Team for user not found in competition':
                 status_code = 404
             elif isinstance(pnet_code, int) and 400 <= pnet_code <= 599:
@@ -1317,10 +1396,40 @@ def create_pnet_lab_session(request):
                 status_code = 500
             return JsonResponse({'error': message}, status=status_code)
 
+        # Запускаем все ноды в топологии
+        import time
+        from .eveFunctions import get_lab_topology, turn_on_node
+        from .lab_topology import LabTopology
+        logger = logging.getLogger(__name__)
+        topology_data = None
+        for attempt in range(4):
+            if attempt > 0:
+                time.sleep(4)
+            topology_data = get_lab_topology(pnet_url, session.cookies, xsrf_token)
+            if topology_data and topology_data.get('code') == 200:
+                break
+        if not topology_data or topology_data.get('code') != 200:
+            logging.warning('create_pnet_lab_session: topology failed for user %s after retries', request.user.id)
+            return JsonResponse({
+                'error': 'Не удалось загрузить топологию (сессия PNET). Обновите страницу и откройте лабу снова.'
+            }, status=503)
+        topology = LabTopology(topology_data)
+        all_node_ids = topology.get_all_node_ids()
+        if all_node_ids:
+            logger.info(f'Starting {len(all_node_ids)} nodes for lab session: {all_node_ids}')
+            for node_id in all_node_ids:
+                ok, msg = turn_on_node(pnet_url, node_id, session.cookies, xsrf_token)
+                if not ok:
+                    logger.warning(f'Node {node_id} start failed: {msg}')
+                else:
+                    logger.debug(f'Node {node_id} started')
+
+        path_q = quote(lab_path or '', safe='')
+        redirect_url = f'/legacy/topology?path={path_q}' if path_q else '/legacy/topology'
         return JsonResponse({
             'success': True,
             'lab_path': lab_path,
-            'redirect_url': '/legacy/topology'
+            'redirect_url': redirect_url,
         })
 
     except Competition.DoesNotExist:
@@ -1399,9 +1508,9 @@ def create_pnet_lab_session_with_console(request):
         
         # Логинимся в PNET
         cookies, xsrf_token = pf_login(pnet_url, user.pnet_login, user.pnet_password)
-        
-        # Создаем сессию лабы
-        success, message, lab_path, pnet_code = create_lab_session_for_issue(
+
+        # Создаём/джойнимся к сессии лабы
+        success, message, lab_path, pnet_code= create_lab_session_for_issue(
             competition, user, issue, pnet_url, cookies, xsrf_token
         )
         
@@ -1414,16 +1523,40 @@ def create_pnet_lab_session_with_console(request):
                 status_code = 500
             return JsonResponse({'error': message}, status=status_code)
 
-        # Получаем топологию лаборатории и инкапсулируем в класс
-        topology_data = get_lab_topology(pnet_url, cookies)
+        # Для сегментных сессий топологию и ноды управляем от имени мастер-пользователя
+        if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user:
+            master_user = issue.master_user
+            logger.info(f'Segment session: switching to master user {master_user.pnet_login} for topology')
+            master_cookies, master_xsrf = pf_login(pnet_url, master_user.pnet_login, master_user.pnet_password)
+            # Открываем сессию от имени мастера (join если уже есть, create если нет)
+            issue.refresh_from_db()
+            if issue.segment_pnet_session_id:
+                from .eveFunctions import join_session
+                join_session(pnet_url, issue.segment_pnet_session_id, master_cookies, master_xsrf)
+            else:
+                create_pnet_lab_session_common(pnet_url, master_user.pnet_login, lab_path, master_cookies, master_xsrf)
+            cookies, xsrf_token = master_cookies, master_xsrf
+
+        # Сессия создана; топологию запрашиваем с повторами
+        import time
+        topology_data = None
+        for attempt in range(4):
+            if attempt > 0:
+                time.sleep(4)
+            topology_data = get_lab_topology(pnet_url, cookies, xsrf_token)
+            if topology_data and topology_data.get('code') == 200:
+                break
         if not topology_data or topology_data.get('code') != 200:
             return JsonResponse({'error': 'Failed to get lab topology'}, status=500)
 
         topology = LabTopology(topology_data)
+        logger.info(f'Available nodes in topology: {topology.get_all_node_names()}')
 
         # Ищем целевую ноду по имени
         target_node = topology.get_node_by_name(node_name)
         if target_node is None:
+            available_names = topology.get_all_node_names()
+            logger.error(f'Node "{node_name}" not found. Available nodes: {available_names}')
             return JsonResponse({'error': f'SSH node "{node_name}" not found in topology'}, status=404)
 
         target_node_id = target_node['id']
@@ -1431,10 +1564,45 @@ def create_pnet_lab_session_with_console(request):
         # Включаем все ноды в топологии
         all_node_ids = topology.get_all_node_ids()
         logger.info(f'Starting all nodes in topology: {all_node_ids}')
-        
+
+        # Вспомогательная функция: реавторизация и rejoin при протухании сессии
+        def relogin_and_rejoin():
+            """Повторная авторизация и присоединение к сессии после 412"""
+            nonlocal cookies, xsrf_token
+            # Определяем пользователя для повторного логина (мастер или текущий)
+            if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user:
+                relogin_user = issue.master_user
+            else:
+                relogin_user = user
+            logger.info(f'Session expired (412), re-logging in as {relogin_user.pnet_login}')
+            new_cookies, new_xsrf = pf_login(pnet_url, relogin_user.pnet_login, relogin_user.pnet_password)
+            cookies, xsrf_token = new_cookies, new_xsrf
+            # Rejoining сессии лабы
+            if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user:
+                issue.refresh_from_db()
+                if issue.segment_pnet_session_id:
+                    from .eveFunctions import join_session
+                    join_session(pnet_url, issue.segment_pnet_session_id, cookies, xsrf_token)
+                else:
+                    create_pnet_lab_session_common(pnet_url, relogin_user.pnet_login, lab_path, cookies, xsrf_token)
+            else:
+                # Для обычных сессий (TeamCompetition2Team, Competition2User) — rejoin к лабе
+                create_pnet_lab_session_common(pnet_url, relogin_user.pnet_login, lab_path, cookies, xsrf_token)
+
         failed_nodes = []
         for node_id in all_node_ids:
-            node_start_success, node_start_message = turn_on_node(pnet_url, node_id, cookies)
+            node_start_success, node_start_message = turn_on_node(pnet_url, node_id, cookies, xsrf_token)
+            # При 412 — повторная авторизация и ещё одна попытка
+            if not node_start_success and node_start_message == 'SESSION_EXPIRED':
+                relogin_and_rejoin()
+                node_start_success, node_start_message = turn_on_node(pnet_url, node_id, cookies, xsrf_token)
+            # Для целевой ноды при таймауте даём ещё 2 попытки с паузой
+            if not node_start_success and node_id == target_node_id and 'timeout' in (node_start_message or '').lower():
+                for _ in range(2):
+                    time.sleep(5)
+                    node_start_success, node_start_message = turn_on_node(pnet_url, node_id, cookies, xsrf_token)
+                    if node_start_success:
+                        break
             if not node_start_success:
                 logger.warning(f'Failed to start node {node_id}: {node_start_message}')
                 failed_nodes.append({'node_id': node_id, 'error': node_start_message})
@@ -1448,8 +1616,18 @@ def create_pnet_lab_session_with_console(request):
                 'error': f'Failed to start target node: {next(f["error"] for f in failed_nodes if f["node_id"] == target_node_id)}'
             }, status=500)
 
+        # Для VNC нод — не ждём готовности, Guacamole переподключится сам
+        target_node_console = target_node.get('console', '')
+        if target_node_console == 'vnc':
+            logger.info(f'VNC node {target_node_id}: returning Guacamole URL immediately, it will reconnect when node is ready')
+
         # Получаем ссылку на Guacamole консоль для целевой ноды
-        guacamole_url = get_guacamole_url(pnet_url, target_node_id, cookies)
+        # cookies/xsrf_token содержат куки мастера для сегментных сессий
+        guacamole_url = get_guacamole_url(pnet_url, target_node_id, cookies, xsrf_token)
+        if not guacamole_url:
+            logger.warning(f'Failed to get guacamole URL, re-logging in and retrying')
+            relogin_and_rejoin()
+            guacamole_url = get_guacamole_url(pnet_url, target_node_id, cookies, xsrf_token)
         if not guacamole_url:
             return JsonResponse({'error': 'Failed to get console URL'}, status=500)
 
@@ -1728,12 +1906,7 @@ def get_team_or_user_issue(competition, user):
     """
     Получает issue для пользователя в соревновании.
     
-    Важно: Competition2User может быть как в Competition, так и в TeamCompetition.
-    TeamCompetition2Team только в TeamCompetition.
-    
-    Приоритет поиска:
-    1. Сначала ищем TeamCompetition2Team (если это командное соревнование)
-    2. Затем ищем Competition2User (может быть в любом типе соревнования)
+    Приоритет: TeamCompetition2Team → TeamCompetition2TeamsAndUsers (сегменты) → Competition2User.
     """
     issue = None
     
@@ -1744,8 +1917,13 @@ def get_team_or_user_issue(competition, user):
             return issue
         except TeamCompetition2Team.DoesNotExist:
             pass
-    
-    # Затем ищем индивидуальный issue (работает для любого типа соревнования)
+
+        issue = TeamCompetition2TeamsAndUsers.objects.filter(
+            team_competition=competition
+        ).filter(Q(teams__users=user) | Q(users=user)).select_related('master_user').first()
+        if issue:
+            return issue
+
     try:
         issue = Competition2User.objects.get(competition=competition, user=user)
     except Competition2User.DoesNotExist:

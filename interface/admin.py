@@ -2,6 +2,7 @@ import random
 import json
 import logging
 
+from django import forms
 from django.contrib import admin
 from django_summernote.admin import SummernoteModelAdmin
 from django_summernote.utils import get_attachment_model
@@ -151,6 +152,14 @@ class LabNodeInline(TabularInlineWithDescription):
     description = LAB_NODE_DESCRIPTION
 
 
+class TopologySegmentInline(admin.TabularInline):
+    model = TopologySegment
+    extra = 0
+    fields = ['name', 'vm_names']
+    verbose_name = 'Сегмент топологии'
+    verbose_name_plural = 'Сегменты топологии'
+
+
 class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
     form = LabForm
     summernote_fields = 'description'
@@ -166,7 +175,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
             'widget': TimeDurationWidget(show_days=True, show_hours=True, show_minutes=True, show_seconds=False, attrs={'style': 'width:5em;'})
         }
     }
-    inlines = [LabLevelInline, LabTaskTypeInline, LabTaskInline, LabNodeInline]
+    inlines = [LabLevelInline, LabTaskTypeInline, LabTaskInline, LabNodeInline, TopologySegmentInline]
 
     class Media:
         js = ('admin/js/jquery-3.7.1.min.js', "admin/js/load_lab_type.js", "admin/js/task_type_selector.js")
@@ -211,7 +220,7 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
                 ('PNETLab Конфигурация', {
                     'fields': pnet_fields,
                     'classes': ('collapse',)
-                })
+                }),
             )
         elif obj and obj.platform == "CMD":
             return (
@@ -223,16 +232,20 @@ class LabModelAdmin(SummernoteModelAdmin):  # instead of ModelAdmin
                 ('Конфигурация консоли', {
                     'fields': ssh_fields,
                     'classes': ('collapse',)
-                })
+                }),
             )
         else:
             return (
                 (None, {'fields': base_fields}),
             )
 
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        return form
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        # После сохранения inline сегментов синхронизируем в TopologySegmentsData (для кода, читающего JSON)
+        obj = form.instance
+        segments = list(obj.topology_segments.order_by('id').values_list('name', 'vm_names'))
+        obj.TopologySegmentsData = [{'name': n, 'vm_names': list(v)} for n, v in segments]
+        obj.save(update_fields=['TopologySegmentsData'])
 
     def get_formsets_with_inlines(self, request, obj=None):
         # Передаем информацию о родительском объекте в inline-формы
@@ -470,9 +483,47 @@ class TeamAdmin(admin.ModelAdmin):
         transaction.on_commit(lambda: Team.post_create(sender=Team, instance=obj, created=True))
 
 
+class TeamCompetition2TeamsAndUsersInline(admin.TabularInline):
+    model = TeamCompetition2TeamsAndUsers
+    extra = 0
+    fields = ['master_user', 'teams', 'users', 'master_session_created', 'joined', 'grade']
+
+
+class TeamOrUser2SegmentInline(admin.TabularInline):
+    model = TeamOrUser2Segment
+    extra = 0
+    fields = ['segment', 'team', 'user']
+
+
+class TeamCompetition2TeamsAndUsersAdmin(admin.ModelAdmin):
+    list_display = ['id', 'team_competition', 'get_teams_count', 'get_users_count', 'master_user']
+    list_filter = ['team_competition']
+    filter_horizontal = ['teams', 'users', 'tasks']
+    readonly_fields = ['master_session_created', 'deleted']
+
+    def get_teams_count(self, obj):
+        return obj.teams.count()
+    get_teams_count.short_description = 'Команд'
+
+    def get_users_count(self, obj):
+        return obj.users.count()
+    get_users_count.short_description = 'Пользователей'
+
+
+class TeamOrUser2SegmentAdmin(admin.ModelAdmin):
+    list_display = ['id', 'team_competition', 'segment', 'team', 'user']
+    list_filter = ['team_competition', 'segment']
+
+
+class TopologySegmentAdmin(admin.ModelAdmin):
+    list_display = ['name', 'lab']
+    list_filter = ['lab']
+
+
 class TeamCompetitionAdmin(CompetitionAdmin):
     form = TeamCompetitionForm
     add_form = TeamCompetitionForm
+    inlines = [Competition2UserInline, TeamCompetition2TeamsAndUsersInline, TeamOrUser2SegmentInline]
 
     def get_queryset(self, request):
         qs = admin.ModelAdmin.get_queryset(self, request)
@@ -498,6 +549,9 @@ admin.site.register(User, MyUserAdmin)
 admin.site.register(Answers, admin.ModelAdmin)
 admin.site.register(Team, TeamAdmin)
 admin.site.register(TeamCompetition, TeamCompetitionAdmin)
+admin.site.register(TopologySegment, TopologySegmentAdmin)
+admin.site.register(TeamCompetition2TeamsAndUsers, TeamCompetition2TeamsAndUsersAdmin)
+admin.site.register(TeamOrUser2Segment, TeamOrUser2SegmentAdmin)
 # admin.site.register(TeamCompetition2Team, admin.ModelAdmin)
 admin.site.unregister(DjangoJob)
 admin.site.unregister(DjangoJobExecution)
