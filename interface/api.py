@@ -1296,7 +1296,7 @@ def _ensure_segment_session(competition, user, session_issue, pnet_url, cookies,
         # Первый открывший: создаём лабу в его сессии
         if not user.pnet_login:
             return False, 'PNET login not configured for user', None
-        create_ok, create_msg = create_pnet_lab_session_common(
+        create_ok, create_msg, _ = create_pnet_lab_session_common(
             pnet_url, user.pnet_login, lab_path, cookies, xsrf
         )
         if not create_ok:
