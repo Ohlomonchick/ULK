@@ -99,6 +99,10 @@ class LabTopology:
         
         return None
     
+    def get_all_node_names(self) -> List[str]:
+        """Возвращает список имён всех нод в топологии."""
+        return [node_data.get('name', '') for node_data in self.nodes.values()]
+
     def get_all_node_ids(self) -> List[int]:
         """
         Получает список ID всех нод в топологии.

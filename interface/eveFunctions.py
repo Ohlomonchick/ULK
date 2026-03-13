@@ -123,6 +123,7 @@ def pf_login(url, name, password):
         'Content-Type': 'application/json;charset=UTF-8'
     }
     session = requests.Session()
+    session.verify = False
     r1 = session.get(url, headers=header1, verify=False)
     header2 = {
         'Content-Type': 'application/json;charset=UTF-8',
@@ -135,8 +136,8 @@ def pf_login(url, name, password):
             'html': '0', 'captcha': ''
         }
     )
-    r2 = requests.post(url2, headers=header2, data=payload2, verify=False)
-    return r2.cookies, session.cookies.get_dict()["_session"]
+    r2 = session.post(url2, headers=header2, data=payload2, verify=False)
+    return session.cookies, session.cookies.get_dict()["_session"]
 
 
 def create_user(url, username, password, user_role='1', cookie=None):
@@ -468,6 +469,11 @@ def create_node(url, node_params, cookie, xsrf):
     if r.status_code in range(200, 400):
         logger.debug(
             "Node {} has been created\nServer response\t{}".format(node_params["template"], r.json()["message"]))
+    else:
+        logger.error(
+            "Failed to create node '{}' (template={}): HTTP {} — {}".format(
+                node_params.get("name"), node_params.get("template"), r.status_code, r.text
+            ))
     return r
 
 
@@ -932,6 +938,19 @@ def turn_on_node(url, node_id, cookie, xsrf=None):
                 logger.info(f"Node {node_id} start response (non-JSON): {response.text[:200]}")
             logger.info(f"Node {node_id} started successfully")
             return True, "Node started successfully"
+        elif response.status_code == 400:
+            try:
+                resp_json = response.json()
+                if resp_json.get('message', '').endswith('(12).'):
+                    logger.info(f"Node {node_id} is already running (code 12), treating as success")
+                    return True, "Node already running"
+            except Exception:
+                pass
+            logger.error(f"Failed to start node {node_id}: {response.status_code} - {response.text}")
+            return False, f"Failed to start node: {response.text}"
+        elif response.status_code == 412:
+            logger.warning(f"Node {node_id} start: 412 Unauthorized (session expired)")
+            return False, "SESSION_EXPIRED"
         else:
             logger.error(f"Failed to start node {node_id}: {response.status_code} - {response.text}")
             return False, f"Failed to start node: {response.text}"

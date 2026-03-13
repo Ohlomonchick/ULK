@@ -1464,18 +1464,32 @@ def create_pnet_lab_session_with_console(request):
         issue, error_response = get_issue_for_user(competition, user)
         if error_response:
             return error_response
-        
+
         # Логинимся в PNET
         cookies, xsrf_token = pf_login(pnet_url, user.pnet_login, user.pnet_password)
-        
-        # Создаем сессию лабы
+
+        # Создаём/джойнимся к сессии лабы
         success, message, lab_path = create_lab_session_for_issue(
             competition, user, issue, pnet_url, cookies, xsrf_token
         )
-        
+
         if not success:
             status_code = 404 if message == 'Team for user not found in competition' else 500
             return JsonResponse({'error': message}, status=status_code)
+
+        # Для сегментных сессий топологию и ноды управляем от имени мастер-пользователя
+        if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user:
+            master_user = issue.master_user
+            logger.info(f'Segment session: switching to master user {master_user.pnet_login} for topology')
+            master_cookies, master_xsrf = pf_login(pnet_url, master_user.pnet_login, master_user.pnet_password)
+            # Открываем сессию от имени мастера (join если уже есть, create если нет)
+            issue.refresh_from_db()
+            if issue.segment_pnet_session_id:
+                from .eveFunctions import join_session
+                join_session(pnet_url, issue.segment_pnet_session_id, master_cookies, master_xsrf)
+            else:
+                create_pnet_lab_session_common(pnet_url, master_user.pnet_login, lab_path, master_cookies, master_xsrf)
+            cookies, xsrf_token = master_cookies, master_xsrf
 
         # Сессия создана; топологию запрашиваем с повторами
         import time
@@ -1490,10 +1504,13 @@ def create_pnet_lab_session_with_console(request):
             return JsonResponse({'error': 'Failed to get lab topology'}, status=500)
 
         topology = LabTopology(topology_data)
+        logger.info(f'Available nodes in topology: {topology.get_all_node_names()}')
 
         # Ищем целевую ноду по имени
         target_node = topology.get_node_by_name(node_name)
         if target_node is None:
+            available_names = topology.get_all_node_names()
+            logger.error(f'Node "{node_name}" not found. Available nodes: {available_names}')
             return JsonResponse({'error': f'SSH node "{node_name}" not found in topology'}, status=404)
 
         target_node_id = target_node['id']
@@ -1501,11 +1518,39 @@ def create_pnet_lab_session_with_console(request):
         # Включаем все ноды в топологии
         all_node_ids = topology.get_all_node_ids()
         logger.info(f'Starting all nodes in topology: {all_node_ids}')
-        
+
+        # Вспомогательная функция: реавторизация и rejoin при протухании сессии
+        def relogin_and_rejoin():
+            """Повторная авторизация и присоединение к сессии после 412"""
+            nonlocal cookies, xsrf_token
+            # Определяем пользователя для повторного логина (мастер или текущий)
+            if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user:
+                relogin_user = issue.master_user
+            else:
+                relogin_user = user
+            logger.info(f'Session expired (412), re-logging in as {relogin_user.pnet_login}')
+            new_cookies, new_xsrf = pf_login(pnet_url, relogin_user.pnet_login, relogin_user.pnet_password)
+            cookies, xsrf_token = new_cookies, new_xsrf
+            # Rejoining сессии лабы
+            if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user:
+                issue.refresh_from_db()
+                if issue.segment_pnet_session_id:
+                    from .eveFunctions import join_session
+                    join_session(pnet_url, issue.segment_pnet_session_id, cookies, xsrf_token)
+                else:
+                    create_pnet_lab_session_common(pnet_url, relogin_user.pnet_login, lab_path, cookies, xsrf_token)
+            else:
+                # Для обычных сессий (TeamCompetition2Team, Competition2User) — rejoin к лабе
+                create_pnet_lab_session_common(pnet_url, relogin_user.pnet_login, lab_path, cookies, xsrf_token)
+
         failed_nodes = []
         for node_id in all_node_ids:
             node_start_success, node_start_message = turn_on_node(pnet_url, node_id, cookies, xsrf_token)
-            # Для целевой ноды при таймауте даём ещё 2 попытки с паузой 
+            # При 412 — повторная авторизация и ещё одна попытка
+            if not node_start_success and node_start_message == 'SESSION_EXPIRED':
+                relogin_and_rejoin()
+                node_start_success, node_start_message = turn_on_node(pnet_url, node_id, cookies, xsrf_token)
+            # Для целевой ноды при таймауте даём ещё 2 попытки с паузой
             if not node_start_success and node_id == target_node_id and 'timeout' in (node_start_message or '').lower():
                 for _ in range(2):
                     time.sleep(5)
@@ -1525,8 +1570,18 @@ def create_pnet_lab_session_with_console(request):
                 'error': f'Failed to start target node: {next(f["error"] for f in failed_nodes if f["node_id"] == target_node_id)}'
             }, status=500)
 
+        # Для VNC нод (qemu) — не ждём готовности, Guacamole переподключится сама
+        target_node_console = target_node.get('console', '')
+        if target_node_console == 'vnc':
+            logger.info(f'VNC node {target_node_id}: returning Guacamole URL immediately, it will reconnect when node is ready')
+
         # Получаем ссылку на Guacamole консоль для целевой ноды
+        # cookies/xsrf_token содержат куки мастера для сегментных сессий
         guacamole_url = get_guacamole_url(pnet_url, target_node_id, cookies, xsrf_token)
+        if not guacamole_url:
+            logger.warning(f'Failed to get guacamole URL, re-logging in and retrying')
+            relogin_and_rejoin()
+            guacamole_url = get_guacamole_url(pnet_url, target_node_id, cookies, xsrf_token)
         if not guacamole_url:
             return JsonResponse({'error': 'Failed to get console URL'}, status=500)
 
