@@ -16,8 +16,9 @@ function _getActiveLoaderId() {
 /**
  * Переключает iframe на консоль выбранной VM в сегменте.
  */
-async function switchSegmentVM(btn, vmName, slug) {
+async function switchSegmentVM(btn, nodeName, slug, vmDisplayName) {
     const loaderId = _getActiveLoaderId();
+    const vmLabel = vmDisplayName || nodeName;
 
     // Визуальная обратная связь: сразу помечаем кнопку активной
     document.querySelectorAll('.vm-segment-slider').forEach(b => {
@@ -25,11 +26,11 @@ async function switchSegmentVM(btn, vmName, slug) {
     });
     btn.classList.add('vm-segment-slider--active');
 
-    showConsoleLoader(loaderId, 'Переключение VM...', vmName);
+    showConsoleLoader(loaderId, 'Переключение VM...', vmLabel);
 
     try {
         const result = await makeAPIRequest('/api/create_pnet_lab_session_with_console/', {
-            body: JSON.stringify({ slug: slug, node_name: vmName })
+            body: JSON.stringify({ slug: slug, node_name: nodeName })
         });
 
         if (result.success && result.data && result.data.guacamole_url) {
@@ -40,7 +41,7 @@ async function switchSegmentVM(btn, vmName, slug) {
                 return;
             }
 
-            updateLoaderText(loaderId, 'Загрузка консоли...', vmName);
+            updateLoaderText(loaderId, 'Загрузка консоли...', vmLabel);
 
             iframe.onload = function () {
                 iframe.onload = null;
@@ -48,7 +49,7 @@ async function switchSegmentVM(btn, vmName, slug) {
             };
             iframe.onerror = function () {
                 iframe.onerror = null;
-                updateLoaderText(loaderId, 'Ошибка загрузки', 'Не удалось загрузить консоль ' + vmName);
+                updateLoaderText(loaderId, 'Ошибка загрузки', 'Не удалось загрузить консоль ' + vmLabel);
                 setTimeout(() => hideConsoleLoader(loaderId), 3000);
             };
 
@@ -68,4 +69,3 @@ async function switchSegmentVM(btn, vmName, slug) {
         btn.classList.remove('vm-segment-slider--active');
     }
 }
-

@@ -1,16 +1,30 @@
 {% load utm_filters %}
-{% if segment_vm_names %}
+{% if segment_vm_items %}
+    {% for vm_item in segment_vm_items %}
+        <button
+            class="vm-segment-slider{% if forloop.first %} vm-segment-slider--active{% endif %}"
+            style="top: {{ forloop.counter0|mul:40|add:90 }}px"
+            data-vm-name="{{ vm_item.node_name }}"
+            data-vm-display-name="{{ vm_item.display_name }}"
+            data-competition-slug="{{ object.slug }}"
+            title="{{ vm_item.display_name }}"
+            onclick="switchSegmentVM(this, '{{ vm_item.node_name|escapejs }}', '{{ object.slug|escapejs }}', '{{ vm_item.display_name|escapejs }}')"
+        >
+            <i class="fas fa-desktop"></i><span class="slider-text"> {{ vm_item.display_name }}</span>
+        </button>
+    {% endfor %}
+{% elif segment_vm_names %}
     {% for vm_name in segment_vm_names %}
         <button
             class="vm-segment-slider{% if forloop.first %} vm-segment-slider--active{% endif %}"
             style="top: {{ forloop.counter0|mul:40|add:90 }}px"
             data-vm-name="{{ vm_name }}"
+            data-vm-display-name="{{ vm_name }}"
             data-competition-slug="{{ object.slug }}"
             title="{{ vm_name }}"
-            onclick="switchSegmentVM(this, '{{ vm_name }}', '{{ object.slug }}')"
+            onclick="switchSegmentVM(this, '{{ vm_name|escapejs }}', '{{ object.slug|escapejs }}', '{{ vm_name|escapejs }}')"
         >
             <i class="fas fa-desktop"></i><span class="slider-text"> {{ vm_name }}</span>
         </button>
     {% endfor %}
 {% endif %}
-

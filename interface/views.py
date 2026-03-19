@@ -34,6 +34,39 @@ from django_summernote.utils import get_attachment_model, get_config
 logger = logging.getLogger(__name__)
 
 
+def _normalize_segment_vm_items(vm_names):
+    """Нормализует vm_names в список объектов {display_name, node_name}."""
+    if not isinstance(vm_names, list):
+        return []
+
+    normalized = []
+    for item in vm_names:
+        if isinstance(item, str):
+            node_name = item.strip()
+            if not node_name:
+                continue
+            normalized.append({'display_name': node_name, 'node_name': node_name})
+            continue
+
+        if not isinstance(item, dict):
+            continue
+
+        display_name = str(item.get('display_name') or item.get('name') or '').strip()
+        node_name = str(item.get('node_name') or item.get('node') or '').strip()
+
+        if not node_name:
+            node_name = display_name
+        if not display_name:
+            display_name = node_name
+
+        if not node_name:
+            continue
+
+        normalized.append({'display_name': display_name, 'node_name': node_name})
+
+    return normalized
+
+
 class LabDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Lab
     slug_url_kwarg = 'slug'
@@ -565,7 +598,7 @@ class TeamCompetitionDetailView(CompetitionDetailView):
         context["show_console_iframe"] = not user.is_superuser
 
         # Передаём VM сегмента пользователя/команды (для кнопок переключения VM)
-        segment_vm_names = []
+        segment_vm_items = []
         if not user.is_superuser:
             segment_assignment = TeamOrUser2Segment.objects.filter(
                 team_competition=competition
@@ -573,9 +606,13 @@ class TeamCompetitionDetailView(CompetitionDetailView):
                 Q(team__users=user) | Q(user=user)
             ).select_related('segment').first()
             if segment_assignment and segment_assignment.segment:
-                segment_vm_names = segment_assignment.segment.vm_names or []
+                raw_vm_names = segment_assignment.segment.vm_names or []
+                segment_vm_items = _normalize_segment_vm_items(raw_vm_names)
                 context["segment_name"] = segment_assignment.segment.name
-        context["segment_vm_names"] = segment_vm_names
+
+        context["segment_vm_items"] = segment_vm_items
+        # legacy-ключ для обратной совместимости
+        context["segment_vm_names"] = [item['node_name'] for item in segment_vm_items]
 
         return context
 
@@ -1050,3 +1087,4 @@ def get_worker_id(request):
         'worker_index': worker_index,
         'pid': pid,
     })
+

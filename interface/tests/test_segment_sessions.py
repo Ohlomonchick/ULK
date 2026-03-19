@@ -396,6 +396,28 @@ class TeamCompetitionDetailViewSegmentContextTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context.get('segment_vm_names'), self.segments[0].vm_names)
+        self.assertEqual(
+            response.context.get('segment_vm_items'),
+            [
+                {'display_name': vm_name, 'node_name': vm_name}
+                for vm_name in self.segments[0].vm_names
+            ]
+        )
+
+    def test_segment_vm_items_support_display_and_node_name(self):
+        self.segments[0].vm_names = [
+            {'display_name': 'Атакующий компьютер', 'node_name': 'attacker'},
+            {'display_name': 'Командная строка', 'node_name': 'command_line.local'},
+        ]
+        self.segments[0].save(update_fields=['vm_names'])
+
+        self.client.login(username=self.user.username, password='pass')
+        url = self.reverse('interface:team-competition-detail', kwargs={'slug': self.competition.slug})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context.get('segment_vm_items'), self.segments[0].vm_names)
+        self.assertEqual(response.context.get('segment_vm_names'), ['attacker', 'command_line.local'])
 
     def test_no_segment_vm_names_when_no_assignment(self):
         other_user = make_user()
@@ -404,6 +426,7 @@ class TeamCompetitionDetailViewSegmentContextTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context.get('segment_vm_names'), [])
+        self.assertEqual(response.context.get('segment_vm_items'), [])
 
     def test_segment_name_in_context(self):
         self.client.login(username=self.user.username, password='pass')
