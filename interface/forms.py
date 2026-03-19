@@ -673,7 +673,6 @@ def _create_previews_for_lab(kkz, lab_entry, competition, users, preview_assignm
                 logger.warning(f"Competition2User not found for user {user.id} in competition {competition.id}")
 
 
-
 class CustomFilteredSelectMultiple(FilteredSelectMultiple):
     def __init__(self, verbose_name, is_stacked, attrs=None, choices=()):
         super().__init__(verbose_name, is_stacked, attrs, choices)
@@ -1005,15 +1004,13 @@ class TeamCompetitionForm(CompetitionForm):
                         c2u, _ = Competition2User.objects.get_or_create(
                             competition=instance,
                             user=user,
-                            defaults={},
+                            defaults={'deploy_meta': {'segment_mode': True}},
                         )
+                        if not c2u.deploy_meta:
+                            c2u.deploy_meta = {}
+                        c2u.deploy_meta['segment_mode'] = True
                         c2u.tasks.set(session_obj.tasks.all())
-                        c2u.save(update_fields=[])
-                session_user_ids = set()
-                for s in TeamCompetition2TeamsAndUsers.objects.filter(team_competition=instance):
-                    for u in s.get_all_participant_users():
-                        session_user_ids.add(u.id)
-                Competition2User.objects.filter(competition=instance).exclude(user_id__in=session_user_ids).delete()
+                        c2u.save(update_fields=['deploy_meta'])
             return
 
         # При сегментах не используем TeamCompetition2Team — удаляем старые записи
@@ -1062,10 +1059,13 @@ class TeamCompetitionForm(CompetitionForm):
                 c2u, _ = Competition2User.objects.get_or_create(
                     competition=instance,
                     user=user,
-                    defaults={},
+                    defaults={'deploy_meta': {'segment_mode': True}},
                 )
+                if not c2u.deploy_meta:
+                    c2u.deploy_meta = {}
+                c2u.deploy_meta['segment_mode'] = True
                 c2u.tasks.set(session_obj.tasks.all())
-                c2u.save(update_fields=[])
+                c2u.save(update_fields=['deploy_meta'])
 
         # Удалить Competition2User для пользователей, которых нет ни в одной сессии
         session_user_ids = set()
@@ -1373,7 +1373,7 @@ class SimpleKkzForm(forms.Form):
         if labs_data and len(labs_data) > 0:
             max_tasks_limit = labs_data[0].get("max_tasks_limit")
 
-        # К выбранной длительности добавляем 5 минут при сохранении 
+        # К выбранной длительности добавляем 5 минут при сохранении
         duration_with_buffer = duration + timedelta(minutes=5)
         kkz = Kkz.objects.create(
             name=self.cleaned_data["name"],

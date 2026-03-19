@@ -613,6 +613,26 @@ class Competition2User(models.Model):
     def post_create(cls, sender, instance, created, *args, **kwargs):
         if not created:
             return
+
+        deploy_meta = instance.deploy_meta or {}
+        if deploy_meta.get('segment_mode'):
+            logger.debug(
+                'Skip Competition2User provisioning (segment_mode) for competition=%s user=%s',
+                instance.competition_id,
+                instance.user_id,
+            )
+            return
+
+        # Для TeamCompetition с сегментами лабу создаёт TeamCompetition2TeamsAndUsers (master_user).
+        team_competition = TeamCompetition.objects.filter(pk=instance.competition_id).select_related('lab').first()
+        if team_competition and team_competition.lab.topology_segments.exists():
+            logger.debug(
+                'Skip Competition2User provisioning for segmented TeamCompetition competition=%s user=%s',
+                instance.competition_id,
+                instance.user_id,
+            )
+            return
+
         lab = instance.competition.lab
 
         def _create_operation(session_manager):

@@ -29,7 +29,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 
-from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, TeamCompetition2TeamsAndUsers, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
+from .models import Competition, LabLevel, Lab, LabTask, Answers, TeamCompetition2Team, TeamCompetition2TeamsAndUsers, TeamOrUser2Segment, User, TeamCompetition, LabTasksType, Kkz, Platoon, LabType, KkzPreview, Competition2User, TaskChecking
 from .serializers import LabLevelSerializer, LabTaskSerializer
 from .api_utils import get_issue
 from .task_answer_parsing import parse_answer_choices
@@ -139,6 +139,59 @@ def get_competition_by_slug(slug):
         return TeamCompetition.objects.get(slug=slug), True
     except TeamCompetition.DoesNotExist:
         return get_object_or_404(Competition, slug=slug), False
+
+
+def _extract_segment_node_names(vm_names):
+    """Нормализует vm_names к списку технических node_name."""
+    if not isinstance(vm_names, list):
+        return []
+
+    names = []
+    for item in vm_names:
+        if isinstance(item, str):
+            name = item.strip()
+        elif isinstance(item, dict):
+            name = str(item.get('node_name') or item.get('node') or item.get('name') or '').strip()
+        else:
+            name = ''
+        if name:
+            names.append(name)
+
+    return list(dict.fromkeys(names))
+
+
+def _get_segment_node_ids_for_user(competition, user, topology):
+    """
+    Возвращает id нод сегмента для пользователя.
+    None означает не-сегментный режим.
+    """
+    if not isinstance(competition, TeamCompetition):
+        return None
+
+    assignment = TeamOrUser2Segment.objects.filter(
+        team_competition=competition
+    ).filter(
+        Q(team__users=user) | Q(user=user)
+    ).select_related('segment').first()
+
+    if not assignment or not assignment.segment:
+        return None
+
+    node_names = _extract_segment_node_names(assignment.segment.vm_names or [])
+    node_ids = []
+    for node_name in node_names:
+        node = topology.get_node_by_name(node_name)
+        if node is None:
+            logging.getLogger(__name__).warning(
+                'Segment node "%s" not found in topology (competition=%s user=%s)',
+                node_name,
+                competition.id,
+                user.id,
+            )
+            continue
+        node_ids.append(node['id'])
+
+    return list(dict.fromkeys(node_ids))
 
 
 def get_competition_solutions_data(competition, is_team_competition=False):
@@ -1414,7 +1467,8 @@ def create_pnet_lab_session(request):
                 'error': 'Не удалось загрузить топологию (сессия PNET). Обновите страницу и откройте лабу снова.'
             }, status=503)
         topology = LabTopology(topology_data)
-        all_node_ids = topology.get_all_node_ids()
+        segment_node_ids = _get_segment_node_ids_for_user(competition, user, topology)
+        all_node_ids = segment_node_ids if segment_node_ids is not None else topology.get_all_node_ids()
         if all_node_ids:
             logger.info(f'Starting {len(all_node_ids)} nodes for lab session: {all_node_ids}')
             for node_id in all_node_ids:
@@ -1455,10 +1509,10 @@ def create_pnet_lab_session_with_console(request):
     slug = request.data.get('slug')
     if not slug:
         return JsonResponse({'error': 'Competition slug required'}, status=400)
-    
+
     # Получаем node_name из request.data, если не указан - используем PnetSSHNodeName
     node_name = request.data.get('node_name')
-    
+
     # Получаем username из request.data, если не передан - используем request.user
     username = request.data.get('username')
     if not username:
@@ -1469,20 +1523,20 @@ def create_pnet_lab_session_with_console(request):
     try:
         logger = logging.getLogger(__name__)
         logger.info(f'Creating CMD console session for slug: {slug}, username: {username}')
-        
+
         from .api_utils import get_user_by_username, get_issue_for_user, create_lab_session_for_issue
-        
+
         competition, _ = get_competition_by_slug(slug)
-        
+
         # Получаем пользователя по username
         user = get_user_by_username(username)
         if not user:
             return JsonResponse({'error': f'User with username "{username}" not found'}, status=404)
-        
+
         # Если node_name не передан в запросе, используем PnetSSHNodeName из лабы
         if not node_name:
             node_name = competition.lab.PnetSSHNodeName
-        
+
         logger.info(f'Competition found: {competition}, Lab: {competition.lab}, SSH Node: {node_name}')
 
         if not user.pnet_login or not user.pnet_password:
@@ -1500,12 +1554,12 @@ def create_pnet_lab_session_with_console(request):
 
         # Получаем URL PNET
         pnet_url = get_pnet_url()
-        
+
         # Получаем issue для пользователя
         issue, error_response = get_issue_for_user(competition, user)
         if error_response:
             return error_response
-        
+
         # Логинимся в PNET
         cookies, xsrf_token = pf_login(pnet_url, user.pnet_login, user.pnet_password)
 
@@ -1513,7 +1567,7 @@ def create_pnet_lab_session_with_console(request):
         success, message, lab_path, pnet_code= create_lab_session_for_issue(
             competition, user, issue, pnet_url, cookies, xsrf_token
         )
-        
+
         if not success:
             if message == 'Team for user not found in competition':
                 status_code = 404
@@ -1561,23 +1615,24 @@ def create_pnet_lab_session_with_console(request):
 
         target_node_id = target_node['id']
 
-        # Включаем все ноды в топологии
-        all_node_ids = topology.get_all_node_ids()
-        logger.info(f'Starting all nodes in topology: {all_node_ids}')
+        segment_node_ids = _get_segment_node_ids_for_user(competition, user, topology)
+        if segment_node_ids is None:
+            all_node_ids = topology.get_all_node_ids()
+            logger.info(f'Starting all nodes in topology: {all_node_ids}')
+        else:
+            all_node_ids = list(segment_node_ids)
+            if target_node_id not in all_node_ids:
+                all_node_ids.append(target_node_id)
+            logger.info(f'Starting segment nodes only: {all_node_ids}')
 
         # Вспомогательная функция: реавторизация и rejoin при протухании сессии
         def relogin_and_rejoin():
-            """Повторная авторизация и присоединение к сессии после 412"""
             nonlocal cookies, xsrf_token
-            # Определяем пользователя для повторного логина (мастер или текущий)
-            if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user:
-                relogin_user = issue.master_user
-            else:
-                relogin_user = user
+            relogin_user = issue.master_user if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user else user
             logger.info(f'Session expired (412), re-logging in as {relogin_user.pnet_login}')
             new_cookies, new_xsrf = pf_login(pnet_url, relogin_user.pnet_login, relogin_user.pnet_password)
             cookies, xsrf_token = new_cookies, new_xsrf
-            # Rejoining сессии лабы
+
             if isinstance(issue, TeamCompetition2TeamsAndUsers) and issue.master_user:
                 issue.refresh_from_db()
                 if issue.segment_pnet_session_id:
@@ -1586,7 +1641,6 @@ def create_pnet_lab_session_with_console(request):
                 else:
                     create_pnet_lab_session_common(pnet_url, relogin_user.pnet_login, lab_path, cookies, xsrf_token)
             else:
-                # Для обычных сессий (TeamCompetition2Team, Competition2User) — rejoin к лабе
                 create_pnet_lab_session_common(pnet_url, relogin_user.pnet_login, lab_path, cookies, xsrf_token)
 
         failed_nodes = []
@@ -1640,7 +1694,7 @@ def create_pnet_lab_session_with_console(request):
             'all_nodes_started': len(all_node_ids),
             'failed_nodes': failed_nodes if failed_nodes else None
         }
-        
+
         return JsonResponse(response_data)
 
     except Competition.DoesNotExist:
@@ -1905,11 +1959,11 @@ def get_users_for_platoon(request):
 def get_team_or_user_issue(competition, user):
     """
     Получает issue для пользователя в соревновании.
-    
+
     Приоритет: TeamCompetition2Team → TeamCompetition2TeamsAndUsers (сегменты) → Competition2User.
     """
     issue = None
-    
+
     # Сначала пытаемся найти командный issue (если это TeamCompetition)
     if isinstance(competition, TeamCompetition):
         try:
@@ -1928,7 +1982,7 @@ def get_team_or_user_issue(competition, user):
         issue = Competition2User.objects.get(competition=competition, user=user)
     except Competition2User.DoesNotExist:
         pass
-    
+
     return issue
 
 @require_POST
@@ -1936,40 +1990,40 @@ def check_task_answers(request):
     """Проверяет ответы пользователя на задания"""
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'User not authenticated'}, status=401)
-    
+
     try:
         data = json.loads(request.body)
         competition_slug = data.get('competition_slug')
         answers = data.get('answers', {})  # {task_id: answer_text}
-        
+
         if not competition_slug:
             return JsonResponse({'error': 'Competition slug required'}, status=400)
-        
+
         # Получаем соревнование
         try:
             competition, is_team_competition = get_competition_by_slug(competition_slug)
         except Competition.DoesNotExist:
             return JsonResponse({'error': 'Competition not found'}, status=404)
-        
+
         issue = get_team_or_user_issue(competition, request.user)
         if issue is None:
             return JsonResponse({'error': 'User is not a participant of this competition'}, status=403)
-        
+
         tasks = issue.tasks.all()
         lab = competition.lab
-        
+
         # Проверяем режим проверки заданий
         is_one_attempt = lab.task_checking == TaskChecking.ONE_ATTEMPT
-        
+
         # Получаем список заданий, на которые больше нельзя отвечать
         failed_tasks_list = issue.failed_tasks if issue.failed_tasks else []
         failed_tasks_set = set(failed_tasks_list) if isinstance(failed_tasks_list, list) else set()
-        
+
         # Результаты проверки
         results = {}
         new_failed_tasks = []
         issue_needs_save = False
-        
+
         # Извлекаем флаги из generated_flags
         flags_dict = {}
         if issue.generated_flags:
@@ -1981,15 +2035,15 @@ def check_task_answers(request):
                     for item in issue.generated_flags
                     if isinstance(item, dict) and item.get('task_id') and item.get('flag')
                 }
-        
+
         for task in tasks:
             task_id = str(task.id)
             task_pk = task.id
-            
+
             # Проверяем, есть ли вопрос у задания
             if not task.question or task.question.strip() == '':
                 continue
-            
+
             # Проверяем, не находится ли задание в списке failed_tasks
             if task_pk in failed_tasks_set:
                 results[task_id] = {
@@ -1997,10 +2051,10 @@ def check_task_answers(request):
                     'message': 'На это задание больше нельзя отвечать'
                 }
                 continue
-            
+
             # Получаем ответ пользователя
             user_answer = answers.get(task_id, '').strip()
-            
+
             # Если ответ не предоставлен, пропускаем
             if not user_answer:
                 results[task_id] = {
@@ -2008,7 +2062,7 @@ def check_task_answers(request):
                     'message': 'Ответ не предоставлен'
                 }
                 continue
-            
+
             # Получаем флаг для этого задания (если есть)
             task_flag = flags_dict.get(task.task_id) if task.task_id else None
 
@@ -2038,12 +2092,12 @@ def check_task_answers(request):
                         is_correct = user_answer.lower() == correct_answer.lower()
                 if not is_correct and task_flag:
                     is_correct = user_answer.strip().lower() == task_flag.strip().lower()
-            
+
             results[task_id] = {
                 'status': 'correct' if is_correct else 'incorrect',
                 'message': 'Верно!' if is_correct else 'Неверно'
             }
-            
+
             # Если ответ правильный, создаем объект Answers
             # Проверяем тип issue, а не is_team_competition, т.к. Competition2User может быть и в TeamCompetition
             answer_filters = {'team': issue.team} if isinstance(issue, TeamCompetition2Team) else {'user': request.user}
@@ -2059,24 +2113,24 @@ def check_task_answers(request):
                         defaults={'datetime': timezone.now()},
                         **answer_filters
                     )
-                    
+
             elif is_one_attempt and not is_correct:
                 # Если режим ONE_ATTEMPT и ответ неверный, добавляем задание в failed_tasks
                 if task_pk not in failed_tasks_set:
                     new_failed_tasks.append(task_pk)
                     failed_tasks_set.add(task_pk)
                     issue_needs_save = True
-        
+
         # Сохраняем обновленный список failed_tasks
         if issue_needs_save:
             issue.failed_tasks = list(failed_tasks_set)
             issue.save(update_fields=['failed_tasks'])
-        
+
         return JsonResponse({
             'success': True,
             'results': results
         })
-        
+
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
@@ -2090,23 +2144,23 @@ def get_user_tasks_status(request):
     """Возвращает статус выполнения заданий пользователя"""
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'User not authenticated'}, status=401)
-    
+
     competition_slug = request.GET.get('competition_slug')
-    
+
     if not competition_slug:
         return JsonResponse({'error': 'Competition slug required'}, status=400)
-    
+
     try:
         competition, is_team_competition = get_competition_by_slug(competition_slug)
         issue = get_team_or_user_issue(competition, request.user)
         if issue is None:
             return JsonResponse({'error': 'User is not a participant of this competition'}, status=403)
-        
+
         tasks = issue.tasks.all()
-        
+
         # Получаем выполненные задания
         # Проверяем тип issue, а не is_team_competition, т.к. Competition2User может быть и в TeamCompetition
-        answer_filters = {'team': issue.team} if isinstance(issue, TeamCompetition2Team) else {'user': request.user} 
+        answer_filters = {'team': issue.team} if isinstance(issue, TeamCompetition2Team) else {'user': request.user}
         completed_task_ids = set(
             Answers.objects.filter(
                 lab=competition.lab,
@@ -2116,15 +2170,15 @@ def get_user_tasks_status(request):
                 **answer_filters
             ).values_list('lab_task_id', flat=True)
         )
-        
+
         # Получаем список заданий, на которые больше нельзя отвечать
         failed_tasks_list = issue.failed_tasks if issue.failed_tasks else []
         failed_tasks_set = set(failed_tasks_list) if isinstance(failed_tasks_list, list) else set()
-        
+
         # Формируем данные о заданиях
         tasks_data = []
         has_questions = False
-        
+
         for idx, task in enumerate(tasks, 1):
             is_completed = task.id in completed_task_ids
             has_question = bool(task.question and task.question.strip())
@@ -2147,16 +2201,17 @@ def get_user_tasks_status(request):
                 task_payload['answer_type'] = 'single_choice' if display_choices['mode'] == 'single' else 'multiple_choice'
                 task_payload['choices'] = [{'id': opt['index'], 'text': opt['text']} for opt in display_choices['options']]
             tasks_data.append(task_payload)
-        
+
         return JsonResponse({
             'success': True,
             'tasks': tasks_data,
             'has_questions': has_questions
         })
-        
+
     except Http404:
         return JsonResponse({'error': 'Competition not found'}, status=404)
     except Exception as e:
         logger = logging.getLogger(__name__)
         logger.error(f'Error getting user tasks status: {str(e)}')
         return JsonResponse({'error': f'Server error: {str(e)}'}, status=500)
+
