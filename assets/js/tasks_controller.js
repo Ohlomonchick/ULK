@@ -276,6 +276,12 @@ class TasksController {
             $counter.find('.completed-count').text(completed);
             $counter.find('.total-count').text(total);
         }
+
+        const $counterClone = $('#tasks-completion-counter-clone');
+        if ($counterClone.length) {
+            $counterClone.find('.completed-count').text(completed);
+            $counterClone.find('.total-count').text(total);
+        }
     }
 
     /**
