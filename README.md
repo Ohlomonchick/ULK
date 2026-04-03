@@ -105,7 +105,7 @@ Cyberpolygon-Interface/
    export USE_POSTGRES=yes
    export DB_HOST=192.168.100.5      # хост PostgreSQL
    export NGINX_IP=192.168.100.10
-   export PNET_IP=172.18.4.160
+   export PNET_IP=172.18.4.254
    export KIBANA_IP=192.168.100.11
    export WORKDIR=/path/to/Cyberpolygon-Interface
    ```

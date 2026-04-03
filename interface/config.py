@@ -15,24 +15,24 @@ def cache_for_minutes(minutes):
     """Simple cache decorator that caches function results for specified minutes"""
     def decorator(func):
         cache = {}
-        
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             # Create a cache key based on function name and arguments
             cache_key = f"{func.__name__}:{hash(str(args) + str(sorted(kwargs.items())))}"
             current_time = time.time()
-            
+
             # Check if we have a cached result and it's still valid
             if cache_key in cache:
                 cached_result, cached_time = cache[cache_key]
                 if current_time - cached_time < minutes * 60:  # Convert minutes to seconds
                     return cached_result
-            
+
             # If not cached or expired, call the function and cache the result
             result = func(*args, **kwargs)
             cache[cache_key] = (result, current_time)
             return result
-        
+
         return wrapper
     return decorator
 
@@ -46,7 +46,7 @@ def _get_config_or_env(key, default):
 
 @cache_for_minutes(1)
 def get_pnet_url():
-    config = _get_config_or_env('PNET_URL', 'http://172.18.4.160')
+    config = _get_config_or_env('PNET_URL', 'http://172.18.4.254')
     if 'http' not in config:
         return None
     return config

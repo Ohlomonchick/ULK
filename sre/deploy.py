@@ -13,7 +13,7 @@ context = {
     'db_host': os.environ.get('DB_HOST', '192.168.100.5'),
     'pnet_ip': os.environ.get('PNET_IP', '192.168.100.10'),
     'kibana_ip': os.environ.get('KIBANA_IP', '192.168.100.11'),
-    'prod_ip': os.environ.get('PROD_IP', '172.18.4.200'),
+    'prod_ip': os.environ.get('PROD_IP', '172.18.4.160'),
     'prod_port': os.environ.get('PROD_PORT', '8080'),
     'user': 'root',
     'group': 'root',
