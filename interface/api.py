@@ -37,6 +37,8 @@ from .config import get_pnet_base_dir, get_pnet_url, get_web_url
 from .utils import get_pnet_lab_name
 from .eveFunctions import create_pnet_lab_session_common
 
+logger = logging.getLogger(__name__)
+
 
 def get_lab_type_code_from_display(lab_type_display):
     if not lab_type_display:
@@ -49,18 +51,33 @@ def get_lab_type_code_from_display(lab_type_display):
 
 
 def find_lab_by_name_and_type(lab_name, lab_type_code=None):
+    """
+    Ищет лабораторную работу по slug (приоритет) или по имени.
+    Пара (name, lab_type) в БД не обязана быть уникальной — только (slug, lab_type).
+    При нескольких совпадениях по имени возвращается запись с наименьшим pk (детерминизм).
+    """
     try:
-        # Сначала пытаемся найти по slug
         if lab_type_code:
             return Lab.objects.get(slug=lab_name, lab_type=lab_type_code)
-        else:
-            return Lab.objects.get(slug=lab_name)
+        return Lab.objects.get(slug=lab_name)
     except Lab.DoesNotExist:
-        # Если не найдено по slug, пытаемся по name
+        qs = Lab.objects.order_by('pk')
         if lab_type_code:
-            return Lab.objects.get(name=lab_name, lab_type=lab_type_code)
+            qs = qs.filter(name=lab_name, lab_type=lab_type_code)
         else:
-            return Lab.objects.get(name=lab_name)
+            qs = qs.filter(name=lab_name)
+        candidates = list(qs[:2])
+        if not candidates:
+            raise Lab.DoesNotExist
+        if len(candidates) > 1:
+            logger.warning(
+                'Найдено несколько лабораторных работ с name=%r, lab_type=%r; '
+                'используется запись с pk=%s. Задайте уникальные имена или ищите по slug.',
+                lab_name,
+                lab_type_code,
+                candidates[0].pk,
+            )
+        return candidates[0]
 
 
 @api_view(['GET'])

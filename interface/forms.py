@@ -210,28 +210,28 @@ class LabTaskInlineForm(forms.ModelForm):
     def clean_dependencies(self):
         """Валидация поля dependencies: проверка формата и существования идентификаторов заданий"""
         data = self.cleaned_data.get('dependencies', '')
-        
+
         if not data or not data.strip():
             return data
-        
+
         if ';' in data:
             raise forms.ValidationError(
                 'Используйте запятую (,) для разделения идентификаторов, а не точку с запятой (;).'
             )
-        
+
         dependencies_list = [dep.strip() for dep in data.split(',') if dep.strip()]
-        
+
         if not dependencies_list:
             raise forms.ValidationError(
                 'Введите хотя бы один идентификатор задания через запятую.'
             )
-        
+
         split_parts = data.split(',')
         if any(not part.strip() for part in split_parts):
             raise forms.ValidationError(
                 'Между запятыми не должно быть пустых значений. Используйте формат: "id1, id2, id3".'
             )
-        
+
         # Получаем родительскую лабораторную работу
         lab = None
         if self.instance:
@@ -243,7 +243,7 @@ class LabTaskInlineForm(forms.ModelForm):
                     lab = Lab.objects.get(pk=self.instance.lab_id)
                 except Lab.DoesNotExist:
                     pass
-        
+
         if not lab:
             return data
 
@@ -253,12 +253,12 @@ class LabTaskInlineForm(forms.ModelForm):
             .exclude(task_id__isnull=True)
             .values_list('task_id', flat=True)
         )
-        
+
         invalid_ids = []
         for dep_id in dependencies_list:
             if dep_id not in existing_task_ids:
                 invalid_ids.append(dep_id)
-        
+
         if invalid_ids:
             if len(invalid_ids) == 1:
                 raise forms.ValidationError(
@@ -270,7 +270,7 @@ class LabTaskInlineForm(forms.ModelForm):
                     f'Задания с идентификаторами {invalid_ids_str} '
                     f'не существуют в данной лабораторной работе.'
                 )
-        
+
         return data
 
     def clean_answer(self):
@@ -957,7 +957,7 @@ class TeamCompetitionForm(CompetitionForm):
         user_sessions_count = len(solo_users) // n
         mixed_count = num_sessions - team_sessions_count - user_sessions_count
 
-        sessions = [] 
+        sessions = []
         t_idx, u_idx = 0, 0
 
         for _ in range(team_sessions_count):

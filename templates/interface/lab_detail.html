@@ -384,7 +384,7 @@
                          style="padding: 1rem; margin-bottom: 1rem;"
                          data-parent-id="{{ group.id }}"
                          data-duration="{{ group.duration_seconds }}">
-                        
+
                         <div class="level is-mobile mb-3">
                             <div class="level-left" style="max-width: 60%; display: flex; align-items: center;">
                                 <label class="checkbox" style="margin-right: 0.75rem;">
@@ -412,7 +412,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         {# Подтипы #}
                         <div class="task-subtypes-container" style="margin-left: 1rem;">
                             {% for subtype in group.subtypes %}
@@ -421,7 +421,7 @@
                                      data-group-id="{{ subtype.id }}"
                                      data-duration="{{ subtype.duration_seconds }}"
                                      data-parent-id="{{ group.id }}">
-                                    
+
                                     <div class="level is-mobile mb-2">
                                         <div class="level-left" style="max-width: 60%; display: flex; align-items: center;">
                                             <label class="checkbox" style="margin-right: 0.5rem;">
@@ -455,7 +455,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <details {% if subtype.count == 1 %}open{% endif %}>
                                         <summary class="is-size-7 has-text-info has-text-weight-bold" style="cursor: pointer; outline: none;">
                                             Показать список ({{ subtype.count }})

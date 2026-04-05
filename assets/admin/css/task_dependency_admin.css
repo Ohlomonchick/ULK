@@ -1,0 +1,30 @@
+/* Предупреждения по зависимостям заданий в админке (select / Select2) */
+
+.task-dep-admin-notice {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+.task-dep-admin-notice--info {
+    background: #fff8e6;
+    border: 1px solid #e6c200;
+    color: #5c4a00;
+}
+
+.task-dep-admin-notice--error {
+    background: #fdecea;
+    border: 1px solid #e74c3c;
+    color: #922b21;
+}
+
+.select2-container.admin-task-dep-select-highlight {
+    box-shadow: 0 0 0 2px #e6c200;
+    border-radius: 4px;
+}
+
+.select2-container.admin-task-dep-select-highlight--error {
+    box-shadow: 0 0 0 2px #e74c3c;
+}

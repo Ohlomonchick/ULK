@@ -343,7 +343,13 @@ class CompetitionAdmin(admin.ModelAdmin):
     actions = [set_all_users_to_competition_level]
 
     class Media:
-        js = ('admin/js/jquery-3.7.1.min.js', 'admin/js/load_levels.js', 'admin/js/update_num_tasks.js')
+        css = {'all': ('admin/css/task_dependency_admin.css',)}
+        js = (
+            'admin/js/jquery-3.7.1.min.js',
+            'js/task_dependency_core.js',
+            'admin/js/load_levels.js',
+            'admin/js/update_num_tasks.js',
+        )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -379,8 +385,12 @@ class KkzLabInline(admin.StackedInline):
     can_delete = False
 
     class Media:
-        css = {'all': ('admin/css/kkz_custom.css',)}
-        js = ('admin/js/jquery-3.7.1.min.js', 'admin/js/load_levels.js')
+        css = {'all': ('admin/css/kkz_custom.css', 'admin/css/task_dependency_admin.css')}
+        js = (
+            'admin/js/jquery-3.7.1.min.js',
+            'js/task_dependency_core.js',
+            'admin/js/load_levels.js',
+        )
 
 
 class KkzPreviewInline(admin.StackedInline):
@@ -391,7 +401,13 @@ class KkzPreviewInline(admin.StackedInline):
     can_delete = False
 
     class Media:
-        js = ('admin/js/kkz_random_preview.js', 'admin/js/load_levels.js', 'admin/js/jquery-3.7.1.min.js')
+        css = {'all': ('admin/css/task_dependency_admin.css',)}
+        js = (
+            'admin/js/jquery-3.7.1.min.js',
+            'js/task_dependency_core.js',
+            'admin/js/kkz_random_preview.js',
+            'admin/js/load_levels.js',
+        )
 
 
 class KkzAdmin(admin.ModelAdmin):
