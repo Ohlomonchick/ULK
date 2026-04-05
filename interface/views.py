@@ -943,6 +943,9 @@ def utils_console(request, slug, node_name):
     if error_response:
         return error_response
 
+    # Как на странице задания: отмечаем подключение (таблица лидеров)
+    issue.__class__.objects.filter(pk=issue.pk).update(joined=True)
+
     return render(request, 'interface/utils_console.html', {'competition': issue.competition, 'node_name': node_name, 'username': username})
 
 
