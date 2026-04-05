@@ -1,4 +1,17 @@
 $(document).ready(function() {
+    /** Отмена устаревших ответов / параллельных запросов для одного и того же селектора заданий */
+    const loadTasksPending = {};
+
+    function normalizeMultiSelectVal(raw) {
+        if (raw == null || raw === '') {
+            return [];
+        }
+        if (Array.isArray(raw)) {
+            return raw.map(String);
+        }
+        return [String(raw)];
+    }
+
     initMainLabObserver();
 
     // Инициализация для существующих
@@ -7,7 +20,9 @@ $(document).ready(function() {
     });
 
     function initLabHandlers() {
-        $('select[id$="-lab"]').each(function() {
+        // #id_lab обрабатывается в initMainLabObserver (Select2 + MutationObserver); повторная
+        // привязка давала второй AJAX на то же поле «Задания» и перезаписывала выбор (в т.ч. после «Выбрать всё»).
+        $('select[id$="-lab"]').not('#id_lab').each(function() {
             const $labSelect = $(this);
             const tasksId = $labSelect.attr('id').replace('-lab', '-tasks');
 
@@ -32,6 +47,9 @@ $(document).ready(function() {
 
     function initMainLabObserver() {
         const $labField = $("#id_lab");
+        if (!$labField.length) {
+            return;
+        }
         const $labSelect2 = $labField.siblings(".select2");
 
         if ($labSelect2.length) {
@@ -49,6 +67,20 @@ $(document).ready(function() {
             }
             const initialLabSlug = $rendered.attr("title");
             handleLabChange(initialLabSlug, "#id_level", "#id_tasks", false);
+        } else {
+            $labField.off('change.labmain').on('change.labmain', function(event, setNumTasks) {
+                if (setNumTasks === undefined) {
+                    setNumTasks = true;
+                }
+                const labSlug = $(this).find('option:selected').text();
+                if (labSlug && labSlug !== "---------") {
+                    handleLabChange(labSlug, "#id_level", "#id_tasks", setNumTasks);
+                }
+            });
+            const initialLabSlug = $labField.find('option:selected').text();
+            if (initialLabSlug && initialLabSlug !== "---------") {
+                handleLabChange(initialLabSlug, "#id_level", "#id_tasks", false);
+            }
         }
     }
 
@@ -126,21 +158,35 @@ $(document).ready(function() {
 
     function loadTasks(labSlug, tasksSelector, setNumTasks = true) {
         const $tasksField = $(tasksSelector);
-        const selectedTasks = $tasksField.val() || [];
+        if (!$tasksField.length) {
+            return;
+        }
 
         // Извлекаем lab_type_display из labSlug (формат: "Name - LabTypeDisplay")
         const parts = labSlug.split(' - ');
         const labName = parts.slice(0, -1).join(' - '); // Всё до последнего " - "
         const labTypeDisplay = parts[parts.length - 1]; // Последний элемент
 
-        $.ajax({
+        if (loadTasksPending[tasksSelector]) {
+            loadTasksPending[tasksSelector].abort();
+        }
+
+        const xhr = $.ajax({
             url: `/api/lab_tasks/${encodeURIComponent(labName)}/`,
             type: 'GET',
             data: {
                 lab_type_display: labTypeDisplay
             },
             success: function(response) {
-                $tasksField.html('');
+                if (loadTasksPending[tasksSelector] !== xhr) {
+                    return;
+                }
+                delete loadTasksPending[tasksSelector];
+
+                // Важно: читать выбор не в начале запроса, а здесь — иначе «Выбрать всё» и быстрый выбор
+                // во время ответа сети теряются при перерисовке <option>.
+                const selectedTasks = normalizeMultiSelectVal($tasksField.val());
+
                 const uniqueTasks = new Map();
                 response.forEach(task => {
                     if (!uniqueTasks.has(task.id)) {
@@ -148,14 +194,16 @@ $(document).ready(function() {
                     }
                 });
 
+                const allowedIds = new Set([...uniqueTasks.keys()].map(String));
+                const toSelect = selectedTasks.filter(id => allowedIds.has(String(id)));
+
+                $tasksField.empty();
                 uniqueTasks.forEach((description, id) => {
-                    const $option = $('<option></option>').val(id).text(description);
-                    if (selectedTasks.includes(String(id))) {
-                        $option.prop('selected', true);
-                    }
-                    $tasksField.append($option);
+                    $tasksField.append($('<option></option>').val(id).text(description));
                 });
-                $tasksField.trigger('change.select2');
+
+                // Select2 (Jet и др.) ожидает обновление через .val(); одних selected на option мало.
+                $tasksField.val(toSelect).trigger('change');
 
                 if (setNumTasks) {
                     const numTasksSelector = tasksSelector.replace(/-tasks$/, '-num_tasks');
@@ -165,9 +213,17 @@ $(document).ready(function() {
                     }
                 }
             },
-            error: function(xhr) {
-                console.error('Ошибка загрузки задач:', xhr.responseText);
+            error: function(xhrReq, status) {
+                if (loadTasksPending[tasksSelector] !== xhrReq) {
+                    return;
+                }
+                delete loadTasksPending[tasksSelector];
+                if (status === 'abort') {
+                    return;
+                }
+                console.error('Ошибка загрузки задач:', xhrReq.responseText);
             }
         });
+        loadTasksPending[tasksSelector] = xhr;
     }
 });
