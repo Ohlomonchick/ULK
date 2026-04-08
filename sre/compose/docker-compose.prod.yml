@@ -1,0 +1,100 @@
+# Production-style stack: Postgres + Gunicorn web + Nginx (no Elasticsearch).
+# Build context: repository root. Web image includes the full tree under /app (including sre/).
+#
+# Bare-metal install remains `sre/run_service.sh` (systemd, deploy.py). In Docker, the same
+# app is started with migrate/collectstatic/gunicorn instead.
+#
+# Usage (from repo root):
+#   docker compose -f sre/compose/docker-compose.prod.yml --env-file path/to/.env up -d
+#
+# Required env (host / .env): PNET_IP, PNET_URL, PNET_BASE_DIR, STUDENT_WORKSPACE (same as integration compose).
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: cyberpolygon_prod_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cyberpolygon}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - cyberpolygon_prod_postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    networks:
+      - cyberpolygon_prod
+
+  web:
+    build:
+      context: ../..
+      dockerfile: sre/Dockerfile
+    image: cyberpolygon-web:prod
+    container_name: cyberpolygon_prod_web
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      bash -lc "python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput &&
+      gunicorn Cyberpolygon.wsgi:application -c sre/gunicorn.conf.py"
+    environment:
+      PROD: "True"
+      INTEGRATION_GUNICORN: "1"
+      USE_POSTGRES: "yes"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-cyberpolygon}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PNET_URL: "${PNET_URL}"
+      WEB_URL: "http://nginx"
+      PNET_BASE_DIR: "${PNET_BASE_DIR}"
+      STUDENT_WORKSPACE: "${STUDENT_WORKSPACE}"
+    volumes:
+      - cyberpolygon_prod_static:/static
+      - cyberpolygon_prod_media:/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cyberpolygon_prod
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    image: cyberpolygon-nginx:prod
+    container_name: cyberpolygon_prod_nginx
+    restart: unless-stopped
+    environment:
+      PNET_IP: ${PNET_IP}
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        envsubst '$$PNET_IP' < /etc/nginx/templates/nginx.docker.conf.template > /etc/nginx/nginx.conf
+        exec nginx -g 'daemon off;'
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx.docker.conf.template:/etc/nginx/templates/nginx.docker.conf.template:ro
+      - cyberpolygon_prod_static:/static:ro
+    depends_on:
+      - web
+    networks:
+      - cyberpolygon_prod
+
+volumes:
+  cyberpolygon_prod_postgres_data:
+  cyberpolygon_prod_static:
+  cyberpolygon_prod_media:
+
+networks:
+  cyberpolygon_prod:
+    driver: bridge

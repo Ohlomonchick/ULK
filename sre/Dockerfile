@@ -1,20 +1,23 @@
-FROM python:3.12-slim-bullseye
+# Production-oriented web image (Gunicorn + gevent). Migrations and collectstatic run at container start (see compose).
+FROM python:3.11-slim-bookworm
+
 LABEL authors="Dmitry"
 
-RUN mkdir ./app
-COPY ./requirements.txt ./app
-COPY . ./app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN pip install -r requirements.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN python manage.py collectstatic --noinput
-RUN python manage.py makemigrations --noinput
-RUN python manage.py migrate --noinput
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-EXPOSE 8000
+# App + sre (gunicorn.conf.py, deployment templates, run_service.sh for host installs, etc.)
+COPY . /app
 
-ENV CREATE_ADDRESS="" CREATE_PORT=""
+EXPOSE 8002
 
-ENTRYPOINT ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["gunicorn", "Cyberpolygon.wsgi:application", "-c", "sre/gunicorn.conf.py"]
